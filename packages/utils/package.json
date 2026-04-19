@@ -1,0 +1,12 @@
+{
+  "name": "@yorozu/utils",
+  "version": "0.1.0",
+  "type": "module",
+  "sideEffects": false,
+  "author": "inshinrei",
+  "license": "MIT",
+  "description": "quality of life",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
