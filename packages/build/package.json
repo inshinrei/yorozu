@@ -1,0 +1,52 @@
+{
+  "name": "@yurozu/build",
+  "type": "module",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "inshinrei",
+  "description": "",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite/index.ts",
+    "./jsr": "./src/jsr/index.ts",
+    "./vite-internal": "./dist_vite-internal.js"
+  },
+  "bin": {
+    "yorozu-build": "./src/cli.main.ts"
+  },
+  "scripts": {
+    "build-vite-plugin": "esbuild ./src/vite/index.ts --bundle --external:tinyglobby --platform=node --format=esm --outfile=dist_vite-internal.js --log-level=error"
+  },
+  "peerDependencies": {
+    "typedoc": "0.28.19",
+    "typescript": "6.0.2",
+    "vite": "8.0.8"
+  },
+  "peerDependenciesMeta": {
+    "typedoc": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@drizzle-team/brocli": "0.12.0",
+    "@yorozu/utils": "workspace:^",
+    "cross-spawn": "7.0.6",
+    "detect-indent": "7.0.2",
+    "js-yaml": "4.1.1",
+    "json5": "2.2.3",
+    "picomatch": "4.0.4",
+    "semver": "7.7.4",
+    "tinyglobby": "0.2.16",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
+    "@types/js-yaml": "4.0.9",
+    "@types/picomatch": "4.0.3",
+    "@types/semver": "7.7.1"
+  },
+  "yorozu": {
+    "jsr": "skip"
+  }
+}

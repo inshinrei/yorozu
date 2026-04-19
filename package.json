@@ -1,0 +1,21 @@
+{
+  "name": "yorozu",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vitest watch"
+  },
+  "author": "inshinrei",
+  "license": "MIT",
+  "devDependencies": {
+    "@rolldown/binding-darwin-arm64": "1.0.0-rc.16",
+    "@types/node": "25.6.0",
+    "prettier": "3.8.3",
+    "ts-node": "10.9.2",
+    "typescript": "6.0.2",
+    "vite": "8.0.8",
+    "vitest": "4.1.4"
+  }
+}
