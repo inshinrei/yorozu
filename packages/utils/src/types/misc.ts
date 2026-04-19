@@ -9,3 +9,8 @@ export type MaybePromise<T> = Promise<T> | T
 export type MaybeArray<T> = Array<T> | T
 
 export type Values<T> = T[keyof T]
+
+export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T
+export type UnsafeMutate<T> = {
+    -readonly [P in keyof T]: T[P]
+}
