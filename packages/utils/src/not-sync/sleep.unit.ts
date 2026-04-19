@@ -45,7 +45,7 @@ describe("sleep", () => {
         const controller = new AbortController()
         controller.abort()
 
-        expect(sleep(1000, controller.signal)).rejects.toThrow("This operation was aborted")
+        await expect(sleep(1000, controller.signal)).rejects.toThrow("This operation was aborted")
     })
 
     it("supports AbortSignal – aborts during delay", async () => {
@@ -55,7 +55,7 @@ describe("sleep", () => {
         setTimeout(() => controller.abort(), 100)
         vi.advanceTimersByTime(100)
 
-        expect(promise).rejects.toThrow("This operation was aborted")
+        await expect(promise).rejects.toThrow("This operation was aborted")
     })
 
     it("cleans up timeout when aborted (no leak)", async () => {
@@ -65,7 +65,7 @@ describe("sleep", () => {
         controller.abort()
         vi.advanceTimersByTime(1000)
 
-        expect(promise).rejects.toThrow()
+        await expect(promise).rejects.toThrow()
     })
 
     it("does not reject if signal is aborted after resolution", async () => {
