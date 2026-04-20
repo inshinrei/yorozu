@@ -91,6 +91,12 @@ importers:
         specifier: 7.7.1
         version: 7.7.1
 
+  packages/io:
+    dependencies:
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../utils
+
   packages/utils: {}
 
 packages:
