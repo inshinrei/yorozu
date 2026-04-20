@@ -92,7 +92,7 @@ describe("getPlatformByteOrder", () => {
         let second = getPlatformByteOrder()
 
         expect(first).toMatch(/^(little|big)$/)
-        expect(second).toBe(first) // cache hit
+        expect(second).toBe(first)
 
         expect((getPlatformByteOrder as any)._cachedByteOrder).not.toBeNull()
     })

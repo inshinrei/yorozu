@@ -7,7 +7,6 @@ describe("CustomMap", () => {
     let fromInternal: (key: string) => string
 
     beforeEach(() => {
-        // Use identity mapper for tests → no collisions
         toInternal = (k: string) => k
         fromInternal = (k: string) => k
         map = new CustomMap(toInternal, fromInternal)

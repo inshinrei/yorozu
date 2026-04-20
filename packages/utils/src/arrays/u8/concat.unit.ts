@@ -51,7 +51,7 @@ describe("concat", () => {
 
         expect(mockAllocate).toHaveBeenCalledWith(5)
         expect(result).toEqual(new Uint8Array([10, 20, 30, 40, 50]))
-        expect(result.buffer).not.toBe(a.buffer) // true copy
+        expect(result.buffer).not.toBe(a.buffer)
 
         globalThis.Buffer = originalBuffer
     })
