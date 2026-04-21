@@ -32,7 +32,7 @@ export function utf16leString(readable: SyncReadable | Uint8Array, byteLength: n
     if (byteLength % 2 !== 0) throw new Error("utf16leString: byteLength must be even.")
     let buf = readable instanceof Uint8Array ? readable : exactly(readable, byteLength)
     let result = ""
-    for (let i = 0; i < byteLength; i += 2) result += String.fromCharCode(buf[i] | (buf[i] << 8))
+    for (let i = 0; i < byteLength; i += 2) result += String.fromCharCode(buf[i] | (buf[i + 1] << 8))
     return result
 }
 
