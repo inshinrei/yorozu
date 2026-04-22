@@ -1,16 +1,20 @@
 {
-    "name": "@yorozu/io",
+    "name": "@yorozu/net",
     "version": "0.1.0",
     "main": "index.js",
     "type": "module",
+    "sideEffects": false,
     "author": "inshinrei",
     "license": "MIT",
     "description": "",
-    "sideEffects": false,
     "exports": {
         ".": "./src/index.ts"
     },
     "dependencies": {
+        "@yorozu/io": "workspace:^",
         "@yorozu/utils": "workspace:^"
+    },
+    "devDependencies": {
+        "ipaddr.js": "2.3.0"
     }
 }
