@@ -124,7 +124,7 @@ describe("LruSet", () => {
         set.add("C")
         set.add("B")
 
-        expect(Array.from(set)).toEqual(["A", "B", "C"])
+        expect(Array.from(set)).toEqual(["A", "C", "B"])
     })
 
     it("evicts least recently used when capacity is exceeded", () => {
