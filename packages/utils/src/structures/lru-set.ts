@@ -42,4 +42,12 @@ export class LruSet<T> {
         this.#head = this.#tail = undefined
         this.#set.clear()
     }
+
+    *[Symbol.iterator](): IterableIterator<T> {
+        yield* this.#set.keys()
+    }
+
+    toArray(): Array<T> {
+        return Array.from(this)
+    }
 }

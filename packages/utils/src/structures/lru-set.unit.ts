@@ -98,4 +98,76 @@ describe("LruSet", () => {
         expect(set.size).toBe(1)
         expect(set.has("b")).toBe(true)
     })
+
+    it("returns empty array when set is empty", () => {
+        let set = new LruSet<string>(10)
+        expect(Array.from(set)).toEqual([])
+        expect(set.toArray()).toEqual([])
+    })
+
+    it("yields items from most recently added to least recently added", () => {
+        let set = new LruSet<string>(5)
+
+        set.add("😀")
+        set.add("🚀")
+        set.add("❤️")
+
+        expect(Array.from(set)).toEqual(["😀", "🚀", "❤️"])
+        expect(set.toArray()).toEqual(["😀", "🚀", "❤️"])
+    })
+
+    it("ignores duplicates and keeps correct order", () => {
+        let set = new LruSet<string>(5)
+
+        set.add("A")
+        set.add("B")
+        set.add("C")
+        set.add("B")
+
+        expect(Array.from(set)).toEqual(["A", "B", "C"])
+    })
+
+    it("evicts least recently used when capacity is exceeded", () => {
+        let set = new LruSet<string>(3)
+
+        set.add("1")
+        set.add("2")
+        set.add("3")
+        set.add("4")
+
+        expect(Array.from(set)).toEqual(["2", "3", "4"])
+        expect(set.size).toBe(3)
+    })
+
+    it("supports for...of loop", () => {
+        let set = new LruSet<number>(4)
+        set.add(10)
+        set.add(20)
+        set.add(30)
+
+        let result: number[] = []
+        for (let item of set) {
+            result.push(item)
+        }
+
+        expect(result).toEqual([10, 20, 30])
+    })
+
+    it("works with spread operator", () => {
+        let set = new LruSet<string>(3)
+        set.add("🐱")
+        set.add("🐶")
+        set.add("🦊")
+
+        expect([...set]).toEqual(["🐱", "🐶", "🦊"])
+    })
+
+    it("clear() resets the iterator", () => {
+        let set = new LruSet<string>(5)
+        set.add("x")
+        set.add("y")
+        set.clear()
+
+        expect(Array.from(set)).toEqual([])
+    })
 })
