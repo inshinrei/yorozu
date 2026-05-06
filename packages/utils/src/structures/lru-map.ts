@@ -1,31 +1,22 @@
-interface TwoWayLinkedList<K, V> {
-    key: K
-    value: V
-    prev?: TwoWayLinkedList<K, V>
-    next?: TwoWayLinkedList<K, V>
-}
-
 export class LruMap<K, V> {
     #capacity: number
-    #head?: TwoWayLinkedList<K, V>
-    #tail?: TwoWayLinkedList<K, V>
-    #map: Map<K, TwoWayLinkedList<K, V>>
-    #size = 0
+    #map: Map<K, V>
 
-    constructor(capacity: number, MapImpl: new () => Map<K, TwoWayLinkedList<K, V>> = Map) {
+    constructor(capacity: number, MapImpl: new () => Map<K, V> = Map) {
         this.#capacity = capacity
         this.#map = new MapImpl()
     }
 
     get size(): number {
-        return this.#size
+        return this.#map.size
     }
 
     get(key: K): V | undefined {
-        let item = this.#map.get(key)
-        if (!item) return undefined
-        this.#markUsed(item)
-        return item.value
+        if (!this.#map.has(key)) return undefined
+        let value = this.#map.get(key)!
+        this.#map.delete(key)
+        this.#map.set(key, value)
+        return value
     }
 
     has(key: K): boolean {
@@ -33,72 +24,40 @@ export class LruMap<K, V> {
     }
 
     set(key: K, value: V): void {
-        let item = this.#map.get(key)
-        if (item) {
-            item.value = value
-            this.#markUsed(item)
-            return
+        if (this.#map.has(key)) {
+            this.#map.delete(key)
         }
+        this.#map.set(key, value)
 
-        item = {
-            key,
-            value,
-            next: undefined,
-            prev: undefined,
-        }
-        this.#map.set(key, item)
-        if (this.#head) {
-            this.#head.prev = item
-            item.next = this.#head
-        } else {
-            this.#tail = item
-        }
-
-        this.#head = item
-        this.#size += 1
-        if (this.#size > this.#capacity) {
-            let oldest = this.#tail
-            if (oldest) this.#remove(oldest)
+        if (this.#map.size > this.#capacity) {
+            let oldest = this.#map.keys().next().value
+            if (oldest !== undefined) {
+                this.#map.delete(oldest)
+            }
         }
     }
 
     delete(key: K): void {
-        let item = this.#map.get(key)
-        if (item) this.#remove(item)
+        this.#map.delete(key)
     }
 
     clear(): void {
         this.#map.clear()
-        this.#head = undefined
-        this.#tail = undefined
-        this.#size = 0
     }
 
-    #markUsed(item: TwoWayLinkedList<K, V>): void {
-        if (item === this.#head) return
-        if (item.prev) {
-            if (item === this.#tail) this.#tail = item.prev
-            item.prev.next = item.next
-        }
-
-        if (item.next) item.next.prev = item.prev
-        item.prev = undefined
-        item.next = this.#head
-        if (this.#head) this.#head.prev = item
-        this.#head = item
+    *[Symbol.iterator](): IterableIterator<[K, V]> {
+        yield* this.#map
     }
 
-    #remove(item: TwoWayLinkedList<K, V>): void {
-        if (item.prev) {
-            this.#tail = item.prev
-            this.#tail.next = undefined
-        } else {
-            this.#tail = undefined
-            this.#head = undefined
-        }
+    entries(): IterableIterator<[K, V]> {
+        return this.#map.entries()
+    }
 
-        item.prev = item.next = undefined
-        this.#map.delete(item.key)
-        this.#size -= 1
+    keys(): IterableIterator<K> {
+        return this.#map.keys()
+    }
+
+    values(): IterableIterator<V> {
+        return this.#map.values()
     }
 }
