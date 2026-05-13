@@ -1,10 +1,12 @@
 # Yorozu Utils - Agent Reference
 
-This document provides a quick reference for the `@yorozu/utils` package, intended for AI coding agents and developers. It covers all exported utilities organized by module.
+This document provides a quick reference for the `@yorozu/utils` package, intended for AI coding agents and developers.
+It covers all exported utilities organized by module.
 
 ## Overview
 
 `packages/utils` exports a collection of lightweight, zero-dependency TypeScript utilities:
+
 - Arrays (typed + Uint8Array helpers)
 - BigInt operations
 - Encoding (base64, hex, utf8)
@@ -21,6 +23,7 @@ All modules are re-exported from the package root.
 ## arrays
 
 ### typed
+
 - `TypedArray`: Union type for all typed arrays (including BigInt variants).
 - `compare(a, b)`: Lexicographic comparison returning -1 | 0 | 1.
 - `equal(a, b)`: Deep equality check for TypedArrays.
@@ -30,6 +33,7 @@ All modules are re-exported from the package root.
 - `getPlatformByteOrder()`: Cached endianness detection.
 
 ### u8 (Uint8Array utilities)
+
 - `concat(bufs)`: Concatenate Uint8Arrays (fast path for Node Buffers).
 - `clone`, `empty`: Cloning and empty buffer constant.
 - `readNthBit`: Bit-level reading.
@@ -41,6 +45,7 @@ All modules are re-exported from the package root.
 ---
 
 ## bigint
+
 - `fromBytes`, `toBytes`: Big-endian byte conversion.
 - `bitLength`, `byteLength`.
 - Math: `divCeil`, `min`, `max`, `abs`, `gcd`, `lcm`, `mod`, `pow`.
@@ -50,20 +55,24 @@ All modules are re-exported from the package root.
 ---
 
 ## encoding
+
 Namespaces: `base64`, `hex`, `utf8`
 
 Each provides:
+
 - `encode(input: Uint8Array): string`
 - `decode(input: string): Uint8Array`
 
 ---
 
 ## iterate
+
 - `enumerate<T>(iterable, start = 0)`: Yields `[index, value]` pairs.
 
 ---
 
 ## misc
+
 - **assert**: `assert(cond, msg?)`, `assertEqual`, `fail`.
 - **composer**: `compose`, `pipe` for function composition.
 - **guards**: Type guards (`isString`, `isNumber`, `isObject`, `isArray`, `isFunction`, `isPromise`, `isDefined`, etc.).
@@ -73,7 +82,8 @@ Each provides:
 
 ---
 
-## not-sync (Async Primitives)
+## async (Async Primitives)
+
 - `sleep(ms)`
 - `AsyncLock`: Mutex with queuing.
 - `AsyncQueue<T>`: Bounded/unbounded async queue.
@@ -87,6 +97,7 @@ Each provides:
 ---
 
 ## structures
+
 - `CustomMap<K, V>`, `CustomSet<T>`: With custom equality/hash functions.
 - `Deque<T>`: Double-ended queue.
 - `LRUMap<K, V>`, `LRUSet<T>`: Size-limited LRU caches.
@@ -94,6 +105,7 @@ Each provides:
 ---
 
 ## types (Type Utilities)
+
 - `Brand<T, B>`: Nominal typing / branded types.
 - `Equal<A, B>`: Type-level equality check.
 - `UnknownToError`, `isError`.
@@ -102,4 +114,5 @@ Each provides:
 
 ---
 
-All utilities are designed to be small, focused, and tree-shakeable. Use them directly via named imports from the package.
+All utilities are designed to be small, focused, and tree-shakeable. Use them directly via named imports from the
+package.

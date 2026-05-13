@@ -1,0 +1,33 @@
+{
+    "name": "@yorozu/node",
+    "version": "0.0.1",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "type": "module",
+    "author": "",
+    "license": "MIT",
+    "description": "",
+    "exports": {
+        ".": "./src/index.ts",
+        "./websocket": "./src/net/websocket.ts"
+    },
+    "peerDependenciesMeta": {
+        "ws": {
+            "optional": true
+        }
+    },
+    "dependencies": {
+        "@yorozu/io": "workspace:^",
+        "@yorozu/net": "workspace:^",
+        "@yorozu/utils": "workspace:^"
+    },
+    "devDependencies": {
+        "@types/ws": "8.18.1",
+        "ws": "8.20.1"
+    },
+    "yorozu": {
+        "jsr": "skip"
+    }
+}
