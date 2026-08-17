@@ -11,7 +11,8 @@
     "lint:workspace": "tsx packages/build/src/cli/main.ts lint",
     "release": "tsx packages/build/src/cli/main.ts release --with-npm",
     "release:dry": "tsx packages/build/src/cli/main.ts release --with-npm --dry-run",
-    "prepare": "pnpm run -C packages/build build-vite-plugin"
+    "prepare": "pnpm run -C packages/build build-vite-plugin",
+    "playground:animations": "vite --config packages/animations/playground/vite.config.ts"
   },
   "repository": {
     "type": "git",

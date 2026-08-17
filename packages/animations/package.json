@@ -1,0 +1,12 @@
+{
+    "name": "@yorozu/animations",
+    "version": "0.1.0",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic compositor motion primitives",
+    "exports": {
+        ".": "./src/index.ts"
+    }
+}
