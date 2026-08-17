@@ -25,3 +25,15 @@ export {
     createSharedElement,
     playSharedElement,
 } from "./shared-element/player"
+
+export type {
+    SlideDirection,
+    ViewSlideMode,
+    ViewSlideMountPolicy,
+    PanelRole,
+    SlidePanelState,
+    SlideTransforms,
+} from "./view-slide/transforms"
+export { VIEW_SLIDE_FADE_OFFSET, slideDirectionByIndex, viewSlideTransforms } from "./view-slide/transforms"
+export type { ViewSlideConfig, ViewSlide } from "./view-slide/session"
+export { VIEW_SLIDE_MS, VIEW_SLIDE_EASING, VIEW_SLIDE_SETTLE_SLACK_MS, createViewSlide } from "./view-slide/session"
