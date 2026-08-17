@@ -26,6 +26,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10

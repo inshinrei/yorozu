@@ -132,10 +132,10 @@ describe("@yorozu/build preparePackageJson", () => {
 
         let hookContext = { packageJson: structuredClone(source) }
         config.preparePackageJson(hookContext)
-        expect(hookContext.packageJson.exports["./vite"]).toBe("./dist_vite-internal.js")
+        expect(hookContext.packageJson.exports["./vite"]).toBe("./src/vite/index.ts")
         expect(hookContext.packageJson.exports["./vite-internal"]).toBeUndefined()
 
         let result = processPackageJson({ packageJson: hookContext.packageJson, onlyEntrypoints: true })
-        expect(result.entrypoints.get("vite")).toBe("./dist_vite-internal.js")
+        expect(result.entrypoints.get("vite")).toBe("./src/vite/index.ts")
     })
 })
