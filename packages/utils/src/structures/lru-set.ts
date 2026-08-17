@@ -18,15 +18,17 @@ export class LruSet<T> {
         this.#set.add(value)
 
         if (this.#set.size > this.#capacity) {
-            let oldest = this.#set.keys().next().value
-            if (oldest !== undefined) {
-                this.#set.delete(oldest)
-            }
+            let oldest = this.#set.keys().next()
+            if (!oldest.done) this.#set.delete(oldest.value)
         }
     }
 
     has(value: T): boolean {
         return this.#set.has(value)
+    }
+
+    delete(value: T): boolean {
+        return this.#set.delete(value)
     }
 
     clear(): void {

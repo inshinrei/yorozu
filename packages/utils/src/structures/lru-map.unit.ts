@@ -119,4 +119,13 @@ describe("LruMap", () => {
         expect(cache.has("b")).toBe(false)
         expect(cache.has("a")).toBe(true)
     })
+
+    it("evicts an undefined key when over capacity", () => {
+        let cache = new LruMap<string | undefined, number>(1)
+        cache.set(undefined, 1)
+        cache.set("a", 2)
+        expect(cache.size).toBe(1)
+        expect(cache.has(undefined)).toBe(false)
+        expect(cache.get("a")).toBe(2)
+    })
 })

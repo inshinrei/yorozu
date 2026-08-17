@@ -170,4 +170,23 @@ describe("LruSet", () => {
 
         expect(Array.from(set)).toEqual([])
     })
+
+    it("evicts an undefined value when over capacity", () => {
+        let set = new LruSet<string | undefined>(1)
+        set.add(undefined)
+        set.add("a")
+        expect(set.size).toBe(1)
+        expect(set.has(undefined)).toBe(false)
+        expect(set.has("a")).toBe(true)
+    })
+
+    it("delete() removes a value and returns boolean", () => {
+        let set = new LruSet<string>(3)
+        set.add("a")
+        set.add("b")
+        expect(set.delete("a")).toBe(true)
+        expect(set.has("a")).toBe(false)
+        expect(set.delete("a")).toBe(false)
+        expect(set.size).toBe(1)
+    })
 })
