@@ -47,6 +47,10 @@ export interface LintConfig {
             field: "dependencies" | "devDependencies" | "peerDependencies" | "optionalDependencies"
         }) => boolean
     }
+    preferProtected?: {
+        enabled?: boolean
+        exclude?: Array<string>
+    }
 }
 
 export interface RootConfigObject {

@@ -8,7 +8,7 @@ The root `package.json` `version` is the source of truth for every managed packa
 
 ```sh
 pnpm build          # build every npm-publishable package (including standalone)
-pnpm lint:workspace # workspace: protocol + external version alignment
+pnpm lint:workspace # workspace: protocol, external version alignment, prefer protected over private/#
 pnpm release:dry    # print next version, changelog, and publish list
 pnpm release        # bump, build, publish to npm, commit, and tag
 ```

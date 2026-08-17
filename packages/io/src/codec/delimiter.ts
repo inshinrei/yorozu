@@ -8,13 +8,13 @@ export interface DelimiterCodecOptions {
 }
 
 export class DelimiterCodec implements FrameDecoder, FrameEncoder {
-    #strategy: DelimiterCodecOptions["strategy"]
+    protected _strategy: DelimiterCodecOptions["strategy"]
 
     constructor(
         readonly delimiter: Uint8Array,
         readonly options?: DelimiterCodecOptions | undefined,
     ) {
-        this.#strategy = options?.strategy ?? "discard"
+        this._strategy = options?.strategy ?? "discard"
     }
 
     decode(buf: Bytes, eof: boolean): Uint8Array | null {
@@ -28,7 +28,7 @@ export class DelimiterCodec implements FrameDecoder, FrameEncoder {
             return null
         }
         buf.rewind(data.length - delimiterIdx - delimiter.length)
-        let frameEnd = this.#strategy === "keep" ? delimiterIdx + delimiter.length : delimiterIdx
+        let frameEnd = this._strategy === "keep" ? delimiterIdx + delimiter.length : delimiterIdx
         return data.slice(0, frameEnd)
     }
 

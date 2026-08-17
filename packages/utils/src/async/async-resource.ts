@@ -26,14 +26,14 @@ export interface AsyncResourceOptions<T> {
 export class AsyncResource<T> {
     readonly onUpdated: Emitter<AsyncResourceContext<T>> = new Emitter()
 
-    #abort?: AbortController
-    #ctx: UnsafeMutate<AsyncResourceContext<T>>
-    #updating?: Deferred<void>
-    #timeout?: timers.Timer
-    #destroyed = false
+    protected _abort?: AbortController
+    protected _ctx: UnsafeMutate<AsyncResourceContext<T>>
+    protected _updating?: Deferred<void>
+    protected _timeout?: timers.Timer
+    protected _destroyed = false
 
     constructor(readonly options: AsyncResourceOptions<T>) {
-        this.#ctx = {
+        this._ctx = {
             current: null,
             currentFetchedAt: 0,
             currentExpiresAt: 0,
@@ -43,110 +43,110 @@ export class AsyncResource<T> {
     }
 
     get isStale(): boolean {
-        return this.#ctx.current === null || this.#ctx.currentExpiresAt <= performance.now()
+        return this._ctx.current === null || this._ctx.currentExpiresAt <= performance.now()
     }
 
     setData(data: T, expiresIn: number): void {
-        if (this.#destroyed) return
+        if (this._destroyed) return
 
         let now = performance.now()
-        this.#ctx.current = data
-        this.#ctx.currentExpiresAt = now + expiresIn
-        this.#ctx.currentFetchedAt = now
-        this.onUpdated.emit(this.#ctx)
+        this._ctx.current = data
+        this._ctx.currentExpiresAt = now + expiresIn
+        this._ctx.currentFetchedAt = now
+        this.onUpdated.emit(this._ctx)
 
         if (this.options.autoReload) {
-            this.#clearTimer()
+            this._clearTimer()
             let delay = expiresIn + (this.options.autoReloadAfter ?? this.options.authReloadAfter ?? 0)
-            this.#timeout = timers.setTimeout(() => {
-                if (this.#destroyed) return
-                this.#ctx.isBackground = true
+            this._timeout = timers.setTimeout(() => {
+                if (this._destroyed) return
+                this._ctx.isBackground = true
                 this.update(true).catch(noop)
             }, delay)
         }
     }
 
     async update(force = false): Promise<void> {
-        if (this.#destroyed) return
-        if (this.#updating) {
-            await this.#updating.promise
+        if (this._destroyed) return
+        if (this._updating) {
+            await this._updating.promise
             return
         }
 
         if (!force && !this.isStale) return
 
-        this.#abort?.abort()
-        this.#abort = new AbortController()
-        this.#ctx.abort = this.#abort.signal
+        this._abort?.abort()
+        this._abort = new AbortController()
+        this._ctx.abort = this._abort.signal
 
-        this.#updating = new Deferred()
+        this._updating = new Deferred()
 
         let result
         try {
-            result = await this.options.fetcher(this.#ctx)
+            result = await this.options.fetcher(this._ctx)
         } catch (err: unknown) {
             if (err instanceof Error && err.name === "AbortError") {
-                this.#updating?.resolve()
-                this.#updating = undefined
-                this.#ctx.abort = null
+                this._updating?.resolve()
+                this._updating = undefined
+                this._ctx.abort = null
                 return
             }
 
-            if (this.options.onError) this.options.onError(err, this.#ctx)
+            if (this.options.onError) this.options.onError(err, this._ctx)
             else console.error(err)
 
-            this.#updating?.resolve()
-            this.#updating = undefined
-            this.#ctx.abort = null
+            this._updating?.resolve()
+            this._updating = undefined
+            this._ctx.abort = null
             return
         }
 
-        this.#updating?.resolve()
-        this.#updating = undefined
-        this.#ctx.abort = null
+        this._updating?.resolve()
+        this._updating = undefined
+        this._ctx.abort = null
 
-        if (!this.#destroyed) {
+        if (!this._destroyed) {
             this.setData(result.data, result.expiresIn)
         }
     }
 
     async get(): Promise<T | null> {
-        if (this.#destroyed) return null
+        if (this._destroyed) return null
 
-        if (this.options.swr === true && this.#ctx.current !== null) {
+        if (this.options.swr === true && this._ctx.current !== null) {
             let validator = this.options.swrValidator
-            if (!validator || validator(this.#ctx)) {
-                this.#ctx.isBackground = true
+            if (!validator || validator(this._ctx)) {
+                this._ctx.isBackground = true
                 this.update(true).catch(noop)
-                return this.#ctx.current
+                return this._ctx.current
             }
         }
 
-        this.#ctx.isBackground = false
+        this._ctx.isBackground = false
         await this.update()
-        return this.#ctx.current
+        return this._ctx.current
     }
 
     getCached(): T | null {
-        return this.#ctx.current
+        return this._ctx.current
     }
 
     destroy(): void {
-        if (this.#destroyed) return
-        this.#destroyed = true
+        if (this._destroyed) return
+        this._destroyed = true
 
-        this.#clearTimer()
-        this.#abort?.abort()
+        this._clearTimer()
+        this._abort?.abort()
         this.onUpdated.clear()
 
-        this.#updating?.resolve()
-        this.#updating = undefined
+        this._updating?.resolve()
+        this._updating = undefined
     }
 
-    #clearTimer(): void {
-        if (this.#timeout) {
-            timers.clearTimeout(this.#timeout)
-            this.#timeout = undefined
+    protected _clearTimer(): void {
+        if (this._timeout) {
+            timers.clearTimeout(this._timeout)
+            this._timeout = undefined
         }
     }
 }

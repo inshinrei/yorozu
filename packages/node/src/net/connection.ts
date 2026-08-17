@@ -9,9 +9,9 @@ export interface NodeConnectionOptions {
 }
 
 class NodeSocketConnection<Sock extends Socket | TLSSocket> implements Readable, Writable, Closable {
-    #error: Error | null = null
-    #buffer: Bytes
-    #cv = new ConditionVariable()
+    protected _error: Error | null = null
+    protected _buffer: Bytes
+    protected _cv: ConditionVariable = new ConditionVariable()
 
     constructor(
         readonly socket: Sock,
@@ -19,23 +19,23 @@ class NodeSocketConnection<Sock extends Socket | TLSSocket> implements Readable,
     ) {
         if (socket.pending) throw new Error("Socket is not connected.")
         if (socket.destroyed) throw new Error("Socket is destroyed.")
-        this.#buffer = Bytes.allocate(options.bufferSize)
+        this._buffer = Bytes.allocate(options.bufferSize)
 
         socket.resume()
 
         const onData = (data: Buffer) => {
-            this.#buffer.writeSync(data.length).set(data)
-            this.#cv.notify()
+            this._buffer.writeSync(data.length).set(data)
+            this._cv.notify()
         }
 
         const onClose = () => {
-            this.#error = new ConnectionClosedError()
-            this.#cv.notify()
+            this._error = new ConnectionClosedError()
+            this._cv.notify()
         }
 
         const onError = (err: unknown) => {
-            this.#error = unknownToError(err)
-            this.#cv.notify()
+            this._error = unknownToError(err)
+            this._cv.notify()
         }
 
         socket.on("data", onData)
@@ -45,30 +45,30 @@ class NodeSocketConnection<Sock extends Socket | TLSSocket> implements Readable,
 
     close(): void {
         this.socket?.destroy()
-        this.#error = new ConnectionClosedError()
-        this.#cv.notify()
+        this._error = new ConnectionClosedError()
+        this._cv.notify()
     }
 
     async read(into: Uint8Array): Promise<number> {
-        if (this.#buffer.available > 0) {
-            let size = Math.min(this.#buffer.available, into.length)
-            into.set(this.#buffer.readSync(size))
-            this.#buffer.reclaim()
+        if (this._buffer.available > 0) {
+            let size = Math.min(this._buffer.available, into.length)
+            into.set(this._buffer.readSync(size))
+            this._buffer.reclaim()
             return size
         }
 
-        if (this.#error !== null) throw this.#error
-        await this.#cv.wait()
-        if (this.#error !== null) throw this.#error
+        if (this._error !== null) throw this._error
+        await this._cv.wait()
+        if (this._error !== null) throw this._error
 
-        let size = Math.min(this.#buffer.available, into.length)
-        into.set(this.#buffer.readSync(size))
-        this.#buffer.reclaim()
+        let size = Math.min(this._buffer.available, into.length)
+        into.set(this._buffer.readSync(size))
+        this._buffer.reclaim()
         return size
     }
 
     async write(bytes: Uint8Array): Promise<void> {
-        if (this.#error) throw this.#error
+        if (this._error) throw this._error
         return new Promise<void>((resolve, reject) => {
             this.socket.write(bytes, (error) => {
                 if (error) reject(error)

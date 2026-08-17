@@ -4,17 +4,17 @@ export class BufferPool {
     readonly size: number
     readonly maxAllocSize: number
 
-    #pool!: ArrayBuffer
-    #offset: number = 0
+    protected _pool!: ArrayBuffer
+    protected _offset: number = 0
 
     constructor(size: number = 16 * 1024) {
         this.size = size
         this.maxAllocSize = size >>> 1
-        this.#reallocate()
+        this._reallocate()
     }
 
-    get #remaining(): number {
-        return this.size - this.#offset
+    protected get _remaining(): number {
+        return this.size - this._offset
     }
 
     allocate(size: number): Uint8Array {
@@ -24,30 +24,30 @@ export class BufferPool {
             return new Uint8Array(size)
         }
 
-        if (size > this.#remaining) {
-            this.#reallocate()
+        if (size > this._remaining) {
+            this._reallocate()
         }
 
-        let start = this.#offset
-        this.#offset += size
-        this.#align()
+        let start = this._offset
+        this._offset += size
+        this._align()
 
-        return new Uint8Array(this.#pool, start, size)
+        return new Uint8Array(this._pool, start, size)
     }
 
     reset(): void {
-        this.#reallocate()
+        this._reallocate()
     }
 
-    #reallocate(): void {
-        this.#pool = new ArrayBuffer(this.size)
-        this.#offset = 0
+    protected _reallocate(): void {
+        this._pool = new ArrayBuffer(this.size)
+        this._offset = 0
     }
 
-    #align(): void {
-        let misalignment = this.#offset & 0x7
+    protected _align(): void {
+        let misalignment = this._offset & 0x7
         if (misalignment !== 0) {
-            this.#offset += 8 - misalignment
+            this._offset += 8 - misalignment
         }
     }
 }

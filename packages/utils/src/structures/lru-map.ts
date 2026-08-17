@@ -1,61 +1,61 @@
 export class LruMap<K, V> {
-    #capacity: number
-    #map: Map<K, V>
+    protected _capacity: number
+    protected _map: Map<K, V>
 
     constructor(capacity: number, MapImpl: new () => Map<K, V> = Map) {
-        this.#capacity = capacity
-        this.#map = new MapImpl()
+        this._capacity = capacity
+        this._map = new MapImpl()
     }
 
     get size(): number {
-        return this.#map.size
+        return this._map.size
     }
 
     get(key: K): V | undefined {
-        if (!this.#map.has(key)) return undefined
-        let value = this.#map.get(key)!
-        this.#map.delete(key)
-        this.#map.set(key, value)
+        if (!this._map.has(key)) return undefined
+        let value = this._map.get(key)!
+        this._map.delete(key)
+        this._map.set(key, value)
         return value
     }
 
     has(key: K): boolean {
-        return this.#map.has(key)
+        return this._map.has(key)
     }
 
     set(key: K, value: V): void {
-        if (this.#map.has(key)) {
-            this.#map.delete(key)
+        if (this._map.has(key)) {
+            this._map.delete(key)
         }
-        this.#map.set(key, value)
+        this._map.set(key, value)
 
-        if (this.#map.size > this.#capacity) {
-            let oldest = this.#map.keys().next()
-            if (!oldest.done) this.#map.delete(oldest.value)
+        if (this._map.size > this._capacity) {
+            let oldest = this._map.keys().next()
+            if (!oldest.done) this._map.delete(oldest.value)
         }
     }
 
     delete(key: K): void {
-        this.#map.delete(key)
+        this._map.delete(key)
     }
 
     clear(): void {
-        this.#map.clear()
+        this._map.clear()
     }
 
     *[Symbol.iterator](): IterableIterator<[K, V]> {
-        yield* this.#map
+        yield* this._map
     }
 
     entries(): IterableIterator<[K, V]> {
-        return this.#map.entries()
+        return this._map.entries()
     }
 
     keys(): IterableIterator<K> {
-        return this.#map.keys()
+        return this._map.keys()
     }
 
     values(): IterableIterator<V> {
-        return this.#map.values()
+        return this._map.values()
     }
 }

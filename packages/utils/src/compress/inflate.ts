@@ -237,38 +237,38 @@ export function decompress(data: Uint8Array, options?: DecompressOptions): Uint8
 }
 
 export class Decompressor {
-    #state: InflateState
-    #window: Uint8Array
-    #pending: Uint8Array
-    #done = false
+    protected _state: InflateState
+    protected _window: Uint8Array
+    protected _pending: Uint8Array
+    protected _done = false
 
     constructor(options?: DecompressOptions) {
         let dict = options?.dictionary?.subarray(-32768)
-        this.#state = { mode: 0, outputLength: dict ? dict.length : 0 }
-        this.#window = new Uint8Array(32768)
-        this.#pending = u8.empty
-        if (dict) this.#window.set(dict)
+        this._state = { mode: 0, outputLength: dict ? dict.length : 0 }
+        this._window = new Uint8Array(32768)
+        this._pending = u8.empty
+        if (dict) this._window.set(dict)
     }
 
     push(chunk: Uint8Array, final?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        if (!this.#pending.length) this.#pending = chunk
+        if (this._done) throw new StreamFinishedError()
+        if (!this._pending.length) this._pending = chunk
         else if (chunk.length) {
-            let next = new Uint8Array(this.#pending.length + chunk.length)
-            next.set(this.#pending)
-            next.set(chunk, this.#pending.length)
-            this.#pending = next
+            let next = new Uint8Array(this._pending.length + chunk.length)
+            next.set(this._pending)
+            next.set(chunk, this._pending.length)
+            this._pending = next
         }
 
-        this.#done = !!final
-        this.#state.mode = this.#done ? 1 : 0
-        let start = this.#state.outputLength || 0
-        let out = inflateRaw(this.#pending, this.#state, this.#window)
-        let produced = copySlice(out, start, this.#state.outputLength)
-        this.#window = copySlice(out, (this.#state.outputLength || 0) - 32768)
-        this.#state.outputLength = this.#window.length
-        this.#pending = copySlice(this.#pending, ((this.#state.bitPos || 0) / 8) | 0)
-        this.#state.bitPos = (this.#state.bitPos || 0) & 7
+        this._done = !!final
+        this._state.mode = this._done ? 1 : 0
+        let start = this._state.outputLength || 0
+        let out = inflateRaw(this._pending, this._state, this._window)
+        let produced = copySlice(out, start, this._state.outputLength)
+        this._window = copySlice(out, (this._state.outputLength || 0) - 32768)
+        this._state.outputLength = this._window.length
+        this._pending = copySlice(this._pending, ((this._state.bitPos || 0) / 8) | 0)
+        this._state.bitPos = (this._state.bitPos || 0) & 7
         return produced.length ? produced : u8.empty
     }
 }

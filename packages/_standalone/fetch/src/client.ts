@@ -37,12 +37,12 @@ function headersToObject(headers?: HeadersInit): Record<string, string> {
 }
 
 class FetchResultImpl implements FetchResult {
-    #fetch: FetchLike
-    private readonly _url: string
-    private readonly _init: RequestInit
-    private _options: FetchOptions
-    private _headers?: Record<string, string>
-    #stack?: string
+    protected _fetch: FetchLike
+    protected readonly _url: string
+    protected readonly _init: RequestInit
+    protected _options: FetchOptions
+    protected _headers?: Record<string, string>
+    protected _stack?: string
 
     constructor(
         fetch: FetchLike,
@@ -52,12 +52,12 @@ class FetchResultImpl implements FetchResult {
         options: FetchOptions,
         stack?: string,
     ) {
-        this.#fetch = fetch
+        this._fetch = fetch
         this._init = init
         this._url = url
         this._options = options
         this._headers = headers
-        this.#stack = stack
+        this._stack = stack
     }
 
     get [Symbol.toStringTag](): string {
@@ -82,15 +82,15 @@ class FetchResultImpl implements FetchResult {
     }
 
     async raw(): Promise<Response> {
-        if (this.#stack == null) return this.#fetchAndValidate()
+        if (this._stack == null) return this._fetchAndValidate()
 
         try {
-            return await this.#fetchAndValidate()
+            return await this._fetchAndValidate()
         } catch (err_) {
             let err = unknownToError(err_)
             let origMessage = err.message
             let origStack = err.stack
-            let stack = this.#stack!.split("\n").slice(2).join("\n")
+            let stack = this._stack!.split("\n").slice(2).join("\n")
             err.stack = `${err.name}: ${err.message}\n${stack}`
             err.cause = { message: origMessage, stack: origStack, cause: err.cause }
             throw err
@@ -133,8 +133,8 @@ class FetchResultImpl implements FetchResult {
         return res.blob()
     }
 
-    async #fetchAndValidate(): Promise<Response> {
-        let res = await this.#fetch(new Request(this._url, this._init))
+    protected async _fetchAndValidate(): Promise<Response> {
+        let res = await this._fetch(new Request(this._url, this._init))
 
         let err: HttpError | null = null
         if (this._options.validateResponse === undefined || this._options.validateResponse !== false) {

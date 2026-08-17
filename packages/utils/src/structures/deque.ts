@@ -20,7 +20,7 @@ export class Deque<T> {
     constructor(array?: ArrayLike<T>, options: DequeOptions = {}) {
         this._capacity = options.capacity
         if (array) {
-            this.#fromArray(array)
+            this._fromArray(array)
         } else {
             this._list = new Array(4)
         }
@@ -52,7 +52,7 @@ export class Deque<T> {
     }
 
     pushFront(item: T): number {
-        if (this._size === this._list.length) this.#growArray()
+        if (this._size === this._list.length) this._growArray()
         this._head = (this._head - 1 + this._list.length) & this._capacityMask
         this._list[this._head] = item
         this._size++
@@ -61,7 +61,7 @@ export class Deque<T> {
     }
 
     pushBack(item: T): number {
-        if (this._size === this._list.length) this.#growArray()
+        if (this._size === this._list.length) this._growArray()
         this._list[this._tail] = item
         this._tail = (this._tail + 1) & this._capacityMask
         this._size++
@@ -75,7 +75,7 @@ export class Deque<T> {
         this._list[this._head] = undefined
         this._head = (this._head + 1) & this._capacityMask
         this._size--
-        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this._shrinkArray()
         return item
     }
 
@@ -85,7 +85,7 @@ export class Deque<T> {
         let item = this._list[this._tail]
         this._list[this._tail] = undefined
         this._size--
-        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this._shrinkArray()
         return item
     }
 
@@ -95,7 +95,7 @@ export class Deque<T> {
         if (idx < 0) idx += len
         let realIdx = (this._head + idx) & this._capacityMask
         let item = this._list[realIdx] as T
-        this.#remove(realIdx)
+        this._remove(realIdx)
         return item
     }
 
@@ -104,7 +104,7 @@ export class Deque<T> {
             let i = (this._head + pos) & this._capacityMask
             let item = this._list[i]
             if (item !== undefined && predicate(item)) {
-                this.#remove(i)
+                this._remove(i)
                 return
             }
         }
@@ -163,7 +163,7 @@ export class Deque<T> {
         }
     }
 
-    #fromArray(array: ArrayLike<T>): void {
+    protected _fromArray(array: ArrayLike<T>): void {
         let start = 0
         let length = array.length
         if (this._capacity !== undefined && length > this._capacity) {
@@ -179,7 +179,7 @@ export class Deque<T> {
         for (let i = 0; i < length; i++) this._list[i] = array[start + i]
     }
 
-    #growArray(): void {
+    protected _growArray(): void {
         let oldMask = this._capacityMask
         let oldList = this._list
         let oldHead = this._head
@@ -194,7 +194,7 @@ export class Deque<T> {
         this._capacityMask = newList.length - 1
     }
 
-    #shrinkArray(): void {
+    protected _shrinkArray(): void {
         if (this._list.length <= 4) return
         let oldMask = this._capacityMask
         let oldList = this._list
@@ -210,7 +210,7 @@ export class Deque<T> {
         this._capacityMask = newList.length - 1
     }
 
-    #remove(idx: number): void {
+    protected _remove(idx: number): void {
         let mask = this._capacityMask
         let len = this._list.length
         let distFromHead = (idx - this._head) & mask
@@ -237,6 +237,6 @@ export class Deque<T> {
         }
 
         this._size--
-        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this._shrinkArray()
     }
 }

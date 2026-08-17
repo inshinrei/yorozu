@@ -8,36 +8,36 @@ export interface FramedReaderOptions {
 }
 
 export class FramedReader<Frame> {
-    #readable: Readable
-    #decoder: FrameDecoder<Frame>
-    #buffer: Bytes
+    protected _readable: Readable
+    protected _decoder: FrameDecoder<Frame>
+    protected _buffer: Bytes
 
-    #readChunkSize: number
-    #eof = false
-    #canDecode = false
+    protected _readChunkSize: number
+    protected _eof = false
+    protected _canDecode = false
 
     constructor(readable: Readable, decoder: FrameDecoder<Frame>, options?: FramedReaderOptions) {
-        this.#readable = readable
-        this.#decoder = decoder
-        this.#buffer = Bytes.allocate(options?.initialBufferSize ?? 1024 * 16)
-        this.#readChunkSize = options?.readChinkSize ?? 1024 * 16
+        this._readable = readable
+        this._decoder = decoder
+        this._buffer = Bytes.allocate(options?.initialBufferSize ?? 1024 * 16)
+        this._readChunkSize = options?.readChinkSize ?? 1024 * 16
     }
 
     async read(): Promise<Frame | null> {
         while (true) {
-            if (this.#canDecode) {
-                let frame = await this.#decoder.decode(this.#buffer, this.#eof)
-                this.#buffer.reclaim()
+            if (this._canDecode) {
+                let frame = await this._decoder.decode(this._buffer, this._eof)
+                this._buffer.reclaim()
 
                 if (frame !== null) return frame
             }
 
-            if (this.#eof) return null
-            let into = this.#buffer.writeSync(this.#readChunkSize)
-            let read = await this.#readable.read(into)
-            this.#buffer.disposeWriteSync(read)
-            if (read === 0) this.#eof = true
-            else this.#canDecode = true
+            if (this._eof) return null
+            let into = this._buffer.writeSync(this._readChunkSize)
+            let read = await this._readable.read(into)
+            this._buffer.disposeWriteSync(read)
+            if (read === 0) this._eof = true
+            else this._canDecode = true
         }
     }
 

@@ -358,55 +358,55 @@ export function compress(data: Uint8Array, options: CompressOptions = {}): Uint8
 }
 
 export class Compressor {
-    #options: CompressOptions
-    #state: DeflateState
-    #buffer: Uint8Array
-    #done = false
+    protected _options: CompressOptions
+    protected _state: DeflateState
+    protected _buffer: Uint8Array
+    protected _done = false
 
     constructor(options: CompressOptions = {}) {
-        this.#options = options
-        this.#state = { last: 0, index: 32768, wait: 32768, end: 32768 }
-        this.#buffer = new Uint8Array(98304)
+        this._options = options
+        this._state = { last: 0, index: 32768, wait: 32768, end: 32768 }
+        this._buffer = new Uint8Array(98304)
         if (options.dictionary) {
             let dict = options.dictionary.subarray(-32768)
-            this.#buffer.set(dict, 32768 - dict.length)
-            this.#state.index = 32768 - dict.length
+            this._buffer.set(dict, 32768 - dict.length)
+            this._state.index = 32768 - dict.length
         }
     }
 
-    #emit(final: boolean): Uint8Array {
-        return deflateWithOptions(this.#buffer, this.#options, 0, 0, this.#state)
+    protected _emit(final: boolean): Uint8Array {
+        return deflateWithOptions(this._buffer, this._options, 0, 0, this._state)
     }
 
     push(chunk: Uint8Array, final?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        let endLen = chunk.length + this.#state.end!
-        if (endLen > this.#buffer.length) {
-            if (endLen > 2 * this.#buffer.length - 32768) {
+        if (this._done) throw new StreamFinishedError()
+        let endLen = chunk.length + this._state.end!
+        if (endLen > this._buffer.length) {
+            if (endLen > 2 * this._buffer.length - 32768) {
                 let next = new Uint8Array(endLen & -32768)
-                next.set(this.#buffer.subarray(0, this.#state.end))
-                this.#buffer = next
+                next.set(this._buffer.subarray(0, this._state.end))
+                this._buffer = next
             }
-            let split = this.#buffer.length - this.#state.end!
-            this.#buffer.set(chunk.subarray(0, split), this.#state.end)
-            this.#state.end = this.#buffer.length
-            let first = this.#emit(false)
-            this.#buffer.set(this.#buffer.subarray(-32768))
-            this.#buffer.set(chunk.subarray(split), 32768)
-            this.#state.end = chunk.length - split + 32768
-            this.#state.index = 32766
-            this.#state.wait = 32768
-            this.#state.last = final ? 1 : 0
+            let split = this._buffer.length - this._state.end!
+            this._buffer.set(chunk.subarray(0, split), this._state.end)
+            this._state.end = this._buffer.length
+            let first = this._emit(false)
+            this._buffer.set(this._buffer.subarray(-32768))
+            this._buffer.set(chunk.subarray(split), 32768)
+            this._state.end = chunk.length - split + 32768
+            this._state.index = 32766
+            this._state.wait = 32768
+            this._state.last = final ? 1 : 0
             let rest = new Uint8Array(0)
-            if (this.#state.end > this.#state.wait + 8191 || final) {
-                rest = this.#emit(!!final)
-                this.#state.wait = this.#state.index
-                this.#state.index! -= 2
+            if (this._state.end > this._state.wait + 8191 || final) {
+                rest = this._emit(!!final)
+                this._state.wait = this._state.index
+                this._state.index! -= 2
             }
             if (final) {
-                this.#done = true
-                this.#buffer = empty
-                this.#state = { last: 1 }
+                this._done = true
+                this._buffer = empty
+                this._state = { last: 1 }
             }
             if (!rest.length) return first
             let joined = new Uint8Array(first.length + rest.length)
@@ -415,33 +415,33 @@ export class Compressor {
             return joined
         }
 
-        this.#buffer.set(chunk, this.#state.end)
-        this.#state.end! += chunk.length
-        this.#state.last = final ? 1 : 0
+        this._buffer.set(chunk, this._state.end)
+        this._state.end! += chunk.length
+        this._state.last = final ? 1 : 0
         let out = u8.empty
-        if (this.#state.end! > this.#state.wait! + 8191 || final) {
-            out = this.#emit(!!final)
-            this.#state.wait = this.#state.index
-            this.#state.index! -= 2
+        if (this._state.end! > this._state.wait! + 8191 || final) {
+            out = this._emit(!!final)
+            this._state.wait = this._state.index
+            this._state.index! -= 2
         }
         if (final) {
-            this.#done = true
-            this.#buffer = empty
-            this.#state = { last: 1 }
+            this._done = true
+            this._buffer = empty
+            this._state = { last: 1 }
         }
         return out
     }
 
     flush(sync?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        let out = this.#emit(false)
-        this.#state.wait = this.#state.index
-        this.#state.index! -= 2
+        if (this._done) throw new StreamFinishedError()
+        let out = this._emit(false)
+        this._state.wait = this._state.index
+        this._state.index! -= 2
         if (!sync) return out
         let block = new Uint8Array(6)
-        block[0] = this.#state.remainder! >> 3
-        let end = writeStoredBlock(block, this.#state.remainder!, empty)
-        this.#state.remainder = 0
+        block[0] = this._state.remainder! >> 3
+        let end = writeStoredBlock(block, this._state.remainder!, empty)
+        this._state.remainder = 0
         let trailer = block.subarray(0, end >> 3)
         if (!out.length) return new Uint8Array(trailer)
         let joined = new Uint8Array(out.length + trailer.length)

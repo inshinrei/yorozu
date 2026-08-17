@@ -10,7 +10,7 @@ abstract class NodeListener<
     C extends Connection<Address>,
 > implements Listener<Address, C> {
     protected _waiter?: Deferred<C>
-    #closed = false
+    protected _closed = false
 
     constructor(readonly server: Server) {
         const onClose = () => {
@@ -30,7 +30,7 @@ abstract class NodeListener<
     }
 
     async accept(): Promise<C> {
-        if (this.#closed) throw new ListenerClosedError()
+        if (this._closed) throw new ListenerClosedError()
         this._waiter = new Deferred()
         let connection = await this._waiter.promise
         this._waiter = undefined

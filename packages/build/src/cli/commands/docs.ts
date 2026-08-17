@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: Partial<td.TypeDocOptions> = {
         notDocumented: false,
     },
     excludePrivate: true,
+    excludeProtected: true,
     excludeExternals: true,
     excludeInternal: true,
     exclude: ["**/*/node_modules", "**/*.unit.ts", "**/*.test.ts", "**/*.test-utils.ts"],
@@ -30,12 +31,12 @@ class YorozuTypedocReader implements td.OptionsReader {
     readonly order = 0
     readonly supportsPackages = true
 
-    private _workspace?: Array<WorkspacePackage>
-    private _rootConfig?: RootConfigObject
+    protected _workspace?: Array<WorkspacePackage>
+    protected _rootConfig?: RootConfigObject
 
     constructor(readonly workspaceRoot: string) {}
 
-    private _forwardOptions(options: td.Options, config: Partial<td.TypeDocOptions>, cwd: string): void {
+    protected _forwardOptions(options: td.Options, config: Partial<td.TypeDocOptions>, cwd: string): void {
         for (let [key, val] of Object.entries(config)) {
             if (CUSTOM_ROOT_FIELDS.includes(key)) continue
             options.setValue(key, val, cwd)

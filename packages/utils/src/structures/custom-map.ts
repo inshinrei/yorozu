@@ -2,79 +2,79 @@ import { maybeWrapIterator } from "./_iterator"
 
 export class CustomMap<ExternalKey, InternalKey, V> implements Map<ExternalKey, V> {
     readonly clear: Map<ExternalKey, V>["clear"]
-    #map: Map<InternalKey, V>
-    #mapperTo: (key: ExternalKey) => InternalKey
-    #mapperFrom: (key: InternalKey) => ExternalKey
+    protected _map: Map<InternalKey, V>
+    protected _mapperTo: (key: ExternalKey) => InternalKey
+    protected _mapperFrom: (key: InternalKey) => ExternalKey
 
     constructor(
         externalToInternal: (key: ExternalKey) => InternalKey,
         internalToExternal: (key: InternalKey) => ExternalKey,
     ) {
-        this.#mapperTo = externalToInternal
-        this.#mapperFrom = internalToExternal
+        this._mapperTo = externalToInternal
+        this._mapperFrom = internalToExternal
 
-        let map = (this.#map = new Map())
-        this.clear = map.clear.bind(this.#map)
+        let map = (this._map = new Map())
+        this.clear = map.clear.bind(this._map)
     }
 
     get size(): number {
-        return this.#map.size
+        return this._map.size
     }
 
     get [Symbol.toStringTag](): string {
-        return this.#map[Symbol.toStringTag]
+        return this._map[Symbol.toStringTag]
     }
 
     getInternalMap(): Map<InternalKey, V> {
-        return this.#map
+        return this._map
     }
 
     delete(key: ExternalKey): boolean {
-        return this.#map.delete(this.#mapperTo(key))
+        return this._map.delete(this._mapperTo(key))
     }
 
     forEach(cb: (value: V, key: ExternalKey, map: Map<ExternalKey, V>) => void, thisArg?: any): void {
-        return this.#map.forEach((value, key) => {
-            cb.call(thisArg, value, this.#mapperFrom(key), this as any)
+        return this._map.forEach((value, key) => {
+            cb.call(thisArg, value, this._mapperFrom(key), this as any)
         })
     }
 
     get(key: ExternalKey): V | undefined {
-        return this.#map.get(this.#mapperTo(key))
+        return this._map.get(this._mapperTo(key))
     }
 
     has(key: ExternalKey): boolean {
-        return this.#map.has(this.#mapperTo(key))
+        return this._map.has(this._mapperTo(key))
     }
 
     set(key: ExternalKey, value: V): this {
-        this.#map.set(this.#mapperTo(key), value)
+        this._map.set(this._mapperTo(key), value)
         return this
     }
 
     getOrInsert(key: ExternalKey, value: V): ReturnType<Map<ExternalKey, V>["getOrInsert"]> {
-        if (this.#map.getOrInsert) {
-            return this.#map.getOrInsert(this.#mapperTo(key), value)
+        if (this._map.getOrInsert) {
+            return this._map.getOrInsert(this._mapperTo(key), value)
         }
-        let k = this.#mapperTo(key)
-        if (!this.#map.has(k)) this.#map.set(k, value)
-        return this.#map.get(k)!
+        let k = this._mapperTo(key)
+        if (!this._map.has(k)) this._map.set(k, value)
+        return this._map.get(k)!
     }
 
     getOrInsertComputed(
         key: ExternalKey,
         callback: (key: ExternalKey) => V,
     ): ReturnType<Map<ExternalKey, V>["getOrInsertComputed"]> {
-        if (this.#map.getOrInsertComputed) {
-            return this.#map.getOrInsertComputed(this.#mapperTo(key), (k) => callback(this.#mapperFrom(k)))
+        if (this._map.getOrInsertComputed) {
+            return this._map.getOrInsertComputed(this._mapperTo(key), (k) => callback(this._mapperFrom(k)))
         }
-        let k = this.#mapperTo(key)
-        if (!this.#map.has(k)) this.#map.set(k, callback(key))
-        return this.#map.get(k)!
+        let k = this._mapperTo(key)
+        if (!this._map.has(k)) this._map.set(k, callback(key))
+        return this._map.get(k)!
     }
 
     entries(): ReturnType<Map<ExternalKey, V>["entries"]> {
-        let inner = this.#map.entries()
+        let inner = this._map.entries()
         const iterator: IterableIterator<[ExternalKey, V]> = {
             [Symbol.iterator]: () => iterator,
             next: () => {
@@ -82,7 +82,7 @@ export class CustomMap<ExternalKey, InternalKey, V> implements Map<ExternalKey, 
                 if (done) return { done, value }
                 return {
                     done,
-                    value: [this.#mapperFrom(value![0]), value![1]] as const,
+                    value: [this._mapperFrom(value![0]), value![1]] as const,
                 }
             },
         }
@@ -91,13 +91,13 @@ export class CustomMap<ExternalKey, InternalKey, V> implements Map<ExternalKey, 
     }
 
     keys(): ReturnType<Map<ExternalKey, V>["keys"]> {
-        let inner = this.#map.keys()
+        let inner = this._map.keys()
         const iterator: IterableIterator<ExternalKey> = {
             [Symbol.iterator]: () => iterator,
             next: () => {
                 let { done, value } = inner.next() as IteratorResult<InternalKey, undefined>
                 if (done) return { done, value }
-                return { done, value: this.#mapperFrom(value!) }
+                return { done, value: this._mapperFrom(value!) }
             },
         }
 
@@ -105,7 +105,7 @@ export class CustomMap<ExternalKey, InternalKey, V> implements Map<ExternalKey, 
     }
 
     values(): ReturnType<Map<ExternalKey, V>["values"]> {
-        let inner = this.#map.values()
+        let inner = this._map.values()
         const iterator: IterableIterator<V> = {
             [Symbol.iterator]: () => iterator,
             next: () => {

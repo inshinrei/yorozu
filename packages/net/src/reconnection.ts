@@ -23,20 +23,24 @@ function defaultOnErrorAction(err: Error): OnErrorAction {
 }
 
 export class PersistentConnection<CA, C extends Closable> {
-    #state: UnsafeMutate<ReconnectionState> = {
+    protected _state: UnsafeMutate<ReconnectionState> = {
         previousWait: null,
         lastError: null,
         consequentFails: 0,
     }
 
-    #connect: (address: CA) => Promise<C>
-    #lastAddress?: CA
-    #connection?: C
-    #connecting = false
-    #strategy: ReconnectionStrategy
-    #onError
-    #sleep?: Deferred<boolean>
-    #closed?: Deferred<void>
+    protected _connect: (address: CA) => Promise<C>
+    protected _lastAddress?: CA
+    protected _connection?: C
+    protected _connecting = false
+    protected _strategy: ReconnectionStrategy
+    protected _onError: (
+        error: Error,
+        connection: C | null,
+        state: ReconnectionState,
+    ) => MaybePromise<OnErrorAction>
+    protected _sleep?: Deferred<boolean>
+    protected _closed?: Deferred<void>
 
     constructor(
         readonly options: {
@@ -48,124 +52,124 @@ export class PersistentConnection<CA, C extends Closable> {
             onError?: (error: Error, connection: C | null, state: ReconnectionState) => MaybePromise<OnErrorAction>
         },
     ) {
-        this.#strategy = options.strategy ?? defaultReconnectionStrategy
-        this.#connect = options.connect
-        this.#onError = options.onError ?? defaultOnErrorAction
+        this._strategy = options.strategy ?? defaultReconnectionStrategy
+        this._connect = options.connect
+        this._onError = options.onError ?? defaultOnErrorAction
     }
 
     get isConnected(): boolean {
-        return this.#connection !== undefined
+        return this._connection !== undefined
     }
 
     get isConnecting(): boolean {
-        return this.#connection === undefined && this.#connecting
+        return this._connection === undefined && this._connecting
     }
 
     get isWaiting(): boolean {
-        return this.#connection === undefined && this.#lastAddress !== undefined && !this.#connecting
+        return this._connection === undefined && this._lastAddress !== undefined && !this._connecting
     }
 
     get connection(): C | null {
-        return this.#connection || null
+        return this._connection || null
     }
 
     get state(): ReconnectionState {
-        return this.#state
+        return this._state
     }
 
     connect(address: CA): void {
-        if (this.#lastAddress !== undefined && this.#lastAddress !== address)
+        if (this._lastAddress !== undefined && this._lastAddress !== address)
             throw new Error("Connection is already open to another address.")
-        this.#closed = undefined
-        this.#lastAddress = address
-        void this.#loop()
+        this._closed = undefined
+        this._lastAddress = address
+        void this._loop()
     }
 
     reconnect(force: boolean): void {
-        if (this.#sleep) this.#sleep.resolve(false)
-        else if (this.#connection && force) this.#connection.close()
+        if (this._sleep) this._sleep.resolve(false)
+        else if (this._connection && force) this._connection.close()
     }
 
     async close(): Promise<void> {
-        if (this.#closed) return this.#closed.promise
-        if (this.#lastAddress == null) return
+        if (this._closed) return this._closed.promise
+        if (this._lastAddress == null) return
 
-        this.#closed = new Deferred()
-        if (this.#sleep) this.#sleep.resolve(false)
-        else if (this.#connection) this.#connection.close()
+        this._closed = new Deferred()
+        if (this._sleep) this._sleep.resolve(false)
+        else if (this._connection) this._connection.close()
 
-        return this.#closed.promise
+        return this._closed.promise
     }
 
     async changeTransport(connect: (address: CA) => Promise<C>): Promise<void> {
-        this.#connect = connect
-        let addr = this.#lastAddress
+        this._connect = connect
+        let addr = this._lastAddress
         await this.close()
         if (addr != null) this.connect(addr)
     }
 
-    #resetState(): void {
-        this.#state.previousWait = null
-        this.#state.lastError = null
-        this.#state.consequentFails = 0
-        this.#connecting = false
+    protected _resetState(): void {
+        this._state.previousWait = null
+        this._state.lastError = null
+        this._state.consequentFails = 0
+        this._connecting = false
     }
 
-    async #loop(): Promise<void> {
+    protected async _loop(): Promise<void> {
         while (true) {
-            if (this.#closed) {
-                this.#closed.resolve()
+            if (this._closed) {
+                this._closed.resolve()
                 break
             }
 
             try {
-                this.#connecting = true
-                this.#connection = await this.#connect(this.#lastAddress!)
+                this._connecting = true
+                this._connection = await this._connect(this._lastAddress!)
 
-                if (this.#closed) (this.#closed as any).resolve()
+                if (this._closed) (this._closed as any).resolve()
 
-                this.#resetState()
-                await this.options.onOpen?.(this.#connection)
+                this._resetState()
+                await this.options.onOpen?.(this._connection)
 
-                this.#connection?.close()
-                this.#connection = undefined
+                this._connection?.close()
+                this._connection = undefined
                 break
             } catch (err) {
-                let oldConnection = this.#connection
-                this.#connection = undefined
+                let oldConnection = this._connection
+                this._connection = undefined
                 await this.options.onClose?.()
 
-                if (this.#closed) (this.#closed as any).resolve()
+                if (this._closed) (this._closed as any).resolve()
 
-                let action = await this.#onError(err as Error, oldConnection ?? null, this.#state)
+                let action = await this._onError(err as Error, oldConnection ?? null, this._state)
                 if (action === "close") break
 
-                let wait = action === "reconnect-now" ? 0 : this.#strategy(this.#state)
+                let wait = action === "reconnect-now" ? 0 : this._strategy(this._state)
                 if (wait === false) break
 
                 this.options.onWait?.(wait)
 
                 if (wait > 0) {
-                    this.#sleep = new Deferred<boolean>()
-                    let timer = timers.setTimeout(() => this.#sleep!.resolve(true), wait)
+                    this._sleep = new Deferred<boolean>()
+                    let timer = timers.setTimeout(() => this._sleep!.resolve(true), wait)
 
-                    let sleepResult = await this.#sleep.promise
-                    this.#sleep = undefined
+                    let sleepResult = await this._sleep.promise
+                    this._sleep = undefined
 
                     if (!sleepResult) {
                         timers.clearTimeout(timer)
-                        if (this.#closed) (this.#closed as any).resolve()
+                        if (this._closed) (this._closed as any).resolve()
                         continue
                     }
                 }
 
-                this.#state.previousWait = wait
-                this.#state.consequentFails++
-                this.#state.lastError = err as Error
+                this._state.previousWait = wait
+                this._state.consequentFails++
+                this._state.lastError = err as Error
             }
         }
 
-        this.#lastAddress = undefined
-        this.#resetState()
+        this._lastAddress = undefined
+        this._resetState()
     }
 }

@@ -9,38 +9,38 @@ export interface LengthDelimitedCodecOptions {
 }
 
 export class LengthDelimitedCodec implements FrameDecoder, FrameEncoder {
-    #read: LengthDelimitedCodecOptions["read"]
-    #write: LengthDelimitedCodecOptions["write"]
-    #pendingLength: number | null = null
+    protected _read: LengthDelimitedCodecOptions["read"]
+    protected _write: LengthDelimitedCodecOptions["write"]
+    protected _pendingLength: number | null = null
 
     constructor(options: LengthDelimitedCodecOptions) {
-        this.#read = options.read
-        this.#write = options.write
+        this._read = options.read
+        this._write = options.write
     }
 
     decode(buf: Bytes): Uint8Array | null {
-        if (!this.#read) throw new Error(`Read function not provided.`)
-        if (this.#pendingLength !== null) {
-            let pendingLength = this.#pendingLength
+        if (!this._read) throw new Error(`Read function not provided.`)
+        if (this._pendingLength !== null) {
+            let pendingLength = this._pendingLength
             if (buf.available < pendingLength) return null
             let data = buf.readSync(pendingLength)
-            this.#pendingLength = null
+            this._pendingLength = null
             return u8.allocateWith(data)
         }
-        let length = this.#read(buf)
+        let length = this._read(buf)
         if (length === null) return null
-        this.#pendingLength = length
+        this._pendingLength = length
         return this.decode(buf)
     }
 
     encode(frame: Uint8Array, into: SyncWritable): void {
-        if (!this.#write) throw new Error(`Write function not provided.`)
-        this.#write(into, frame.length)
+        if (!this._write) throw new Error(`Write function not provided.`)
+        this._write(into, frame.length)
         into.writeSync(frame.length).set(frame)
         into.disposeWriteSync()
     }
 
     reset(): void {
-        this.#pendingLength = null
+        this._pendingLength = null
     }
 }

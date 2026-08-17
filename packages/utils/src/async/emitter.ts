@@ -1,16 +1,16 @@
 import { noop } from "../misc/noop"
 
 export class Emitter<T> {
-    #listeners: ((value: T) => void)[] = []
-    #emit: (value: T) => void = noop
+    protected _listeners: ((value: T) => void)[] = []
+    protected _emit: (value: T) => void = noop
 
     get length(): number {
-        return this.#listeners.length
+        return this._listeners.length
     }
 
     add(listener: (value: T) => void): void {
-        this.#listeners.push(listener)
-        this.#updateEmit()
+        this._listeners.push(listener)
+        this._updateEmit()
     }
 
     forwardTo(emitter: Emitter<T>): void {
@@ -18,14 +18,14 @@ export class Emitter<T> {
     }
 
     remove(listener: (value: T) => void): void {
-        let idx = this.#listeners.indexOf(listener)
+        let idx = this._listeners.indexOf(listener)
         if (idx === -1) return
-        this.#listeners.splice(idx, 1)
-        this.#updateEmit()
+        this._listeners.splice(idx, 1)
+        this._updateEmit()
     }
 
     emit(value: T): void {
-        this.#emit(value)
+        this._emit(value)
     }
 
     once(listener: (value: T) => void): void {
@@ -38,16 +38,16 @@ export class Emitter<T> {
     }
 
     listeners(): readonly ((value: T) => void)[] {
-        return this.#listeners
+        return this._listeners
     }
 
     clear(): void {
-        this.#listeners.length = 0
-        this.#emit = noop
+        this._listeners.length = 0
+        this._emit = noop
     }
 
-    #emitFew = (value: T): void => {
-        let listeners = this.#listeners.slice()
+    protected _emitFew = (value: T): void => {
+        let listeners = this._listeners.slice()
         let len = listeners.length
         listeners[0](value)
 
@@ -57,21 +57,21 @@ export class Emitter<T> {
         len > 4 && listeners[4](value)
     }
 
-    #emitAll = (value: T): void => {
-        let listeners = this.#listeners.slice()
+    protected _emitAll = (value: T): void => {
+        let listeners = this._listeners.slice()
         for (let i = 0; i < listeners.length; i++) {
             listeners[i](value)
         }
     }
 
-    #updateEmit = (): void => {
-        let len = this.#listeners.length
+    protected _updateEmit = (): void => {
+        let len = this._listeners.length
         if (len === 0) {
-            this.#emit = noop
+            this._emit = noop
         } else if (len <= 5) {
-            this.#emit = this.#emitFew
+            this._emit = this._emitFew
         } else {
-            this.#emit = this.#emitAll
+            this._emit = this._emitAll
         }
     }
 }

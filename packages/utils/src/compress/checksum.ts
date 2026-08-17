@@ -6,21 +6,21 @@ for (let i = 0; i < 256; i++) {
 }
 
 export class Crc32 {
-    #c: number
+    protected _c: number
 
     constructor(seed = 0) {
-        this.#c = ~seed
+        this._c = ~seed
     }
 
     update(data: Uint8Array): this {
-        let c = this.#c
+        let c = this._c
         for (let i = 0; i < data.length; i++) c = crcTable[(c & 255) ^ data[i]] ^ (c >>> 8)
-        this.#c = c
+        this._c = c
         return this
     }
 
     digest(): number {
-        return ~this.#c >>> 0
+        return ~this._c >>> 0
     }
 }
 
@@ -29,17 +29,17 @@ export function crc32(data: Uint8Array, seed = 0): number {
 }
 
 export class Adler32 {
-    #a: number
-    #b: number
+    protected _a: number
+    protected _b: number
 
     constructor(seed = 1) {
-        this.#a = seed & 0xffff
-        this.#b = (seed >>> 16) & 0xffff
+        this._a = seed & 0xffff
+        this._b = (seed >>> 16) & 0xffff
     }
 
     update(data: Uint8Array): this {
-        let a = this.#a
-        let b = this.#b
+        let a = this._a
+        let b = this._b
         let i = 0
         let n = data.length
         while (i < n) {
@@ -51,13 +51,13 @@ export class Adler32 {
             a %= 65521
             b %= 65521
         }
-        this.#a = a
-        this.#b = b
+        this._a = a
+        this._b = b
         return this
     }
 
     digest(): number {
-        return ((this.#b << 16) | this.#a) >>> 0
+        return ((this._b << 16) | this._a) >>> 0
     }
 }
 

@@ -4,7 +4,7 @@ import { Deque } from "../structures"
 type LockInfo = [Promise<void>, NoneToVoidFunction]
 
 export class AsyncLock {
-    private _queue = new Deque<LockInfo>()
+    protected _queue: Deque<LockInfo> = new Deque<LockInfo>()
 
     async acquire(): Promise<void> {
         let info

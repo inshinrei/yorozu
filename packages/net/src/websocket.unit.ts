@@ -20,7 +20,7 @@ beforeEach(() => {
         url: string
         send = vi.fn()
         close = vi.fn()
-        private listeners = new Map<string, Function[]>()
+        protected listeners = new Map<string, Function[]>()
 
         constructor(url: string | URL, protocols?: string | string[]) {
             lastCreatedSocket = this

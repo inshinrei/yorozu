@@ -16,7 +16,7 @@ import { Duplex } from "node:stream"
 abstract class NodeWebSocketConnectionBase {
     protected _error: Error | null = null
     protected _cv: ConditionVariable = new ConditionVariable()
-    #headers?: Headers
+    protected _headers?: Headers
 
     constructor(
         readonly socket: WebSocket,
@@ -47,9 +47,9 @@ abstract class NodeWebSocketConnectionBase {
     }
 
     get headers(): Headers {
-        if (!this.#headers) {
+        if (!this._headers) {
             let headers = new Headers()
-            this.#headers = headers
+            this._headers = headers
             for (let [key, value] of Object.entries(this.request.headers)) {
                 if (value == null) continue
                 if (Array.isArray(value)) {
@@ -62,7 +62,7 @@ abstract class NodeWebSocketConnectionBase {
             }
         }
 
-        return this.#headers
+        return this._headers
     }
 
     get url(): string {
@@ -91,18 +91,18 @@ abstract class NodeWebSocketConnectionBase {
 }
 
 class NodeWebSocketConnection extends NodeWebSocketConnectionBase implements WebSocketServerConnection {
-    #buffer = Bytes.allocate(0)
+    protected _buffer: Bytes = Bytes.allocate(0)
 
     onMessage(data: Buffer): void {
-        this.#buffer.writeSync(data.length).set(data)
-        this.#buffer.disposeWriteSync()
+        this._buffer.writeSync(data.length).set(data)
+        this._buffer.disposeWriteSync()
     }
 
     async read(into: Uint8Array): Promise<number> {
-        if (this.#buffer.available > 0) {
-            let size = Math.min(this.#buffer.available, into.length)
-            into.set(this.#buffer.readSync(size))
-            this.#buffer.reclaim()
+        if (this._buffer.available > 0) {
+            let size = Math.min(this._buffer.available, into.length)
+            into.set(this._buffer.readSync(size))
+            this._buffer.reclaim()
             return size
         }
 
@@ -110,9 +110,9 @@ class NodeWebSocketConnection extends NodeWebSocketConnectionBase implements Web
         await this._cv.wait()
         if (this._error) throw this._error
 
-        let size = Math.min(this.#buffer.available, into.length)
-        into.set(this.#buffer.readSync(size))
-        this.#buffer.reclaim()
+        let size = Math.min(this._buffer.available, into.length)
+        into.set(this._buffer.readSync(size))
+        this._buffer.reclaim()
         return size
     }
 
@@ -124,23 +124,23 @@ class NodeWebSocketConnection extends NodeWebSocketConnectionBase implements Web
 }
 
 class NodeWebSocketConnectionFramed extends NodeWebSocketConnectionBase implements WebSocketServerConnectionFramed {
-    #buffer: Deque<string | Uint8Array> = new Deque()
+    protected _buffer: Deque<string | Uint8Array> = new Deque()
 
     onMessage(data: Buffer, isBinary: boolean): void {
-        if (isBinary) this.#buffer.pushBack(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
-        else this.#buffer.pushBack(data.toString("utf-8"))
+        if (isBinary) this._buffer.pushBack(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
+        else this._buffer.pushBack(data.toString("utf-8"))
     }
 
     async readFrame(): Promise<Uint8Array | string> {
-        if (!this.#buffer.isEmpty()) {
-            return this.#buffer.popFront()!
+        if (!this._buffer.isEmpty()) {
+            return this._buffer.popFront()!
         }
 
         if (this._error !== null) throw this._error
         await this._cv.wait()
         if (this._error !== null) throw this._error
 
-        return this.#buffer.popFront()!
+        return this._buffer.popFront()!
     }
 
     async writeFrame(data: Uint8Array | string): Promise<void> {
@@ -150,26 +150,26 @@ class NodeWebSocketConnectionFramed extends NodeWebSocketConnectionBase implemen
 }
 
 abstract class NodeWebSocketServerBase<Connection> {
-    #closed = false
-    #waiter?: Deferred<Connection>
+    protected _closed = false
+    protected _waiter?: Deferred<Connection>
 
     constructor(readonly server: WebSocketServer) {
         const onConnection = (socket: WebSocket, request: IncomingMessage) => {
-            if (!this.#waiter) {
+            if (!this._waiter) {
                 socket.close()
                 return
             }
 
-            this.#waiter.resolve(this.makeConnection(socket, request))
-            this.#waiter = undefined
+            this._waiter.resolve(this.makeConnection(socket, request))
+            this._waiter = undefined
         }
 
         const onError = (err: unknown) => {
-            this.#waiter?.reject(err)
+            this._waiter?.reject(err)
         }
 
         const onClose = () => {
-            this.#waiter?.reject(new ListenerClosedError())
+            this._waiter?.reject(new ListenerClosedError())
         }
 
         server.on("connection", onConnection)
@@ -201,22 +201,22 @@ abstract class NodeWebSocketServerBase<Connection> {
     }
 
     async accept(): Promise<Connection> {
-        if (this.#closed) throw new ListenerClosedError()
+        if (this._closed) throw new ListenerClosedError()
 
-        this.#waiter = new Deferred()
-        let connection = await this.#waiter.promise
-        this.#waiter = undefined
+        this._waiter = new Deferred()
+        let connection = await this._waiter.promise
+        this._waiter = undefined
         return connection
     }
 
     handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
-        if (!this.#waiter) {
+        if (!this._waiter) {
             socket.destroy()
             return
         }
 
-        let waiter = this.#waiter
-        this.#waiter = undefined
+        let waiter = this._waiter
+        this._waiter = undefined
         this.server.handleUpgrade(req, socket, head, (socket, _req) => {
             waiter.resolve(this.makeConnection(socket, _req))
         })

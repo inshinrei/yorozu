@@ -6,46 +6,46 @@ export interface ReaderWithFinalResult {
 }
 
 export class ReaderWithFinal implements Readable {
-    #buf1: Uint8Array
-    #buf2: Uint8Array
+    protected _buf1: Uint8Array
+    protected _buf2: Uint8Array
 
-    #readable: Readable
-    #prev: Uint8Array | null = null
-    #ended = false
+    protected _readable: Readable
+    protected _prev: Uint8Array | null = null
+    protected _ended = false
 
     constructor(readable: Readable, options?: { internalBufferSize?: number }) {
-        this.#readable = readable
+        this._readable = readable
         let bufSize = options?.internalBufferSize ?? 1024 * 32
-        this.#buf1 = new Uint8Array(bufSize)
-        this.#buf2 = new Uint8Array(bufSize)
+        this._buf1 = new Uint8Array(bufSize)
+        this._buf2 = new Uint8Array(bufSize)
     }
 
     async readWithFinal(into: Uint8Array): Promise<ReaderWithFinalResult> {
-        if (this.#ended) return { nread: 0, final: true }
-        if (!this.#prev) {
-            let nread = await this.#readable.read(this.#buf1)
+        if (this._ended) return { nread: 0, final: true }
+        if (!this._prev) {
+            let nread = await this._readable.read(this._buf1)
             if (nread === 0) return { nread: 0, final: true }
-            this.#prev = this.#buf1.subarray(0, nread)
-            this.#swapBufs()
+            this._prev = this._buf1.subarray(0, nread)
+            this._swapBufs()
         }
 
-        if (this.#prev.length > into.length) {
-            into.set(this.#prev.subarray(0, into.length))
-            this.#prev = this.#prev.subarray(into.length)
+        if (this._prev.length > into.length) {
+            into.set(this._prev.subarray(0, into.length))
+            this._prev = this._prev.subarray(into.length)
             return { nread: into.length, final: false }
         }
 
-        let nread = await this.#readable.read(this.#buf1)
+        let nread = await this._readable.read(this._buf1)
         if (nread === 0) {
-            into.set(this.#prev)
-            this.#ended = true
-            return { nread: this.#prev.length, final: true }
+            into.set(this._prev)
+            this._ended = true
+            return { nread: this._prev.length, final: true }
         }
 
-        into.set(this.#prev)
-        let nwritten = this.#prev.length
-        this.#prev = this.#buf1.subarray(0, nread)
-        this.#swapBufs()
+        into.set(this._prev)
+        let nwritten = this._prev.length
+        this._prev = this._buf1.subarray(0, nread)
+        this._swapBufs()
         return { nread: nwritten, final: false }
     }
 
@@ -54,9 +54,9 @@ export class ReaderWithFinal implements Readable {
         return res.nread
     }
 
-    #swapBufs(): void {
-        let tmp = this.#buf1
-        this.#buf1 = this.#buf2
-        this.#buf2 = tmp
+    protected _swapBufs(): void {
+        let tmp = this._buf1
+        this._buf1 = this._buf2
+        this._buf2 = tmp
     }
 }

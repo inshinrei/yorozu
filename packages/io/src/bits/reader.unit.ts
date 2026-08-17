@@ -3,18 +3,18 @@ import { BitReader } from "./reader"
 import { PartialReadError } from "../errors"
 
 class MockSyncReadable {
-    #data: Uint8Array
-    #pos = 0
+    protected _data: Uint8Array
+    protected _pos = 0
 
     constructor(data: Uint8Array) {
-        this.#data = data
+        this._data = data
     }
 
     readSync(size: number): Uint8Array {
-        if (this.#pos >= this.#data.length) return new Uint8Array(0)
-        const n = Math.min(size, this.#data.length - this.#pos)
-        const slice = this.#data.subarray(this.#pos, this.#pos + n)
-        this.#pos += n
+        if (this._pos >= this._data.length) return new Uint8Array(0)
+        const n = Math.min(size, this._data.length - this._pos)
+        const slice = this._data.subarray(this._pos, this._pos + n)
+        this._pos += n
         return slice
     }
 }

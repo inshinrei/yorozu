@@ -4,12 +4,12 @@ import { ConditionVariable } from "@yorozu/utils"
 import { ConnectionClosedError } from "./errors"
 
 export class FakeConnection<Address = string> implements Connection<Address, Address> {
-    private _rx = Bytes.allocate()
-    private _tx = Bytes.allocate()
-    private _closed = false
-    private _cv = new ConditionVariable()
+    protected _rx: Bytes = Bytes.allocate()
+    protected _tx: Bytes = Bytes.allocate()
+    protected _closed = false
+    protected _cv: ConditionVariable = new ConditionVariable()
 
-    constructor(private readonly address: Address) {}
+    constructor(protected readonly address: Address) {}
 
     get localAddress(): Address {
         return this.address

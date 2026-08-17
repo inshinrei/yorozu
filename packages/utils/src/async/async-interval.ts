@@ -2,58 +2,58 @@ import * as timers from "./timers"
 import { noop } from "../misc"
 
 export class AsyncInterval {
-    #handler: (abortSignal: AbortSignal) => Promise<void>
-    #interval: number
-    #timer?: timers.Timer
-    #onError: (err: unknown) => void = noop
-    #stopped = true
-    #generation = 0
-    #abortController = new AbortController()
+    protected _handler: (abortSignal: AbortSignal) => Promise<void>
+    protected _interval: number
+    protected _timer?: timers.Timer
+    protected _onError: (err: unknown) => void = noop
+    protected _stopped = true
+    protected _generation = 0
+    protected _abortController: AbortController = new AbortController()
 
     constructor(handler: (abortSignal: AbortSignal) => Promise<void>, interval: number) {
-        this.#handler = handler
-        this.#interval = interval
+        this._handler = handler
+        this._interval = interval
     }
 
-    start(after: number = this.#interval): void {
+    start(after: number = this._interval): void {
         this.stop()
-        this.#stopped = false
-        let generation = this.#generation
-        this.#timer = timers.setTimeout(() => this.#onTimeout(generation), after)
+        this._stopped = false
+        let generation = this._generation
+        this._timer = timers.setTimeout(() => this._onTimeout(generation), after)
     }
 
     startNow(): void {
         this.stop()
-        this.#stopped = false
-        this.#onTimeout(this.#generation)
+        this._stopped = false
+        this._onTimeout(this._generation)
     }
 
     stop(): void {
-        this.#generation++
-        this.#abortController.abort()
-        this.#abortController = new AbortController()
-        if (this.#timer != null) {
-            timers.clearTimeout(this.#timer)
-            this.#timer = undefined
+        this._generation++
+        this._abortController.abort()
+        this._abortController = new AbortController()
+        if (this._timer != null) {
+            timers.clearTimeout(this._timer)
+            this._timer = undefined
         }
-        this.#stopped = true
+        this._stopped = true
     }
 
     onError(handler: (err: unknown) => void): void {
-        this.#onError = handler
+        this._onError = handler
     }
 
-    #onTimeout = (generation: number) => {
-        this.#timer = undefined
+    protected _onTimeout = (generation: number): void => {
+        this._timer = undefined
         void (async () => {
             try {
-                await this.#handler(this.#abortController.signal)
+                await this._handler(this._abortController.signal)
             } catch (err) {
-                this.#onError(err)
+                this._onError(err)
             }
 
-            if (this.#stopped || generation !== this.#generation) return
-            this.#timer = timers.setTimeout(() => this.#onTimeout(generation), this.#interval)
+            if (this._stopped || generation !== this._generation) return
+            this._timer = timers.setTimeout(() => this._onTimeout(generation), this._interval)
         })()
     }
 }

@@ -10,16 +10,16 @@ interface Writable {
 }
 
 class MockReadable implements Readable {
-    #chunks: Uint8Array[]
-    #idx = 0
+    protected _chunks: Uint8Array[]
+    protected _idx = 0
 
     constructor(chunks: Uint8Array[]) {
-        this.#chunks = chunks
+        this._chunks = chunks
     }
 
     async read(into: Uint8Array): Promise<number> {
-        if (this.#idx >= this.#chunks.length) return 0
-        const chunk = this.#chunks[this.#idx++]
+        if (this._idx >= this._chunks.length) return 0
+        const chunk = this._chunks[this._idx++]
         const n = Math.min(chunk.length, into.length)
         into.set(chunk.subarray(0, n))
         return n

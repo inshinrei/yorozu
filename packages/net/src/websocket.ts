@@ -59,7 +59,7 @@ abstract class WebSocketConnectionBase implements Closable {
 }
 
 export class WebSocketConnection extends WebSocketConnectionBase implements Connection<string, never> {
-    #buffer = Bytes.allocate(0)
+    protected _buffer: Bytes = Bytes.allocate(0)
 
     get localAddress(): null {
         return null
@@ -67,20 +67,20 @@ export class WebSocketConnection extends WebSocketConnectionBase implements Conn
 
     onMessage(event: MessageEvent): void {
         if (typeof event.data === "string") {
-            let buffer = this.#buffer.writeSync(utf8.encodedLength(event.data))
+            let buffer = this._buffer.writeSync(utf8.encodedLength(event.data))
             utf8.encoder.encodeInto(event.data, buffer)
         } else {
             let u8 = new Uint8Array(event.data)
-            this.#buffer.writeSync(u8.length).set(u8)
+            this._buffer.writeSync(u8.length).set(u8)
         }
-        this.#buffer.disposeWriteSync()
+        this._buffer.disposeWriteSync()
     }
 
     async read(into: Uint8Array): Promise<number> {
-        if (this.#buffer.available > 0) {
-            let size = Math.min(this.#buffer.available, into.length)
-            into.set(this.#buffer.readSync(size))
-            this.#buffer.reclaim()
+        if (this._buffer.available > 0) {
+            let size = Math.min(this._buffer.available, into.length)
+            into.set(this._buffer.readSync(size))
+            this._buffer.reclaim()
             return size
         }
 
@@ -88,9 +88,9 @@ export class WebSocketConnection extends WebSocketConnectionBase implements Conn
         await this._cv.wait()
         if (this._error !== null) throw this._error
 
-        let size = Math.min(this.#buffer.available, into.length)
-        into.set(this.#buffer.readSync(size))
-        this.#buffer.reclaim()
+        let size = Math.min(this._buffer.available, into.length)
+        into.set(this._buffer.readSync(size))
+        this._buffer.reclaim()
         return size
     }
 
@@ -107,20 +107,20 @@ export interface WebSocketConnectionFramed extends Closable {
 }
 
 export class WebSocketConnectionFramedBase extends WebSocketConnectionBase implements WebSocketConnectionFramed {
-    #buffer = new Deque()
+    protected _buffer: Deque<string | Uint8Array> = new Deque()
 
     onMessage(event: MessageEvent): void {
-        if (typeof event.data === "string") this.#buffer.pushBack(event.data)
-        else this.#buffer.pushBack(new Uint8Array(event.data))
+        if (typeof event.data === "string") this._buffer.pushBack(event.data)
+        else this._buffer.pushBack(new Uint8Array(event.data))
     }
 
     async readFrame(): Promise<Uint8Array | string> {
-        if (!this.#buffer.isEmpty()) return this.#buffer.popFront() as Uint8Array
+        if (!this._buffer.isEmpty()) return this._buffer.popFront() as Uint8Array
         if (this._error !== null) throw this._error
         await this._cv.wait()
         if (this._error !== null) throw this._error
 
-        return this.#buffer.popFront() as Uint8Array
+        return this._buffer.popFront() as Uint8Array
     }
 
     async writeFrame(data: Uint8Array | string): Promise<void> {

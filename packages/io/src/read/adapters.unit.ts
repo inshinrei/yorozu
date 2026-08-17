@@ -6,16 +6,16 @@ interface SyncReadable {
 }
 
 class MockSyncReadable implements SyncReadable {
-    #chunks: Uint8Array[]
-    #idx = 0
+    protected _chunks: Uint8Array[]
+    protected _idx = 0
 
     constructor(chunks: Uint8Array[]) {
-        this.#chunks = chunks
+        this._chunks = chunks
     }
 
     readSync(size: number): Uint8Array {
-        if (this.#idx >= this.#chunks.length) return new Uint8Array(0)
-        let chunk = this.#chunks[this.#idx++]
+        if (this._idx >= this._chunks.length) return new Uint8Array(0)
+        let chunk = this._chunks[this._idx++]
         let n = Math.min(size, chunk.length)
         return chunk.subarray(0, n)
     }

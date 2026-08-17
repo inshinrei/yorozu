@@ -5,9 +5,9 @@ export class AsyncQueue<T> {
     readonly queue: Deque<T>
     readonly maxSize: number | undefined
 
-    #consumerWaiters = new Deque<Deferred<T | undefined>>()
-    #producerWaiters = new Deque<Deferred<void>>()
-    #ended = false
+    protected _consumerWaiters: Deque<Deferred<T | undefined>> = new Deque<Deferred<T | undefined>>()
+    protected _producerWaiters: Deque<Deferred<void>> = new Deque<Deferred<void>>()
+    protected _ended = false
 
     constructor(from?: ArrayLike<T> | Deque<T>, maxSize?: number) {
         if (maxSize !== undefined && maxSize < 1) {
@@ -44,17 +44,17 @@ export class AsyncQueue<T> {
     }
 
     get ended(): boolean {
-        return this.#ended
+        return this._ended
     }
 
     async enqueue(item: T): Promise<void> {
-        if (this.#ended) {
+        if (this._ended) {
             throw new Error("Cannot enqueue after .end() has been called")
         }
 
         while (true) {
-            if (this.#consumerWaiters.length > 0) {
-                let waiter = this.#consumerWaiters.popFront()!
+            if (this._consumerWaiters.length > 0) {
+                let waiter = this._consumerWaiters.popFront()!
                 waiter.resolve(item)
                 return
             }
@@ -65,21 +65,21 @@ export class AsyncQueue<T> {
             }
 
             let waiter = new Deferred<void>()
-            this.#producerWaiters.pushBack(waiter)
+            this._producerWaiters.pushBack(waiter)
             await waiter.promise
 
-            if (this.#ended) {
+            if (this._ended) {
                 throw new Error("Queue was ended while waiting to enqueue.")
             }
         }
     }
 
     tryEnqueue(item: T): boolean {
-        if (this.#ended || this.isFull) {
+        if (this._ended || this.isFull) {
             return false
         }
-        if (this.#consumerWaiters.length > 0) {
-            let waiter = this.#consumerWaiters.popFront()!
+        if (this._consumerWaiters.length > 0) {
+            let waiter = this._consumerWaiters.popFront()!
             waiter.resolve(item)
             return true
         }
@@ -88,19 +88,19 @@ export class AsyncQueue<T> {
     }
 
     end(): void {
-        if (this.#ended) throw new Error(".end() has already been called.")
-        this.#ended = true
+        if (this._ended) throw new Error(".end() has already been called.")
+        this._ended = true
 
-        for (let waiter of this.#consumerWaiters) {
+        for (let waiter of this._consumerWaiters) {
             waiter.resolve(undefined)
         }
-        this.#consumerWaiters.clear()
+        this._consumerWaiters.clear()
 
         let err = new Error("Queue has been ended.")
-        for (let waiter of this.#producerWaiters) {
+        for (let waiter of this._producerWaiters) {
             waiter.reject(err)
         }
-        this.#producerWaiters.clear()
+        this._producerWaiters.clear()
     }
 
     peek(): T | undefined {
@@ -110,22 +110,22 @@ export class AsyncQueue<T> {
     next(): T | undefined {
         if (this.queue.length === 0) return undefined
         let item = this.queue.popFront()
-        this.#wakeProducerIfNeeded()
+        this._wakeProducerIfNeeded()
         return item
     }
 
     async nextOrWait(): Promise<T | undefined> {
         if (this.queue.length > 0) {
             let item = this.queue.popFront()
-            this.#wakeProducerIfNeeded()
+            this._wakeProducerIfNeeded()
             return item
         }
-        if (this.#ended) {
+        if (this._ended) {
             return undefined
         }
 
         let waiter = new Deferred<T | undefined>()
-        this.#consumerWaiters.pushBack(waiter)
+        this._consumerWaiters.pushBack(waiter)
         return waiter.promise
     }
 
@@ -141,9 +141,9 @@ export class AsyncQueue<T> {
         return iterator
     }
 
-    #wakeProducerIfNeeded(): void {
-        if (this.#producerWaiters.length > 0 && !this.isFull) {
-            let producer = this.#producerWaiters.popFront()!
+    protected _wakeProducerIfNeeded(): void {
+        if (this._producerWaiters.length > 0 && !this.isFull) {
+            let producer = this._producerWaiters.popFront()!
             producer.resolve()
         }
     }

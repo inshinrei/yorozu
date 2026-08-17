@@ -106,125 +106,125 @@ export function decompress(data: Uint8Array, options?: DecompressOptions): Uint8
 }
 
 export class Compressor {
-    #inner: RawCompressor
-    #options: GzipCompressOptions
-    #crc = new Crc32()
-    #length = 0
-    #header = false
-    #done = false
+    protected _inner: RawCompressor
+    protected _options: GzipCompressOptions
+    protected _crc: Crc32 = new Crc32()
+    protected _length = 0
+    protected _header = false
+    protected _done = false
 
     constructor(options: GzipCompressOptions = {}) {
-        this.#options = options
-        this.#inner = new RawCompressor(options)
+        this._options = options
+        this._inner = new RawCompressor(options)
     }
 
-    #wrap(raw: Uint8Array, final: boolean): Uint8Array {
+    protected _wrap(raw: Uint8Array, final: boolean): Uint8Array {
         let header = 0
-        if (!this.#header) {
-            header = gzipHeaderSize(this.#options)
-            this.#header = true
+        if (!this._header) {
+            header = gzipHeaderSize(this._options)
+            this._header = true
         }
         let footer = final ? 8 : 0
         if (!header && !footer) return raw
         let out = new Uint8Array(header + raw.length + footer)
-        if (header) writeGzipHeader(out, this.#options)
+        if (header) writeGzipHeader(out, this._options)
         out.set(raw, header)
         if (footer) {
-            writeU32LE(out, header + raw.length, this.#crc.digest())
-            writeU32LE(out, header + raw.length + 4, this.#length >>> 0)
+            writeU32LE(out, header + raw.length, this._crc.digest())
+            writeU32LE(out, header + raw.length + 4, this._length >>> 0)
         }
         return out
     }
 
     push(chunk: Uint8Array, final?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        this.#crc.update(chunk)
-        this.#length += chunk.length
-        this.#done = !!final
-        return this.#wrap(this.#inner.push(chunk, final), !!final)
+        if (this._done) throw new StreamFinishedError()
+        this._crc.update(chunk)
+        this._length += chunk.length
+        this._done = !!final
+        return this._wrap(this._inner.push(chunk, final), !!final)
     }
 
     flush(sync?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        return this.#wrap(this.#inner.flush(sync), false)
+        if (this._done) throw new StreamFinishedError()
+        return this._wrap(this._inner.flush(sync), false)
     }
 }
 
 export class Decompressor {
-    #pending = u8.empty
-    #needHeader = true
-    #state: InflateState = { mode: 0 }
-    #window = new Uint8Array(32768)
-    #crc = new Crc32()
-    #length = 0
-    #check: boolean
-    #done = false
+    protected _pending: Uint8Array = u8.empty
+    protected _needHeader = true
+    protected _state: InflateState = { mode: 0 }
+    protected _window: Uint8Array = new Uint8Array(32768)
+    protected _crc: Crc32 = new Crc32()
+    protected _length = 0
+    protected _check: boolean
+    protected _done = false
 
     constructor(options?: DecompressOptions) {
-        this.#check = options?.check !== false
+        this._check = options?.check !== false
     }
 
     push(chunk: Uint8Array, final?: boolean): Uint8Array {
-        if (this.#done) throw new StreamFinishedError()
-        if (!this.#pending.length) this.#pending = chunk
+        if (this._done) throw new StreamFinishedError()
+        if (!this._pending.length) this._pending = chunk
         else if (chunk.length) {
-            let next = new Uint8Array(this.#pending.length + chunk.length)
-            next.set(this.#pending)
-            next.set(chunk, this.#pending.length)
-            this.#pending = next
+            let next = new Uint8Array(this._pending.length + chunk.length)
+            next.set(this._pending)
+            next.set(chunk, this._pending.length)
+            this._pending = next
         }
 
         let parts: Uint8Array[] = []
         for (;;) {
-            if (this.#needHeader) {
-                if (!this.#pending.length) break
-                if (this.#pending.length < 10 && !final) break
-                let header = gzipHeaderLength(this.#pending)
-                this.#pending = this.#pending.subarray(header)
-                this.#needHeader = false
-                this.#state = { mode: 0 }
-                this.#window = new Uint8Array(32768)
-                this.#crc = new Crc32()
-                this.#length = 0
+            if (this._needHeader) {
+                if (!this._pending.length) break
+                if (this._pending.length < 10 && !final) break
+                let header = gzipHeaderLength(this._pending)
+                this._pending = this._pending.subarray(header)
+                this._needHeader = false
+                this._state = { mode: 0 }
+                this._window = new Uint8Array(32768)
+                this._crc = new Crc32()
+                this._length = 0
             }
 
-            this.#state.mode = 0
-            let start = this.#state.outputLength || 0
-            let out = inflateRaw(this.#pending, this.#state, this.#window)
-            let produced = out.subarray(start, Math.min(this.#state.outputLength || 0, out.length))
+            this._state.mode = 0
+            let start = this._state.outputLength || 0
+            let out = inflateRaw(this._pending, this._state, this._window)
+            let produced = out.subarray(start, Math.min(this._state.outputLength || 0, out.length))
             if (produced.length) {
-                this.#crc.update(produced)
-                this.#length += produced.length
+                this._crc.update(produced)
+                this._length += produced.length
                 parts.push(new Uint8Array(produced))
             }
-            if (this.#state.final && !this.#state.lengthMap) {
-                this.#pending = this.#pending.subarray(byteCeil(this.#state.bitPos || 0))
-                this.#state.bitPos = 0
+            if (this._state.final && !this._state.lengthMap) {
+                this._pending = this._pending.subarray(byteCeil(this._state.bitPos || 0))
+                this._state.bitPos = 0
             } else {
-                this.#pending = this.#pending.subarray(((this.#state.bitPos || 0) / 8) | 0)
-                this.#state.bitPos = (this.#state.bitPos || 0) & 7
+                this._pending = this._pending.subarray(((this._state.bitPos || 0) / 8) | 0)
+                this._state.bitPos = (this._state.bitPos || 0) & 7
             }
-            this.#window = new Uint8Array(out.subarray(Math.max(0, (this.#state.outputLength || 0) - 32768)))
-            this.#state.outputLength = this.#window.length
+            this._window = new Uint8Array(out.subarray(Math.max(0, (this._state.outputLength || 0) - 32768)))
+            this._state.outputLength = this._window.length
 
-            if (this.#state.final && !this.#state.lengthMap) {
-                if (this.#pending.length < 8) {
+            if (this._state.final && !this._state.lengthMap) {
+                if (this._pending.length < 8) {
                     if (!final) break
                     throw new UnexpectedEofError()
                 }
-                if (this.#check) {
-                    if (readU32LE(this.#pending, 0) !== this.#crc.digest() || readU32LE(this.#pending, 4) !== this.#length >>> 0) {
+                if (this._check) {
+                    if (readU32LE(this._pending, 0) !== this._crc.digest() || readU32LE(this._pending, 4) !== this._length >>> 0) {
                         throw new ChecksumMismatchError()
                     }
                 }
-                this.#pending = this.#pending.subarray(8)
-                this.#needHeader = true
+                this._pending = this._pending.subarray(8)
+                this._needHeader = true
                 continue
             }
             break
         }
 
-        if (final) this.#done = true
+        if (final) this._done = true
         return concatParts(parts)
     }
 }

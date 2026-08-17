@@ -3,28 +3,28 @@ import { u8 } from "@yorozu/utils"
 import { nextPowerOfTwo } from "./_utils"
 
 export class Bytes implements Readable, Writable, SyncReadable, SyncWritable {
-    #buffer: Uint8Array
-    #writePos = 0
-    #readPos = 0
-    #preferredCapacity: number
-    #sharedRead = new Uint8Array(1)
-    #lastWriteSize = 0
+    protected _buffer: Uint8Array
+    protected _writePos = 0
+    protected _readPos = 0
+    protected _preferredCapacity: number
+    protected _sharedRead: Uint8Array = new Uint8Array(1)
+    protected _lastWriteSize = 0
 
     constructor(buf: Uint8Array) {
-        this.#buffer = buf
-        this.#preferredCapacity = buf.length
+        this._buffer = buf
+        this._preferredCapacity = buf.length
     }
 
     get capacity(): number {
-        return this.#buffer.byteLength
+        return this._buffer.byteLength
     }
 
     get available(): number {
-        return this.#writePos - this.#readPos
+        return this._writePos - this._readPos
     }
 
     get written(): number {
-        return this.#writePos
+        return this._writePos
     }
 
     static allocate(capacity: number = 1024 * 16): Bytes {
@@ -33,47 +33,47 @@ export class Bytes implements Readable, Writable, SyncReadable, SyncWritable {
 
     static from(data: Uint8Array): Bytes {
         let bytes = new Bytes(data)
-        bytes.#writePos = data.length
+        bytes._writePos = data.length
         return bytes
     }
 
     readSync(bytes: number): Uint8Array {
-        if (this.#readPos >= this.#writePos) return u8.empty
+        if (this._readPos >= this._writePos) return u8.empty
         if (bytes === 1) {
-            this.#sharedRead[0] = this.#buffer[this.#readPos++]
-            return this.#sharedRead
+            this._sharedRead[0] = this._buffer[this._readPos++]
+            return this._sharedRead
         }
-        let end = Math.min(this.#writePos, this.#readPos + bytes)
-        let result = this.#buffer.subarray(this.#readPos, end)
-        this.#readPos = end
+        let end = Math.min(this._writePos, this._readPos + bytes)
+        let result = this._buffer.subarray(this._readPos, end)
+        this._readPos = end
         return result
     }
 
     async read(into: Uint8Array): Promise<number> {
-        let size = Math.min(into.length, this.#writePos - this.#readPos)
-        into.set(this.#buffer.subarray(this.#readPos, this.#readPos + size))
-        this.#readPos += size
+        let size = Math.min(into.length, this._writePos - this._readPos)
+        into.set(this._buffer.subarray(this._readPos, this._readPos + size))
+        this._readPos += size
         return size
     }
 
     writeSync(size: number): Uint8Array {
-        this.#lastWriteSize = size
-        let newPos = this.#writePos + size
-        if (newPos > this.#buffer.length) {
+        this._lastWriteSize = size
+        let newPos = this._writePos + size
+        if (newPos > this._buffer.length) {
             let newBuffer = u8.allocate(nextPowerOfTwo(newPos))
-            newBuffer.set(this.#buffer)
-            this.#buffer = newBuffer
+            newBuffer.set(this._buffer)
+            this._buffer = newBuffer
         }
-        let slice = this.#buffer.subarray(this.#writePos, newPos)
-        this.#writePos = newPos
+        let slice = this._buffer.subarray(this._writePos, newPos)
+        this._writePos = newPos
         return slice
     }
 
     disposeWriteSync(written?: number): void {
         if (written !== undefined) {
-            if (written > this.#lastWriteSize)
-                throw new RangeError(`Written exceed last write size: ${written} > ${this.#lastWriteSize}`)
-            this.#writePos -= this.#lastWriteSize - written
+            if (written > this._lastWriteSize)
+                throw new RangeError(`Written exceed last write size: ${written} > ${this._lastWriteSize}`)
+            this._writePos -= this._lastWriteSize - written
         }
     }
 
@@ -83,32 +83,32 @@ export class Bytes implements Readable, Writable, SyncReadable, SyncWritable {
     }
 
     result(): Uint8Array {
-        return this.#buffer.subarray(this.#readPos, this.#writePos)
+        return this._buffer.subarray(this._readPos, this._writePos)
     }
 
     reclaim(): void {
-        if (this.#readPos === 0) return
-        let remaining = this.#writePos - this.#readPos
+        if (this._readPos === 0) return
+        let remaining = this._writePos - this._readPos
         if (remaining > 0) {
-            if (remaining < this.#preferredCapacity && this.capacity > this.#preferredCapacity) {
-                let newBuffer = u8.allocate(this.#preferredCapacity)
-                newBuffer.set(this.#buffer.subarray(this.#readPos, this.#writePos))
-                this.#buffer = newBuffer
+            if (remaining < this._preferredCapacity && this.capacity > this._preferredCapacity) {
+                let newBuffer = u8.allocate(this._preferredCapacity)
+                newBuffer.set(this._buffer.subarray(this._readPos, this._writePos))
+                this._buffer = newBuffer
             } else {
-                this.#buffer.copyWithin(0, this.#readPos, this.#writePos)
+                this._buffer.copyWithin(0, this._readPos, this._writePos)
             }
         }
-        this.#writePos = remaining
-        this.#readPos = 0
+        this._writePos = remaining
+        this._readPos = 0
     }
 
     rewind(n: number): void {
-        if (n > this.#readPos) throw new RangeError(`Rewind ${n} > ${this.#readPos}.`)
-        this.#readPos -= n
+        if (n > this._readPos) throw new RangeError(`Rewind ${n} > ${this._readPos}.`)
+        this._readPos -= n
     }
 
     reset(): void {
-        this.#readPos = 0
-        this.#writePos = 0
+        this._readPos = 0
+        this._writePos = 0
     }
 }

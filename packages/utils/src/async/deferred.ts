@@ -16,14 +16,14 @@ export class Deferred<T = void> {
 export class DeferredTracked<T = void> {
     readonly promise: Promise<T>
     readonly status: { type: "pending" } | { type: "fulfilled"; value: T } | { type: "rejected"; reason: unknown }
-    #resolve!: (value: T) => void
-    #reject!: (reason: unknown) => void
+    protected _resolve!: (value: T) => void
+    protected _reject!: (reason: unknown) => void
 
     constructor() {
         this.status = { type: "pending" }
         this.promise = new Promise<T>((resolve, reject) => {
-            this.#resolve = resolve
-            this.#reject = reject
+            this._resolve = resolve
+            this._reject = reject
         })
     }
 
@@ -40,12 +40,12 @@ export class DeferredTracked<T = void> {
     resolve(value: T): void {
         if (this.status.type !== "pending") return
         ;(this as UnsafeMutate<this>).status = { type: "fulfilled", value }
-        this.#resolve(value)
+        this._resolve(value)
     }
 
     reject(reason: unknown): void {
         if (this.status.type !== "pending") return
         ;(this as UnsafeMutate<this>).status = { type: "rejected", reason }
-        this.#reject(reason)
+        this._reject(reason)
     }
 }

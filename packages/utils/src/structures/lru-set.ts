@@ -1,45 +1,45 @@
 export class LruSet<T> {
-    #capacity: number
-    #set: Set<T>
+    protected _capacity: number
+    protected _set: Set<T>
 
     constructor(capacity: number, SetImpl: new () => Set<T> = Set) {
-        this.#capacity = capacity
-        this.#set = new SetImpl()
+        this._capacity = capacity
+        this._set = new SetImpl()
     }
 
     get size(): number {
-        return this.#set.size
+        return this._set.size
     }
 
     add(value: T): void {
-        if (this.#set.has(value)) {
-            this.#set.delete(value)
+        if (this._set.has(value)) {
+            this._set.delete(value)
         }
-        this.#set.add(value)
+        this._set.add(value)
 
-        if (this.#set.size > this.#capacity) {
-            let oldest = this.#set.keys().next()
-            if (!oldest.done) this.#set.delete(oldest.value)
+        if (this._set.size > this._capacity) {
+            let oldest = this._set.keys().next()
+            if (!oldest.done) this._set.delete(oldest.value)
         }
     }
 
     has(value: T): boolean {
-        return this.#set.has(value)
+        return this._set.has(value)
     }
 
     delete(value: T): boolean {
-        return this.#set.delete(value)
+        return this._set.delete(value)
     }
 
     clear(): void {
-        this.#set.clear()
+        this._set.clear()
     }
 
     *[Symbol.iterator](): IterableIterator<T> {
-        yield* this.#set
+        yield* this._set
     }
 
     toArray(): Array<T> {
-        return Array.from(this.#set)
+        return Array.from(this._set)
     }
 }
