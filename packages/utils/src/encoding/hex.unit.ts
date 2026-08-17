@@ -53,7 +53,13 @@ describe("hex encoding utilities", () => {
         })
 
         it("decodes odd-length hex string", () => {
-            expect(() => decode("abc")).toThrow(TypeError)
+            let originalFromHex = Uint8Array.fromHex
+            Uint8Array.fromHex = undefined as unknown as typeof Uint8Array.fromHex
+            try {
+                expect(() => decode("abc")).toThrow(TypeError)
+            } finally {
+                Uint8Array.fromHex = originalFromHex
+            }
         })
 
         it("decodes empty string to empty Uint8Array", () => {
@@ -61,16 +67,23 @@ describe("hex encoding utilities", () => {
         })
 
         it("throws on invalid hex characters", () => {
-            expect(() => decode("0123g")).toThrow("Invalid hex string")
-            expect(() => decode("0123ZZ")).toThrow("Invalid hex string")
+            let originalFromHex = Uint8Array.fromHex
+            // force the manual path (fromHex, when present, is already strict)
+            Uint8Array.fromHex = undefined as unknown as typeof Uint8Array.fromHex
+            try {
+                expect(() => decode("0123g")).toThrow("Invalid hex string")
+                expect(() => decode("0123ZZ")).toThrow("Invalid hex string")
+            } finally {
+                Uint8Array.fromHex = originalFromHex
+            }
         })
 
-        it("uses native Buffer.from when available", () => {
-            const mockBuffer = new Uint8Array([0xde, 0xad])
-            vi.stubGlobal("Buffer", { from: vi.fn(() => mockBuffer) })
+        it("does not use silent Buffer.from for decode", () => {
+            let from = vi.fn(() => new Uint8Array([0xff]))
+            vi.stubGlobal("Buffer", { from })
 
-            const result = decode("dead")
-            expect(result).toEqual(mockBuffer)
+            expect(decode("dead")).toEqual(new Uint8Array([0xde, 0xad]))
+            expect(from).not.toHaveBeenCalled()
         })
 
         it("uses Uint8Array.fromHex when available", () => {
@@ -118,5 +131,12 @@ describe("hex encoding utilities", () => {
 
             expect(decoded).toEqual(buf)
         })
+    })
+})
+
+describe("hex decode Node path (Buffer present)", () => {
+    it("throws on invalid hex in Node (Buffer present)", () => {
+        expect(() => decode("zz")).toThrow()
+        expect(() => decode("abc")).toThrow()
     })
 })

@@ -46,6 +46,11 @@ describe("encoding utilities", () => {
             expect(encodedLength("😀")).toBe(4)
         })
 
+        it("does not skip the previous unit for a lone low surrogate", () => {
+            let str = "é\uDC00"
+            expect(encodedLength(str)).toBe(new TextEncoder().encode(str).length)
+        })
+
         it("matches native TextEncoder.byteLength for all cases", () => {
             const testCases = [
                 "",

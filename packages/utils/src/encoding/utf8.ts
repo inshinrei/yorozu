@@ -9,7 +9,10 @@ export function encodedLength(data: string): number {
         let code = data.charCodeAt(i)
         if (code > 0x7f && code <= 0x7ff) length++
         else if (code > 0x7ff && code <= 0xffff) length += 2
-        if (code >= 0xdc00 && code <= 0xdfff) i--
+        if (code >= 0xdc00 && code <= 0xdfff && i > 0) {
+            let prev = data.charCodeAt(i - 1)
+            if (prev >= 0xd800 && prev <= 0xdbff) i--
+        }
     }
 
     return length
