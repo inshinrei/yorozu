@@ -13,22 +13,22 @@ describe("AsyncLock", () => {
         lock.release()
     })
 
-    it.todo("acquire() is sequential when called multiple times", async () => {
-        const order: number[] = []
+    it("acquire() is sequential when called multiple times", async () => {
+        let order: number[] = []
 
-        const p1 = lock.acquire().then(() => order.push(1))
-        const p2 = lock.acquire().then(() => order.push(2))
-        const p3 = lock.acquire().then(() => order.push(3))
+        let p1 = lock.acquire().then(() => order.push(1))
+        let p2 = lock.acquire().then(() => order.push(2))
+        let p3 = lock.acquire().then(() => order.push(3))
 
-        await Promise.resolve()
+        await p1
         expect(order).toEqual([1])
 
         lock.release()
-        await Promise.resolve()
+        await p2
         expect(order).toEqual([1, 2])
 
         lock.release()
-        await Promise.resolve()
+        await p3
         expect(order).toEqual([1, 2, 3])
 
         lock.release()

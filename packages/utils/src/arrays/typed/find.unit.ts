@@ -14,6 +14,10 @@ describe("indexOf", () => {
         expect(indexOf(haystack, 7, 2)).toBe(2)
         expect(indexOf(haystack, 7, -5)).toBe(2)
         expect(indexOf(haystack, 7, 10)).toBe(-1)
+        // start < 0 → start + length; still-negative floors at 0
+        expect(indexOf(haystack, 7, -2)).toBe(-1)
+        expect(indexOf(haystack, 8, -2)).toBe(3)
+        expect(indexOf(haystack, 5, -100)).toBe(0)
     })
 
     it("works with BigInt64Array / BigUint64Array", () => {
@@ -31,14 +35,21 @@ describe("indexOf", () => {
 describe("lastIndexOf", () => {
     it("finds last occurrence in regular TypedArray", () => {
         let haystack = new Uint32Array([10, 20, 30, 20, 40])
-        expect(lastIndexOf(haystack as any, 20 as any)).toBe(3)
+        expect(lastIndexOf(haystack, 20)).toBe(3)
         expect(lastIndexOf(haystack, 20, 2)).toBe(1)
     })
 
     it("respects start index (including default = length-1)", () => {
         let haystack = new Int8Array([1, 2, 3, 2, 4])
-        expect(lastIndexOf(haystack as any, 2 as any)).toBe(3)
+        expect(lastIndexOf(haystack, 2)).toBe(3)
         expect(lastIndexOf(haystack, 2, 1)).toBe(1)
+    })
+
+    it("applies native lastIndexOf fromIndex rules", () => {
+        let haystack = new Uint32Array([10, 20, 30, 20, 40])
+        expect(lastIndexOf(haystack, 20, -2)).toBe(3)
+        expect(lastIndexOf(haystack, 20, -3)).toBe(1)
+        expect(lastIndexOf(haystack, 20, -100)).toBe(-1)
     })
 
     it("works with BigInt arrays", () => {
@@ -48,7 +59,7 @@ describe("lastIndexOf", () => {
 
     it("returns -1 when not found or empty", () => {
         let empty = new Uint16Array([])
-        expect(lastIndexOf(empty as any, 5 as any)).toBe(-1)
+        expect(lastIndexOf(empty, 5)).toBe(-1)
     })
 })
 
@@ -134,6 +145,12 @@ describe("includes", () => {
     it("supports BigInt needles", () => {
         let haystack = new BigInt64Array([BigInt(100), BigInt(200)])
         expect(includes(haystack, BigInt(200))).toBe(true)
+    })
+
+    it("uses SameValueZero so NaN matches NaN", () => {
+        expect(includes(new Float32Array([NaN]), NaN)).toBe(true)
+        expect(includes(new Float64Array([1, NaN, 2]), NaN)).toBe(true)
+        expect(includes(new Float32Array([0]), -0)).toBe(true)
     })
 })
 

@@ -85,6 +85,24 @@ describe("Emitter", () => {
         expect(emitter.length).toBe(0)
     })
 
+    it("once() then a second listener both receive the first emit", () => {
+        emitter.once(spy1)
+        emitter.add(spy2)
+
+        emitter.emit(7)
+
+        expect(spy1).toHaveBeenCalledTimes(1)
+        expect(spy1).toHaveBeenCalledWith(7)
+        expect(spy2).toHaveBeenCalledTimes(1)
+        expect(spy2).toHaveBeenCalledWith(7)
+        expect(emitter.length).toBe(1)
+
+        emitter.emit(8)
+        expect(spy1).toHaveBeenCalledTimes(1)
+        expect(spy2).toHaveBeenCalledTimes(2)
+        expect(spy2).toHaveBeenCalledWith(8)
+    })
+
     it("forwardTo() correctly forwards all emissions", () => {
         let target = new Emitter<number>()
         let targetSpy = vi.fn()

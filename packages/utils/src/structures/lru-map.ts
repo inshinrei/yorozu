@@ -30,10 +30,8 @@ export class LruMap<K, V> {
         this.#map.set(key, value)
 
         if (this.#map.size > this.#capacity) {
-            let oldest = this.#map.keys().next().value
-            if (oldest !== undefined) {
-                this.#map.delete(oldest)
-            }
+            let oldest = this.#map.keys().next()
+            if (!oldest.done) this.#map.delete(oldest.value)
         }
     }
 

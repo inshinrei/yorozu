@@ -18,6 +18,7 @@ export class BufferPool {
     }
 
     allocate(size: number): Uint8Array {
+        if (!Number.isInteger(size) || size < 0) throw new RangeError(`Invalid allocation size: ${size}.`)
         if (size === 0) return empty
         if (size > this.maxAllocSize) {
             return new Uint8Array(size)

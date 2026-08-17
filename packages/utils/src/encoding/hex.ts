@@ -46,7 +46,6 @@ declare const Uint8Array: Uint8ArrayConstructor & {
 }
 
 const HasToHex = typeof Uint8Array.prototype.toHex === "function"
-const HasFromHex = typeof Uint8Array.fromHex === "function"
 
 export function encode(buf: Uint8Array): string {
     if (typeof Buffer !== "undefined") return Buffer.from(buf).toString("hex")
@@ -57,18 +56,12 @@ export function encode(buf: Uint8Array): string {
 }
 
 export function decode(data: string): Uint8Array {
-    if (typeof Buffer !== "undefined") {
-        let buf = Buffer.from(data, "hex")
-        return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
-    }
-    if (HasFromHex) return Uint8Array.fromHex(data)
-    let buf = u8.allocate(Math.ceil(data.length / 2))
-    let dataLength = data.length
-    let length = Math.min(buf.length, dataLength / 2)
-    let i
-    for (i = 0; i < length; ++i) {
+    // Buffer.from(str, "hex") is silent on odd length and non-hex characters
+    if (typeof Uint8Array.fromHex === "function") return Uint8Array.fromHex(data)
+    if (data.length % 2 !== 0) throw new TypeError("Invalid hex string.", { cause: { data } })
+    let buf = u8.allocate(data.length / 2)
+    for (let i = 0; i < buf.length; ++i) {
         let a = hexCharValueTable[data[i * 2]]
-        /* ?? 0 */
         let b = hexCharValueTable[data[i * 2 + 1]]
         if (a === undefined || b === undefined) throw new TypeError("Invalid hex string.", { cause: { data } })
         buf[i] = (a << 4) | b

@@ -14,6 +14,7 @@ export function composeMiddlewares<C, R = void>(
     if (final == null)
         return function (context: C, next: Middleware<C, R>): Promise<R> {
             function dispatch(i: number, ctx: C): Promise<R> {
+                if (i > middlewares.length) throw new Error("next() called after end")
                 let fn = middlewares[i] ?? next
                 return fn(ctx, dispatch.bind(null, i + 1))
             }

@@ -16,7 +16,7 @@ export function unsafeCastType<T>(value: unknown): asserts value is T {
 }
 
 export function assertNotNull<T>(value: T): asserts value is Exclude<T, null | undefined> {
-    if (value === null || undefined) throw new Error(`Value is ${value as string}.`)
+    if (value == null) throw new Error(`Value is ${value as string}.`)
 }
 
 export function asNonNull<T>(

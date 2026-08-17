@@ -20,14 +20,16 @@ lookup.set("_".charCodeAt(0), 63)
 declare const Buffer: typeof import("node:buffer").Buffer
 
 const HasToBase64 = typeof Uint8Array.prototype.toBase64 === "function"
-const HasFromBase64 = typeof Uint8Array.fromBase64 === "function"
+
+declare const Uint8Array: Uint8ArrayConstructor & {
+    fromBase64?: (data: string, options?: { alphabet?: "base64" | "base64url" }) => Uint8Array
+}
 
 export function decode(data: string, url: boolean = false): Uint8Array {
-    if (typeof Buffer !== "undefined") {
-        let buf = Buffer.from(data, url ? "base64url" : "base64")
-        return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+    // Buffer.from(str, "base64"|"base64url") is silent on invalid alphabet
+    if (typeof Uint8Array.fromBase64 === "function") {
+        return Uint8Array.fromBase64(data, { alphabet: url ? "base64url" : "base64" })
     }
-    if (HasFromBase64) return Uint8Array.fromBase64(data, { alphabet: url ? "base64url" : "base64" })
     data = data.replace(/=+$/g, "")
     let n = data.length
     let rem = n % 4
@@ -36,11 +38,14 @@ export function decode(data: string, url: boolean = false): Uint8Array {
     let encoded = u8.allocate(n + 3)
     encoder.encodeInto(`${data}===`, encoded)
     for (let i = 0, j = 0; i < n; i += 4, j += 3) {
-        let x =
-            (lookup.get(encoded[i])! << 18) +
-            (lookup.get(encoded[i + 1])! << 12) +
-            (lookup.get(encoded[i + 2])! << 6) +
-            lookup.get(encoded[i + 3])!
+        let a = lookup.get(encoded[i])
+        let b = lookup.get(encoded[i + 1])
+        let c = lookup.get(encoded[i + 2])
+        let d = lookup.get(encoded[i + 3])
+        if (a === undefined || b === undefined || c === undefined || d === undefined) {
+            throw new TypeError("Invalid base64 string.", { cause: { data } })
+        }
+        let x = (a << 18) + (b << 12) + (c << 6) + d
         encoded[j] = x >> 16
         encoded[j + 1] = (x >> 8) & 0xff
         encoded[j + 2] = x & 0xff

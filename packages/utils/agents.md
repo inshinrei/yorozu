@@ -1,118 +1,147 @@
 # Yorozu Utils - Agent Reference
 
-This document provides a quick reference for the `@yorozu/utils` package, intended for AI coding agents and developers.
-It covers all exported utilities organized by module.
+Quick reference for `@yorozu/utils`. Names and behaviors match what is exported from `src/**` (re-exported from the package root).
 
-## Overview
-
-`packages/utils` exports a collection of lightweight, zero-dependency TypeScript utilities:
-
-- Arrays (typed + Uint8Array helpers)
-- BigInt operations
-- Encoding (base64, hex, utf8)
-- Iteration helpers
-- Misc utilities (assert, guards, objects, strings, composition)
-- Async primitives (locks, queues, emitters, etc.)
-- Data structures (LRU, Deque, custom maps/sets)
-- Advanced TypeScript types
-
-All modules are re-exported from the package root.
+Import as namespaces where the package does (`typed`, `u8`, `base64`, `hex`, `utf8`, `timers`) or as named exports.
 
 ---
 
 ## arrays
 
+Root exports: `TypedArray`, namespaces `typed` and `u8`.
+
 ### typed
 
-- `TypedArray`: Union type for all typed arrays (including BigInt variants).
-- `compare(a, b)`: Lexicographic comparison returning -1 | 0 | 1.
-- `equal(a, b)`: Deep equality check for TypedArrays.
-- `indexOf`, `lastIndexOf`, `includes`: Overloaded search functions.
-- `indexOfArray`, `lastIndexOfArray`, `includesArray`: Search for sub-arrays.
-- `toDataView`, `view(ctor, buf)`: Conversion helpers.
-- `getPlatformByteOrder()`: Cached endianness detection.
+- `TypedArray` — union of standard typed arrays (BigInt variants via `AnyToNever`).
+- `compare(a, b)` — length first, then element-wise; returns `-1 | 0 | 1`.
+- `equal(a, b)` — `compare(a, b) === 0`.
+- `indexOf` / `lastIndexOf` — scalar search; optional `start` with native-style negative/clamp handling.
+- `indexOfArray` / `lastIndexOfArray` / `includesArray` — subarray search.
+- `includes` — SameValueZero (NaN matches NaN).
+- `toDataView(buf)`, `view(ctor, buf)`, `getPlatformByteOrder()` (`"little" | "big"`, cached).
 
-### u8 (Uint8Array utilities)
+### u8
 
-- `concat(bufs)`: Concatenate Uint8Arrays (fast path for Node Buffers).
-- `clone`, `empty`: Cloning and empty buffer constant.
-- `readNthBit`: Bit-level reading.
-- `allocate(n)`, `free(buf)`: Pooled allocator for Uint8Arrays.
-- `reverse(buf)`: In-place reversal.
-- `swap(a, b, i, j)`: Byte swapping between buffers.
-- `xor(a, b, out?)`: XOR operation with optional output buffer.
+- Pool: `BufferPool` (`allocate`, `reset`; ctor `size` default 16KiB, max single pooled alloc = size/2), `setDefaultPool(size)`, `allocate(size)`, `allocateWith(init)` — **no `free`**.
+- `empty`, `clone(buf)`, `readNthBit(byte, bit)`.
+- `concat(bufs)` — empty → `allocate(0)`; single element returns that buffer (alias, not a copy); multi uses `Buffer.concat` when available.
+- `concat2(a, b)`, `concat3(a, b, c)`.
+- `reverse(buffer)` in-place; `toReversed(buffer)` new buffer.
+- `xor(data, key)` (new buffer), `xorInPlace(data, key)` — key must be at least as long as data.
+- Endian/nibble: `swap16` / `swap32` / `swap64` / `swapNibbles` (in-place; length must be multiple of width where applicable).
 
 ---
 
 ## bigint
 
-- `fromBytes`, `toBytes`: Big-endian byte conversion.
-- `bitLength`, `byteLength`.
-- Math: `divCeil`, `min`, `max`, `abs`, `gcd`, `lcm`, `mod`, `pow`.
-- Predicates: `isOdd`, `isEven`.
-- Bitwise: `and`, `or`, `xor`, `not`, shifts.
+- Bytes: `toBytes(value, length = 0, le = false)`, `fromBytes(buffer, le = false)`.
+- `bitLength(n)`, `twoMultiplicity(n)`.
+- `min` / `max` (variadic), `min2` / `max2`, `abs`.
+- `euclideanGcd(a, b)` (non-negative result), `modPowBinary(base, exp, mod)`, `modInv(a, n)`.
 
 ---
 
 ## encoding
 
-Namespaces: `base64`, `hex`, `utf8`
+Namespaces only: `base64`, `hex`, `utf8`.
 
-Each provides:
+### base64
 
-- `encode(input: Uint8Array): string`
-- `decode(input: string): Uint8Array`
+- `encode(bytes, url = false)`, `decode(data, url = false)`.
+- `encodedLength(n)`, `decodedLength(n)`.
+- Tables: `lookup`, `encodeLookup`.
+
+### hex
+
+- `encode(buf)`, `decode(data)`.
+- `encodedLength(n)`, `decodedLength(n)`.
+
+### utf8
+
+- `encoder` (`TextEncoder`), `decoder` (`TextDecoder`).
+- `encodedLength(data: string)` — UTF-8 byte length (no `encode`/`decode` helpers on the namespace).
 
 ---
 
 ## iterate
 
-- `enumerate<T>(iterable, start = 0)`: Yields `[index, value]` pairs.
+- `enumerate(iterable)` — yields `[index, value]` from `0`; **no `start` parameter**.
 
 ---
 
 ## misc
 
-- **assert**: `assert(cond, msg?)`, `assertEqual`, `fail`.
-- **composer**: `compose`, `pipe` for function composition.
-- **guards**: Type guards (`isString`, `isNumber`, `isObject`, `isArray`, `isFunction`, `isPromise`, `isDefined`, etc.).
-- **noop**: `noop()`, `asyncNoop()`.
-- **objects**: `deepEqual`, `deepClone`, `pick`, `omit`, `mapValues`, `hasOwn`.
-- **string**: `capitalize`, `camelCase`, `snakeCase`, `kebabCase`, `truncate`.
+### assert
+
+- `assert(condition, message?)`
+- `assertHashKey(obj, key)`
+- `unsafeCastType<T>(value)`
+- `assertNotNull(value)`, `asNonNull(value)`
+- `assertMatches(str, regex)` → `RegExpMatchArray`
+
+### composer
+
+- Types: `Middleware<C, R>`, `ComposedMiddleware<C, R>`
+- `composeMiddlewares(middlewares, final?)` — onion middleware chain (not `compose`/`pipe`).
+
+### guards
+
+- `isNotUndefined`, `isNotNull`, `isBoolean`, `isTruthy`, `isFalsy`
+- `isFunction`, `isNumber`, `isString`, `isSymbol`, `isBigInt`, `isObject`
+
+### noop
+
+- `noop()` only (no `asyncNoop`).
+
+### objects
+
+- `objectKeys`, `objectEntries`
+- `clearUndefinedInPlace`
+- Types: `MergeInsertions`, `DeepMerge`, `DeepMergeOptions`
+- `deepMerge(into, from, options?)` — mutates `into`; strategies for undefined / properties / arrays / objects
+
+### string
+
+- `splitOnce(str, separator)`
+- `assertStartsWith(str, prefix)`, `assertEndsWith(str, suffix)`
+- Alias: `assertsEndsWith` → `assertEndsWith`
 
 ---
 
-## async (Async Primitives)
+## async
 
-- `sleep(ms)`
-- `AsyncLock`: Mutex with queuing.
-- `AsyncQueue<T>`: Bounded/unbounded async queue.
-- `AsyncResource<T>`: Acquire/release resource pattern.
-- `ConditionVariable`: Wait/notify.
-- `Deferred<T>`: Promise with external resolve/reject.
-- `Emitter`: Typed event emitter.
-- `Pool<T>`: Generic resource pool.
-- Timers: `setInterval`, `clearInterval` wrappers.
+- `sleep(ms, signal?)` — optional `AbortSignal`.
+- `AsyncLock` — `acquire` / `release` / `with`.
+- `AsyncQueue<T>` — bounded optional `maxSize`; `enqueue` / `tryEnqueue` / `next` / `nextOrWait` / `peek` / `end` / async iterator.
+- `AsyncResource<T>` — **SWR-style cache** (`fetcher` + `expiresIn`), not acquire/release pooling. Options: `autoReload`, `autoReloadAfter`, `swr`, `swrValidator`, `fetcher`, `onError`. Methods: `setData`, `update`, `get`, `getCached`, `destroy`, `isStale`; `onUpdated` emitter. Types: `AsyncResourceContext`, `AsyncResourceOptions`.
+- Concurrency “pool”: `asyncPool(iterable, executor, options?)`, `parallelMap(iterable, executor, options?)`, `AsyncPoolOptions`, `AggregateError`.
+- `ConditionVariable` — `wait()`, `notify()` **broadcasts** all waiters (no `notifyOne`).
+- `Deferred<T>`, `DeferredTracked<T>` (status / result / error).
+- `Emitter<T>` — `add` / `remove` / `once` / `emit` / `forwardTo` / `listeners` / `clear` / `length`.
+- `AsyncInterval` — `start` / `startNow` / `stop` / `onError` (handler receives `AbortSignal`).
+- Namespace `timers`: `Timer`, `Interval`, `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval` (branded handles).
 
 ---
 
 ## structures
 
-- `CustomMap<K, V>`, `CustomSet<T>`: With custom equality/hash functions.
-- `Deque<T>`: Double-ended queue.
-- `LRUMap<K, V>`, `LRUSet<T>`: Size-limited LRU caches.
+- `CustomMap<ExternalKey, InternalKey, V>` — Map with **external↔internal key mappers** (not hash/equality callbacks). Implements Map API + `getInternalMap`, `getOrInsert`, `getOrInsertComputed`.
+- `CustomSet<ExternalKey, InternalKey>` — Set with the same mapper pattern.
+- `Deque<T>` — double-ended queue; `DequeOptions.capacity`; front/back push/pop/peek, `at`, etc.
+- `LruMap<K, V>` / `LruSet<T>` — capacity-limited LRU (**class names are `LruMap` / `LruSet`**, not `LRU*`). Optional custom `Map`/`Set` impl in ctor.
+
+(`maybeWrapIterator` in `_iterator.ts` is internal, not re-exported from the package.)
 
 ---
 
-## types (Type Utilities)
+## types
 
-- `Brand<T, B>`: Nominal typing / branded types.
-- `Equal<A, B>`: Type-level equality check.
-- `UnknownToError`, `isError`.
-- `Maybe`, `NonEmptyArray`, `DeepPartial`, `AnyToNever`.
-- Union helpers: `UnionToIntersection`, `UnionToTuple`, `DistributiveOmit`, etc.
+- `Brand<T, Name extends string>` — nominal branding.
+- `TypesAreEqual<X, Y>` — type-level equality (type-challenges style).
+- Errors: `unknownToError(err)`, `NotImplementedError`, `throwNotImplemented`, `throwUnreachable`.
+- Misc: `NoneToVoidFunction`, `AnyFunction`, `AnyToVoidFunction`, `AnyToNever`, `MaybePromise`, `MaybeArray`, `Values`, `Truthy`, `UnsafeMutate`.
+- Unions: `UnionToIntersection`, `LastOfUnion`, `UnionToTuple`.
 
 ---
 
-All utilities are designed to be small, focused, and tree-shakeable. Use them directly via named imports from the
-package.
+Small, focused, tree-shakeable. Prefer named imports from `@yorozu/utils` (or the namespaces above).

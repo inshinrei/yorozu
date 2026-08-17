@@ -31,6 +31,13 @@ describe("BufferPool", () => {
         expect(large.length).toBe(300)
     })
 
+    it("rejects non-integer and negative sizes", () => {
+        expect(() => pool.allocate(-1)).toThrow(RangeError)
+        expect(() => pool.allocate(1.5)).toThrow(RangeError)
+        expect(() => pool.allocate(Number.NaN)).toThrow(RangeError)
+        expect(() => pool.allocate(Number.POSITIVE_INFINITY)).toThrow(RangeError)
+    })
+
     it("aligns every small allocation to 8-byte boundary", () => {
         pool.allocate(3)
         let aligned = pool.allocate(5)

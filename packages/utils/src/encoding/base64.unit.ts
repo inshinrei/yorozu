@@ -80,3 +80,9 @@ describe("Base64 utilities", () => {
         })
     })
 })
+
+describe("base64 decode Node path (Buffer present)", () => {
+    it("throws on invalid base64 alphabet", () => {
+        expect(() => decode("!!!!")).toThrow()
+    })
+})

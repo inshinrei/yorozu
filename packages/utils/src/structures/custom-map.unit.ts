@@ -50,16 +50,17 @@ describe("CustomMap", () => {
         expect(map.get("x")).toBeUndefined()
     })
 
-    /* not supported */
-    it.todo("getOrInsert and getOrInsertComputed work with mapped keys", () => {
+    it("getOrInsert and getOrInsertComputed work with mapped keys", () => {
         expect(map.getOrInsert("abc", "default")).toBe("default")
         expect(map.get("abc")).toBe("default")
+        expect(map.getOrInsert("abc", "other")).toBe("default")
 
-        const computed = map.getOrInsertComputed("def", (k) => {
+        let computed = map.getOrInsertComputed("def", (k) => {
             expect(k).toBe("def")
             return "computed"
         })
         expect(computed).toBe("computed")
+        expect(map.get("def")).toBe("computed")
     })
 
     it("entries() returns iterator with external keys", () => {

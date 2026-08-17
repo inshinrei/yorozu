@@ -112,6 +112,24 @@ describe("AsyncResource", () => {
         expect(resource.getCached()).toBe("background")
     })
 
+    it("destroy() during a hanging fetch does not throw and get() returns null", async () => {
+        fetcherMock.mockImplementation((ctx: { abort: AbortSignal | null }) => {
+            return new Promise((_resolve, reject) => {
+                ctx.abort?.addEventListener("abort", () => {
+                    let err = new DOMException("The operation was aborted.", "AbortError")
+                    reject(err)
+                })
+            })
+        })
+
+        let resource = new AsyncResource({ fetcher: fetcherMock })
+        let pending = resource.update()
+        resource.destroy()
+
+        await expect(pending).resolves.toBeUndefined()
+        expect(await resource.get()).toBeNull()
+    })
+
     it("destroy clears timer, aborts pending request, and clears listeners", () => {
         let resource = new AsyncResource({
             fetcher: fetcherMock,

@@ -25,6 +25,10 @@ export class AsyncQueue<T> {
         } else {
             this.queue = new Deque<T>()
         }
+
+        if (maxSize !== undefined && this.queue.length > maxSize) {
+            throw new Error("Initial queue length exceeds maxSize")
+        }
     }
 
     get length(): number {
@@ -48,13 +52,18 @@ export class AsyncQueue<T> {
             throw new Error("Cannot enqueue after .end() has been called")
         }
 
-        if (this.#consumerWaiters.length > 0) {
-            let waiter = this.#consumerWaiters.popFront()!
-            waiter.resolve(item)
-            return
-        }
+        while (true) {
+            if (this.#consumerWaiters.length > 0) {
+                let waiter = this.#consumerWaiters.popFront()!
+                waiter.resolve(item)
+                return
+            }
 
-        if (this.isFull) {
+            if (!this.isFull) {
+                this.queue.pushBack(item)
+                return
+            }
+
             let waiter = new Deferred<void>()
             this.#producerWaiters.pushBack(waiter)
             await waiter.promise
@@ -63,13 +72,16 @@ export class AsyncQueue<T> {
                 throw new Error("Queue was ended while waiting to enqueue.")
             }
         }
-
-        this.queue.pushBack(item)
     }
 
     tryEnqueue(item: T): boolean {
-        if (this.#ended || this.isFull || this.#consumerWaiters.length > 0) {
+        if (this.#ended || this.isFull) {
             return false
+        }
+        if (this.#consumerWaiters.length > 0) {
+            let waiter = this.#consumerWaiters.popFront()!
+            waiter.resolve(item)
+            return true
         }
         this.queue.pushBack(item)
         return true
@@ -96,16 +108,20 @@ export class AsyncQueue<T> {
     }
 
     next(): T | undefined {
+        if (this.queue.length === 0) return undefined
         let item = this.queue.popFront()
         this.#wakeProducerIfNeeded()
         return item
     }
 
     async nextOrWait(): Promise<T | undefined> {
-        if (this.queue.length > 0 || this.#ended) {
+        if (this.queue.length > 0) {
             let item = this.queue.popFront()
             this.#wakeProducerIfNeeded()
             return item
+        }
+        if (this.#ended) {
+            return undefined
         }
 
         let waiter = new Deferred<T | undefined>()

@@ -62,19 +62,44 @@ describe("deep merge utilities", () => {
         })
 
         it('arrays strategy: "replace" (default), "ignore", "merge"', () => {
-            const into = { arr: [1, 2] }
-
-            expect(deepMerge(into, { arr: [3, 4] }).arr).toEqual([3, 4])
-            // expect(deepMerge(into, { arr: [3, 4] }, { arrays: "ignore" }).arr).toEqual([1, 2])
-            // expect(deepMerge(into, { arr: [3, 4] }, { arrays: "merge" }).arr).toEqual([1, 2, 3, 4])
+            expect(deepMerge({ arr: [1, 2] }, { arr: [3, 4] }).arr).toEqual([3, 4])
+            expect(deepMerge({ arr: [1, 2] }, { arr: [3, 4] }, { arrays: "ignore" }).arr).toEqual([1, 2])
+            expect(deepMerge({ arr: [1, 2] }, { arr: [3, 4] }, { arrays: "merge" }).arr).toEqual([1, 2, 3, 4])
         })
 
         it('objects strategy: "merge" (default), "replace", "ignore"', () => {
-            const into = { nested: { x: 1, y: 2 } }
+            expect(deepMerge({ nested: { x: 1, y: 2 } }, { nested: { y: 99, z: 3 } }).nested).toEqual({
+                x: 1,
+                y: 99,
+                z: 3,
+            })
+            expect(deepMerge({ nested: { x: 1, y: 2 } }, { nested: { y: 99, z: 3 } }, { objects: "replace" }).nested).toEqual({
+                y: 99,
+                z: 3,
+            })
+            expect(deepMerge({ nested: { x: 1, y: 2 } }, { nested: { y: 99 } }, { objects: "ignore" }).nested).toEqual({
+                x: 1,
+                y: 2,
+            })
+        })
 
-            expect(deepMerge(into, { nested: { y: 99, z: 3 } }).nested).toEqual({ x: 1, y: 99, z: 3 })
-            expect(deepMerge(into, { nested: { y: 99, z: 3 } }, { objects: "replace" }).nested).toEqual({ y: 99, z: 3 })
-            // expect(deepMerge(into, { nested: { y: 99 } }, { objects: "ignore" }).nested).toEqual({ x: 1, y: 2 })
+        it("treats Date, Map, Set, and RegExp as leaf values", () => {
+            let date = new Date("2020-01-01T00:00:00.000Z")
+            let map = new Map([["a", 1]])
+            let set = new Set([1, 2])
+            let re = /ab/g
+
+            let result = deepMerge({} as Record<string, unknown>, { date, map, set, re })
+
+            expect(result.date).toBeInstanceOf(Date)
+            expect((result.date as Date).getTime()).toBe(date.getTime())
+            expect(result.map).toBeInstanceOf(Map)
+            expect([...(result.map as Map<string, number>)]).toEqual([["a", 1]])
+            expect(result.set).toBeInstanceOf(Set)
+            expect([...(result.set as Set<number>)]).toEqual([1, 2])
+            expect(result.re).toBeInstanceOf(RegExp)
+            expect((result.re as RegExp).source).toBe("ab")
+            expect((result.re as RegExp).flags).toBe("g")
         })
 
         it("handles nested objects recursively", () => {

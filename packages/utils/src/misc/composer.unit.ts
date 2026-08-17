@@ -72,6 +72,21 @@ describe("composeMiddlewares", () => {
         expect(result).toBe("next-called")
     })
 
+    it("terminal next does not recurse when next() is called after the chain ends", async () => {
+        let composed = composeMiddlewares<{}>([])
+        let calls = 0
+
+        await expect(
+            composed({}, (async (_ctx, next: any) => {
+                calls++
+                if (calls > 3) throw new Error("recursed")
+                await next({})
+            }) as any),
+        ).rejects.toThrow("next() called after end")
+
+        expect(calls).toBe(1)
+    })
+
     it("supports async middleware with await", async () => {
         const order: string[] = []
 

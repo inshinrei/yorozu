@@ -77,6 +77,13 @@ describe("BigInt utilities", () => {
             expect(euclideanGcd(42n, 0n)).toBe(42n)
             expect(euclideanGcd(0n, 0n)).toBe(0n)
         })
+
+        it("returns a non-negative result", () => {
+            expect(euclideanGcd(-48n, 18n)).toBe(6n)
+            expect(euclideanGcd(-48n, -18n)).toBe(6n)
+            expect(euclideanGcd(-42n, 0n)).toBe(42n)
+            expect(euclideanGcd(0n, -42n)).toBe(42n)
+        })
     })
 
     describe("modPowBinary", () => {
@@ -84,6 +91,20 @@ describe("BigInt utilities", () => {
             expect(modPowBinary(2n, 10n, 1000n)).toBe(24n)
             expect(modPowBinary(5n, 3n, 7n)).toBe(6n)
             expect(modPowBinary(3n, 0n, 5n)).toBe(1n)
+        })
+
+        it("reduces base into [0, mod)", () => {
+            expect(modPowBinary(-3n, 3n, 7n)).toBe(1n)
+            expect(modPowBinary(-2n, 3n, 5n)).toBe(2n)
+        })
+
+        it("returns 0n when mod === 1n", () => {
+            expect(modPowBinary(5n, 0n, 1n)).toBe(0n)
+            expect(modPowBinary(5n, 3n, 1n)).toBe(0n)
+        })
+
+        it("throws on negative exponent", () => {
+            expect(() => modPowBinary(2n, -1n, 7n)).toThrow(RangeError)
         })
     })
 

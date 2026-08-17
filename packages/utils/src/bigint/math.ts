@@ -54,11 +54,14 @@ export function euclideanGcd(a: bigint, b: bigint): bigint {
         b = a % b
         a = t
     }
-    return a
+    return a < 0n ? -a : a
 }
 
 export function modPowBinary(base: bigint, exp: bigint, mod: bigint): bigint {
+    if (exp < 0n) throw new RangeError("Negative exponent is not supported.")
+    if (mod === 1n) return 0n
     base %= mod
+    if (base < 0n) base += mod
     let result = 1n
     while (exp > 0n) {
         if (exp % 2n === 1n) result = (result * base) % mod

@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { sleep } from "./sleep"
 
@@ -76,6 +77,19 @@ describe("sleep", () => {
         controller.abort()
 
         await expect(promise).resolves.toBeUndefined()
+    })
+
+    it("does not leak abort listeners after successful sleeps", async () => {
+        let controller = new AbortController()
+        let signal = controller.signal
+
+        for (let i = 0; i < 5; i++) {
+            let done = sleep(0, signal)
+            vi.advanceTimersByTime(0)
+            await done
+        }
+
+        expect(getEventListeners(signal, "abort")).toHaveLength(0)
     })
 
     it("works without signal (original behavior)", async () => {

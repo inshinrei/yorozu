@@ -53,17 +53,24 @@ export class CustomMap<ExternalKey, InternalKey, V> implements Map<ExternalKey, 
     }
 
     getOrInsert(key: ExternalKey, value: V): ReturnType<Map<ExternalKey, V>["getOrInsert"]> {
-        if (!this.#map.getOrInsert) {
-            return value
+        if (this.#map.getOrInsert) {
+            return this.#map.getOrInsert(this.#mapperTo(key), value)
         }
-        return this.#map.getOrInsert(this.#mapperTo(key), value)
+        let k = this.#mapperTo(key)
+        if (!this.#map.has(k)) this.#map.set(k, value)
+        return this.#map.get(k)!
     }
 
     getOrInsertComputed(
         key: ExternalKey,
         callback: (key: ExternalKey) => V,
     ): ReturnType<Map<ExternalKey, V>["getOrInsertComputed"]> {
-        return this.#map.getOrInsertComputed(this.#mapperTo(key), (key) => callback(this.#mapperFrom(key)))
+        if (this.#map.getOrInsertComputed) {
+            return this.#map.getOrInsertComputed(this.#mapperTo(key), (k) => callback(this.#mapperFrom(k)))
+        }
+        let k = this.#mapperTo(key)
+        if (!this.#map.has(k)) this.#map.set(k, callback(key))
+        return this.#map.get(k)!
     }
 
     entries(): ReturnType<Map<ExternalKey, V>["entries"]> {

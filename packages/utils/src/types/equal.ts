@@ -1,1 +1,1 @@
-export type TypesAreEqual<T, V> = (() => T) extends () => V ? ((() => V) extends () => T ? true : false) : false
+export type TypesAreEqual<X, Y> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false

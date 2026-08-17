@@ -7,7 +7,12 @@ export function indexOf(
 ): number
 export function indexOf(haystack: BigInt64Array | BigUint64Array, needle: bigint, start?: number): number
 export function indexOf(haystack: TypedArray, needle: number | bigint, start = 0): number {
-    for (let i = start; i < haystack.length; i++) {
+    let length = haystack.length
+    if (start < 0) {
+        start += length
+        if (start < 0) start = 0
+    }
+    for (let i = start; i < length; i++) {
         if (haystack[i] === needle) return i
     }
     return -1
@@ -16,10 +21,17 @@ export function indexOf(haystack: TypedArray, needle: number | bigint, start = 0
 export function lastIndexOf(
     haystack: Exclude<TypedArray, BigInt64Array | BigUint64Array>,
     needle: number,
-    start: number,
+    start?: number,
 ): number
 export function lastIndexOf(haystack: BigInt64Array | BigUint64Array, needle: bigint, start?: number): number
 export function lastIndexOf(haystack: TypedArray, needle: number | bigint, start = haystack.length - 1): number {
+    let length = haystack.length
+    if (start < 0) {
+        start += length
+        if (start < 0) return -1
+    } else if (start >= length) {
+        start = length - 1
+    }
     for (let i = start; i >= 0; i--) {
         if (haystack[i] === needle) return i
     }
@@ -69,7 +81,11 @@ export function lastIndexOfArray<T extends TypedArray>(
 export function includes(haystack: Exclude<TypedArray, BigInt64Array | BigUint64Array>, needle: number): boolean
 export function includes(haystack: BigInt64Array | BigUint64Array, needle: bigint): boolean
 export function includes(haystack: TypedArray, needle: number | bigint): boolean {
-    return indexOf(haystack as Uint8Array, needle as number) !== -1
+    for (let i = 0; i < haystack.length; i++) {
+        let value = haystack[i]
+        if (value === needle || (Number.isNaN(value) && Number.isNaN(needle))) return true
+    }
+    return false
 }
 
 export function includesArray<T extends TypedArray>(haystack: T, needle: T): boolean {
