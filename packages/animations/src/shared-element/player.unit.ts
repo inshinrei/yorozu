@@ -142,6 +142,31 @@ describe("createSharedElement", () => {
         expect(await playback!.done).toBe(false)
     })
 
+    it("playback.cancel() removes the clone and does not kill a later play", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let hideTarget = createFakeEl() as unknown as HTMLElement
+        hideTarget.style.visibility = "visible"
+        let se = createSharedElement()
+        let p1 = se.play({ host, from, to, hideTarget })
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+        expect(hideTarget.style.visibility).toBe("hidden")
+        p1!.cancel()
+        expect((host as unknown as FakeNode).children).toHaveLength(0)
+        expect(hideTarget.style.visibility).toBe("visible")
+        expect(await p1!.done).toBe(false)
+
+        let p2 = se.play({ host, from, to, hideTarget })
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+        expect(hideTarget.style.visibility).toBe("hidden")
+        p1!.cancel()
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+        expect(hideTarget.style.visibility).toBe("hidden")
+        await vi.runAllTimersAsync()
+        expect(await p2!.done).toBe(true)
+        expect((host as unknown as FakeNode).children).toHaveLength(0)
+        expect(hideTarget.style.visibility).toBe("visible")
+    })
+
     it("awaits onLand before removing the clone", async () => {
         let host = createFakeEl() as unknown as HTMLElement
         let hideTarget = createFakeEl() as unknown as HTMLElement

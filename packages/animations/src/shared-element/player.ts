@@ -67,7 +67,7 @@ type Active = {
     clone: HTMLElement
     hideTarget: HTMLElement | null
     hidePrev: string
-    playback: Playback
+    settleCancel: () => void
     resolve: (ran: boolean) => void
     isCancelled: () => boolean
     anim: Animation | null
@@ -135,14 +135,17 @@ export function createSharedElement(): SharedElementController {
         if (active.hideTarget) active.hideTarget.style.visibility = active.hidePrev
     }
 
-    let cancel = (): void => {
-        if (!current) return
-        let active = current
-        current = null
+    let abort = (active: Active): void => {
+        if (current === active) current = null
         active.anim?.cancel()
         active.anim = null
         teardownDom(active)
-        active.playback.cancel()
+        active.settleCancel()
+    }
+
+    let cancel = (): void => {
+        if (!current) return
+        abort(current)
     }
 
     let start = (opts: SharedElementPlayOptions, flight: Flight): Playback => {
@@ -159,7 +162,7 @@ export function createSharedElement(): SharedElementController {
             clone,
             hideTarget,
             hidePrev,
-            playback,
+            settleCancel: playback.cancel,
             resolve,
             isCancelled,
             anim: null,
@@ -172,8 +175,20 @@ export function createSharedElement(): SharedElementController {
         opts.host.appendChild(clone)
         if (hideTarget) hideTarget.style.visibility = "hidden"
 
+        let handle: Playback = {
+            done: playback.done,
+            cancel: () => {
+                if (current === active) abort(active)
+                else playback.cancel()
+            },
+        }
+
         let finish = async (ran: boolean): Promise<void> => {
             if (current !== active || active.finishing) return
+            if (isCancelled()) {
+                abort(active)
+                return
+            }
             active.finishing = true
             if (active.timer != null) {
                 clearTimeout(active.timer)
@@ -194,7 +209,11 @@ export function createSharedElement(): SharedElementController {
 
         void (async () => {
             await dualRaf()
-            if (isCancelled() || current !== active) return
+            if (current !== active) return
+            if (isCancelled()) {
+                abort(active)
+                return
+            }
 
             let fromFrame: Keyframe = { transform: startTransform(flight) }
             let toFrame: Keyframe = { transform: "translate3d(0, 0, 0) scale(1, 1)" }
@@ -225,7 +244,7 @@ export function createSharedElement(): SharedElementController {
             }
         })()
 
-        return playback
+        return handle
     }
 
     let play = (opts: SharedElementPlayOptions): Playback | null => {
