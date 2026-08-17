@@ -2,7 +2,7 @@
 
 Quick reference for `@yorozu/utils`. Names and behaviors match what is exported from `src/**` (re-exported from the package root).
 
-Import as namespaces where the package does (`typed`, `u8`, `base64`, `hex`, `utf8`, `timers`) or as named exports.
+Import as namespaces where the package does (`typed`, `u8`, `base64`, `hex`, `utf8`, `timers`, `compress`, `decompress`) or as named exports.
 
 ---
 
@@ -141,6 +141,36 @@ Namespaces only: `base64`, `hex`, `utf8`.
 - Errors: `unknownToError(err)`, `NotImplementedError`, `throwNotImplemented`, `throwUnreachable`.
 - Misc: `NoneToVoidFunction`, `AnyFunction`, `AnyToVoidFunction`, `AnyToNever`, `MaybePromise`, `MaybeArray`, `Values`, `Truthy`, `UnsafeMutate`.
 - Unions: `UnionToIntersection`, `LastOfUnion`, `UnionToTuple`.
+
+---
+
+## compress / decompress
+
+Namespaces `compress` and `decompress` for RFC 1951 (raw DEFLATE), RFC 1952 (gzip), and RFC 1950 (zlib).
+
+### compress
+
+- `deflate(data, options?)` / `gzip(data, options?)` / `zlib(data, options?)` → `Uint8Array`
+- Classes `Deflate`, `Gzip`, `Zlib`: `push(chunk, final?)` returns output bytes (empty if none yet); `flush(sync?)` on compressors
+- `CompressOptions`: `level` 0–9 (default 6), `mem` 0–12, `dictionary`
+- `GzipCompressOptions` also: `mtime` (`0` writes zeros), `filename`
+
+### decompress
+
+- `deflate` / `gzip` / `zlib` — format-specific
+- `auto(data, options?)` — gzip if `1f 8b`, else zlib if CMF/FLG is valid (CM=8, CINFO≤7, 31-check), else raw DEFLATE
+- Classes `Deflate`, `Gzip`, `Zlib` with `push(chunk, final?)`
+- `DecompressOptions`: `dictionary`, `out` (truncates if short), `check` (default true; gzip CRC32+ISIZE, zlib Adler-32)
+- gzip `push` continues across concatenated members
+
+### checksums
+
+- `crc32(data, seed?)`, `adler32(data, seed?)`
+- Classes `Crc32` / `Adler32`: `update` / `digest`
+
+### errors
+
+`FlateError` and: `UnexpectedEofError`, `InvalidBlockTypeError`, `InvalidLengthLiteralError`, `InvalidDistanceError`, `InvalidHeaderError`, `StreamFinishedError`, `ChecksumMismatchError`.
 
 ---
 
