@@ -1,11 +1,12 @@
 import {
     createViewSlide,
+    resolveViewSlideMode,
     slideDirectionByIndex,
     VIEW_SLIDE_MS,
     VIEW_SLIDE_SETTLE_SLACK_MS,
     type Key,
-    type ViewSlideMode,
 } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 type Panel = {
     id: string
@@ -20,14 +21,11 @@ let panels: Panel[] = [
     { id: "gamma", title: "Gamma", body: "Third stacked panel.", tint: "16 60% 92%" },
 ]
 
-let modes: ViewSlideMode[] = ["push", "crossfade", "none"]
-
 function darkTint(hsl: string): string {
     return hsl.replace("92%", "22%")
 }
 
 export function mountViewSlide(root: HTMLElement): () => void {
-    let mode: ViewSlideMode = "push"
     let active = panels[0]!.id
     let items = panels.map((panel) => ({ id: panel.id }))
     let nodes = new Map<Key, HTMLElement>()
@@ -35,7 +33,7 @@ export function mountViewSlide(root: HTMLElement): () => void {
     let settleTimer = 0
 
     let slide = createViewSlide({
-        getMode: () => mode,
+        getMode: () => resolveViewSlideMode(getAnimationLevel(), "stack"),
         getDirection: (from, to) => slideDirectionByIndex(from, to, items),
         mountPolicy: "keep-visited",
     })
@@ -56,21 +54,10 @@ export function mountViewSlide(root: HTMLElement): () => void {
     nextBtn.className = "pg-btn pg-btn-primary"
     nextBtn.textContent = "Next"
 
-    let modeBtns = new Map<ViewSlideMode, HTMLButtonElement>()
-    for (let value of modes) {
-        let btn = document.createElement("button")
-        btn.type = "button"
-        btn.className = "pg-btn"
-        btn.textContent = value
-        btn.setAttribute("aria-pressed", value === mode ? "true" : "false")
-        btn.addEventListener("click", () => setMode(value))
-        modeBtns.set(value, btn)
-    }
-
     let viewport = document.createElement("div")
     viewport.className = "pg-slide-view"
 
-    toolbar.append(prevBtn, nextBtn, ...modeBtns.values())
+    toolbar.append(prevBtn, nextBtn)
     tester.append(toolbar, viewport)
     root.append(tester)
 
@@ -127,13 +114,6 @@ export function mountViewSlide(root: HTMLElement): () => void {
         let index = panels.findIndex((panel) => panel.id === active)
         let next = (index + delta + panels.length) % panels.length
         goTo(panels[next]!.id)
-    }
-
-    function setMode(next: ViewSlideMode): void {
-        mode = next
-        for (let [value, btn] of modeBtns) {
-            btn.setAttribute("aria-pressed", value === mode ? "true" : "false")
-        }
     }
 
     prevBtn.addEventListener("click", () => step(-1))

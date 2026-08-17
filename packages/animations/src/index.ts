@@ -1,6 +1,18 @@
 export type { AttachHandle, Key, Playback } from "./core/types"
 export { prefersReducedMotion } from "./core/reduced-motion"
 export { dualRaf } from "./core/raf"
+export type { AnimationLevel } from "./core/level"
+export {
+    ANIMATION_LEVELS,
+    DEFAULT_ANIMATION_LEVEL,
+    isAnimationLevel,
+    parseAnimationLevel,
+    defaultAnimationLevel,
+    cycleAnimationLevel,
+    canAnimate,
+    pickAnimationLevelFromRatio,
+    stepAnimationLevel,
+} from "./core/level"
 
 export type { Rect, Size, Insets, ObjectFit } from "./rect/types"
 export { fitContain, centerFitInViewport } from "./rect/fit"
@@ -27,14 +39,26 @@ export {
 export type {
     SlideDirection,
     ViewSlideMode,
+    ViewSlideKind,
     ViewSlideMountPolicy,
     PanelRole,
     SlidePanelState,
     SlideTransforms,
 } from "./view-slide/transforms"
-export { VIEW_SLIDE_FADE_OFFSET, slideDirectionByIndex, viewSlideTransforms } from "./view-slide/transforms"
+export {
+    VIEW_SLIDE_FADE_OFFSET,
+    VIEW_SLIDE_MS,
+    VIEW_SLIDE_EASING,
+    VIEW_SLIDE_COVER_MS,
+    VIEW_SLIDE_COVER_EASING,
+    slideDirectionByIndex,
+    resolveViewSlideMode,
+    viewSlideDurationMs,
+    viewSlideEasing,
+    viewSlideTransforms,
+} from "./view-slide/transforms"
 export type { ViewSlideConfig, ViewSlide } from "./view-slide/session"
-export { VIEW_SLIDE_MS, VIEW_SLIDE_EASING, VIEW_SLIDE_SETTLE_SLACK_MS, createViewSlide } from "./view-slide/session"
+export { VIEW_SLIDE_SETTLE_SLACK_MS, createViewSlide } from "./view-slide/session"
 
 export type { SlidingIndicator, SlidingIndicatorOptions } from "./sliding-indicator/indicator"
 export {

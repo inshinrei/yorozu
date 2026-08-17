@@ -1,5 +1,7 @@
 import { catalog, type CatalogEntry } from "./catalog"
+import { mountLevelSwitch } from "./level-switch"
 import { openOverlay } from "./overlay"
+import "./level"
 import "./tokens.css"
 import "./app.css"
 
@@ -111,7 +113,11 @@ function boot(): void {
 
     search.addEventListener("input", () => renderGrid(wrap, search.value))
 
-    top.append(heading, search, themeBtn)
+    let levelHost = document.createElement("div")
+    levelHost.className = "pg-level-host"
+    mountLevelSwitch(levelHost)
+
+    top.append(heading, search, levelHost, themeBtn)
     shell.append(top, wrap)
     app.append(shell)
     renderGrid(wrap, "")

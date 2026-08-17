@@ -1,12 +1,14 @@
 import {
+    canAnimate,
     createSlidingIndicator,
     createViewSlide,
-    prefersReducedMotion,
+    resolveViewSlideMode,
     slideDirectionByIndex,
     VIEW_SLIDE_MS,
     VIEW_SLIDE_SETTLE_SLACK_MS,
     type Key,
 } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 type Tab = {
     id: string
@@ -37,7 +39,7 @@ export function mountTabs(root: HTMLElement): () => void {
     let settleTimer = 0
 
     let slide = createViewSlide({
-        getMode: () => "push",
+        getMode: () => resolveViewSlideMode(getAnimationLevel(), "stack"),
         getDirection: (from, to) => slideDirectionByIndex(from, to, items),
         mountPolicy: "keep-visited",
     })
@@ -76,7 +78,7 @@ export function mountTabs(root: HTMLElement): () => void {
         getTrack: () => track,
         getIndicator: () => pill,
         getActive: () => tabBtns.get(active) ?? null,
-        enabled: () => !prefersReducedMotion(),
+        enabled: () => canAnimate(getAnimationLevel()),
     })
 
     function paintPanel(el: HTMLElement, tab: Tab): void {

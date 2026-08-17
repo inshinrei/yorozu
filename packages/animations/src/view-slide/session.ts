@@ -3,6 +3,8 @@ import { dualRaf } from "../core/raf"
 import { applyStyles, clearStyles } from "../core/styles"
 import type { AttachHandle, Key } from "../core/types"
 import {
+    viewSlideDurationMs,
+    viewSlideEasing,
     viewSlideTransforms,
     type PanelRole,
     type SlideDirection,
@@ -12,8 +14,7 @@ import {
     type ViewSlideMountPolicy,
 } from "./transforms"
 
-export const VIEW_SLIDE_MS: number = 300
-export const VIEW_SLIDE_EASING: string = "cubic-bezier(0.25, 1, 0.5, 1)"
+export { VIEW_SLIDE_COVER_EASING, VIEW_SLIDE_COVER_MS, VIEW_SLIDE_EASING, VIEW_SLIDE_MS } from "./transforms"
 export const VIEW_SLIDE_SETTLE_SLACK_MS: number = 80
 
 export type { PanelRole, SlideDirection, SlidePanelState, SlideTransforms, ViewSlideMode, ViewSlideMountPolicy }
@@ -25,6 +26,7 @@ export type ViewSlideConfig = {
     getDirection: (from: Key, to: Key) => SlideDirection | null
     transforms?: (dir: SlideDirection, mode: Exclude<ViewSlideMode, "none">) => SlideTransforms
     durationMs?: (mode: Exclude<ViewSlideMode, "none">) => number
+    easing?: (mode: Exclude<ViewSlideMode, "none">) => string
     mountPolicy?: ViewSlideMountPolicy
     settleSlackMs?: number
 }
@@ -72,7 +74,8 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
     let mountPolicy: ViewSlideMountPolicy = config.mountPolicy ?? "keep-visited"
     let settleSlackMs = config.settleSlackMs ?? VIEW_SLIDE_SETTLE_SLACK_MS
     let resolveTransforms = config.transforms ?? viewSlideTransforms
-    let resolveDuration = config.durationMs ?? ((_mode: Exclude<ViewSlideMode, "none">): number => VIEW_SLIDE_MS)
+    let resolveDuration = config.durationMs ?? viewSlideDurationMs
+    let resolveEasing = config.easing ?? viewSlideEasing
 
     let mountedKeys: Key[] = []
     let panelEls = new Map<Key, HTMLElement>()
@@ -210,14 +213,15 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         await dualRaf()
         if (gen !== slideGen || destroyed || pair !== active) return
 
+        let easing = resolveEasing(mode)
         active.fromAnim = animateElement(fromEl, [tx.fromStart, tx.fromEnd], {
             duration: ms,
-            easing: VIEW_SLIDE_EASING,
+            easing,
             fill: "forwards",
         })
         active.toAnim = animateElement(toEl, [tx.toStart, tx.toEnd], {
             duration: ms,
-            easing: VIEW_SLIDE_EASING,
+            easing,
             fill: "forwards",
         })
 

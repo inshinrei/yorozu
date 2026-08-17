@@ -1,3 +1,4 @@
+import { mountListLayer } from "./testers/list-layer"
 import { mountListReorder } from "./testers/list-reorder"
 import { mountSharedElement } from "./testers/shared-element"
 import { mountSlidingIndicator } from "./testers/sliding-indicator"
@@ -47,5 +48,12 @@ export let catalog: CatalogEntry[] = [
         description: "Indicator and view slide on one tab strip.",
         tags: ["tabs", "combined", "indicator"],
         mount: mountTabs,
+    },
+    {
+        id: "list-layer",
+        title: "List layer",
+        description: "Open a nested list over the current one; reverse to close.",
+        tags: ["layer", "cover", "list"],
+        mount: mountListLayer,
     },
 ]

@@ -1,4 +1,5 @@
-import { createSharedElement, type SharedElementSeed } from "@yorozu/animations"
+import { canAnimate, createSharedElement, type SharedElementSeed } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 type Cover = {
     id: string
@@ -90,6 +91,8 @@ export function mountSharedElement(root: HTMLElement): () => void {
         stage.classList.add("is-open")
         thumb.style.visibility = "hidden"
 
+        if (!canAnimate(getAnimationLevel())) return
+
         let playback = se.playOpen({
             host: document.body,
             seed: seedFor(thumb, imageUrl),
@@ -115,6 +118,10 @@ export function mountSharedElement(root: HTMLElement): () => void {
         }
 
         media.style.visibility = "hidden"
+        if (!canAnimate(getAnimationLevel())) {
+            finish()
+            return
+        }
         let playback = se.playClose({
             host: document.body,
             fromStage,

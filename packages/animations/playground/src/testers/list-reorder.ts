@@ -1,4 +1,5 @@
-import { createListReorder, prefersReducedMotion } from "@yorozu/animations"
+import { canAnimate, createListReorder } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 type Row = {
     id: string
@@ -23,7 +24,7 @@ export function mountListReorder(root: HTMLElement): () => void {
     let reorder = createListReorder<Row>({
         getItemHeight: () => ROW_H,
         getKey: (item) => item.id,
-        isReduced: () => prefersReducedMotion(),
+        isReduced: () => !canAnimate(getAnimationLevel()),
     })
 
     let tester = document.createElement("div")

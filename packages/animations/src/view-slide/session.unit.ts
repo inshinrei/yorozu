@@ -279,4 +279,21 @@ describe("createViewSlide", () => {
         expect(slide.animating).toBe(false)
         expect(slide.mountedKeys).toEqual(["b"])
     })
+
+    it("cover uses 250ms ease-in-out on both panels", async () => {
+        let slide = makeSlide({ mode: "cover" })
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "b")
+        await flushFrames()
+        expect(animate).toHaveBeenCalled()
+        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        expect(opts.duration).toBe(250)
+        expect(opts.easing).toBe("ease-in-out")
+        let fromFrames = animate.mock.calls[0]![0] as Keyframe[]
+        expect(fromFrames[1]).toMatchObject({ transform: "scale(0.7)", opacity: "0" })
+        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
+    })
 })

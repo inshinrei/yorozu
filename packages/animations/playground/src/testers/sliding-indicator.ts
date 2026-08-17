@@ -1,4 +1,5 @@
-import { createSlidingIndicator, prefersReducedMotion } from "@yorozu/animations"
+import { canAnimate, createSlidingIndicator } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 let shortLabels = ["A", "Medium", "Longer label", "Wide section title", "B"]
 let tallLabels = ["Alpha item", "Med", "Label three is much longer now", "Wide", "Beta extra"]
@@ -53,7 +54,7 @@ export function mountSlidingIndicator(root: HTMLElement): () => void {
         getTrack: () => track,
         getIndicator: () => pill,
         getActive: () => tabs[activeIndex] ?? null,
-        enabled: () => !prefersReducedMotion(),
+        enabled: () => canAnimate(getAnimationLevel()),
     })
 
     function select(index: number): void {
