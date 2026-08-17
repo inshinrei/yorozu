@@ -1,6 +1,54 @@
 import { describe, expect, it } from "vitest"
-import { unsafeCastType } from "./assert"
+import {
+    asNonNull,
+    assert,
+    assertHashKey,
+    assertMatches,
+    assertNotNull,
+    unsafeCastType,
+} from "./assert"
 import { Brand } from "../types/brand"
+
+describe("assert", () => {
+    it("throws when condition is false", () => {
+        expect(() => assert(false)).toThrow(/Assertion failed/)
+        expect(() => assert(false, "custom message")).toThrow("custom message")
+        expect(() => assert(true)).not.toThrow()
+    })
+})
+
+describe("assertHashKey", () => {
+    it("throws when key is missing, narrows when present", () => {
+        expect(() => assertHashKey({}, "missing")).toThrow(/Key "missing" not found/)
+        let obj = { a: 1 }
+        expect(() => assertHashKey(obj, "a")).not.toThrow()
+    })
+})
+
+describe("assertMatches", () => {
+    it("returns match array or throws", () => {
+        let match = assertMatches("hello-123", /^hello-(\d+)$/)
+        expect(match[1]).toBe("123")
+        expect(() => assertMatches("nope", /^\d+$/)).toThrow(/does not match/)
+    })
+})
+
+describe("assertNotNull", () => {
+    it("assertNotNull throws for null and undefined", () => {
+        expect(() => assertNotNull(null)).toThrow(/Value is/)
+        expect(() => assertNotNull(undefined)).toThrow(/Value is/)
+        expect(() => assertNotNull(0)).not.toThrow()
+        expect(() => assertNotNull("")).not.toThrow()
+    })
+})
+
+describe("asNonNull", () => {
+    it("asNonNull returns the value or throws", () => {
+        expect(asNonNull(0)).toBe(0)
+        expect(() => asNonNull(undefined)).toThrow()
+        expect(() => asNonNull(null)).toThrow()
+    })
+})
 
 describe("unsafeCastType", () => {
     it("never throws for any runtime value", () => {
