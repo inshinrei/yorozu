@@ -53,7 +53,7 @@ export async function generateDenoWorkspace(params: {
     let workspaceRoot = normalizeFilePath(workspaceRoot_)
     let rootPackage = findRootPackage(workspacePackages)
 
-    let outDir = join(workspaceRoot, rootConfig?.outputDir ?? "dist")
+    let outDir = join(workspaceRoot, rootConfig?.outputDir ?? "dist/jsr")
     await fsp.rm(outDir, { recursive: true, force: true })
     await fsp.mkdir(outDir, { recursive: true })
 

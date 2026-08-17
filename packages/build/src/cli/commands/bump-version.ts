@@ -1,3 +1,4 @@
+import type { ReleaseType } from "semver"
 import type { BumpVersionResult } from "../../versioning/bump-version"
 import { isRunningInGithubActions, writeGithubActionsOutput } from "../../ci/github-actions"
 import { getLatestTag } from "../../git/utils"
@@ -5,6 +6,22 @@ import { collectPackageJsons } from "../../package-json/collect-package-jsons"
 import { bumpVersion } from "../../versioning/bump-version"
 import { info } from "../log"
 import { bc, loadConfig, resolveWorkspaceRoot } from "./_utils"
+
+export type BumpVersionKind = "major" | "minor" | "patch" | "auto"
+
+export function sharedWorkspaceBumpOptions(params: { type: BumpVersionKind; dryRun?: boolean }): {
+    type: ReleaseType | undefined
+    withRoot: true
+    all: true
+    dryRun?: boolean
+} {
+    return {
+        type: params.type === "auto" ? undefined : params.type,
+        withRoot: true,
+        all: true,
+        dryRun: params.dryRun,
+    }
+}
 
 export function formatBumpVersionResult(result: BumpVersionResult, withReleaseType: boolean): string {
     let lines: Array<string> = []
@@ -29,7 +46,7 @@ export function formatBumpVersionResult(result: BumpVersionResult, withReleaseTy
 
 export let bumpVersionCli = bc.command({
     name: "bump-version",
-    desc: "bump the version of changed packages",
+    desc: "bump the shared workspace version",
     options: {
         root: bc.string().desc("path to the root of the workspace (default: process.cwd())"),
         type: bc
@@ -58,11 +75,10 @@ export let bumpVersionCli = bc.command({
 
         let result = await bumpVersion({
             workspace,
-            type: releaseType,
             cwd: root,
             since,
             params: config?.versioning,
-            dryRun: args.dryRun,
+            ...sharedWorkspaceBumpOptions({ type: args.type, dryRun: args.dryRun }),
         })
 
         if (args.quiet) {
