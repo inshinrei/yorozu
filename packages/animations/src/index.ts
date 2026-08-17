@@ -37,3 +37,10 @@ export type {
 export { VIEW_SLIDE_FADE_OFFSET, slideDirectionByIndex, viewSlideTransforms } from "./view-slide/transforms"
 export type { ViewSlideConfig, ViewSlide } from "./view-slide/session"
 export { VIEW_SLIDE_MS, VIEW_SLIDE_EASING, VIEW_SLIDE_SETTLE_SLACK_MS, createViewSlide } from "./view-slide/session"
+
+export type { SlidingIndicator, SlidingIndicatorOptions } from "./sliding-indicator/indicator"
+export {
+    INDICATOR_MS,
+    INDICATOR_EASING,
+    createSlidingIndicator,
+} from "./sliding-indicator/indicator"
