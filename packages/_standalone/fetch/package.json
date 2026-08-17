@@ -5,8 +5,35 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },
-    "author": "",
+    "author": "inshinrei",
     "license": "MIT",
-    "description": "",
-    "type": "module"
+    "description": "tiny wrapper over fetch",
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": "./src/index.ts",
+        "./tough": "./src/addons/tough-cookie.ts"
+    },
+    "peerDependencies": {
+        "tough-cookie": "^6.0.2"
+    },
+    "peerDependenciesMeta": {
+        "tough-cookie": {
+            "optional": true
+        }
+    },
+    "dependencies": {
+        "@standard-schema/spec": "1.1.0",
+        "@yorozu/utils": "workspace:^"
+    },
+    "yorozu": {
+        "standalone": true
+    },
+    "devDependencies": {
+        "@yorozu/io": "workspace:^",
+        "tough-cookie": "6.0.2",
+        "valibot": "1.4.0",
+        "yup": "1.7.1",
+        "zod": "catalog:"
+    }
 }
