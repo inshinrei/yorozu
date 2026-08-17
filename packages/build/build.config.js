@@ -8,6 +8,7 @@ export default {
         }
     },
     preparePackageJson({ packageJson }) {
-        delete packageJson.exports['./vite-internal']
+        delete packageJson.exports["./vite-internal"]
+        packageJson.exports["./vite"] = "./dist_vite-internal.js"
     }
 }

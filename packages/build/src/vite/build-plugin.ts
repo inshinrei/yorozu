@@ -180,7 +180,7 @@ export async function yorozuBuild(params: {
     packageConfig?.preparePackageJson?.(hookContext)
 
     let { packageJson, entrypoints, entrypointsToCopy } = processPackageJson({
-        packageJson: ourPackageJson,
+        packageJson: hookContext.packageJson,
         rootPackageJson,
         workspaceVersions,
         bundledWorkspaceDeps: toBundledWorkspaceDeps(bundledWorkspaceDeps),
@@ -188,6 +188,10 @@ export async function yorozuBuild(params: {
         fixedVersion,
         shouldCopyEntrypoint: packageConfig?.shouldCopyEntrypoint,
     })
+
+    if (fixedVersion != null) {
+        packageJson.version = fixedVersion
+    }
 
     hookContext.packageJson = packageJson
 
