@@ -1,14 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, expect, it } from "vitest"
 import type { PackageJson } from './types'
 import { processPackageJson, removeCommonjsExports } from './process-package-json'
 
-let DefaultFieldsToCopyRoot: Set<string>
-let RegExpMatcher: RegExp
-
-beforeEach(() => {
-    DefaultFieldsToCopyRoot = new Set(['license', 'author', 'contributors', 'homepage', 'repository', 'bugs'])
-    RegExpMatcher = new RegExp(/(?<!\.d)\.[mc]?[jt]sx?$/i)
-})
+let DefaultFieldsToCopyRoot = new Set(["license", "author", "contributors", "homepage", "repository", "bugs"])
 
 describe('processPackageJson', () => {
     it('copies root fields from rootPackageJson when missing in target (onlyEntrypoints=false)', () => {
@@ -106,33 +100,79 @@ describe('processPackageJson', () => {
         expect(() => processPackageJson({ packageJson: packageJsonOriginal, workspaceVersions: new Map() })).toThrow('Cannot replace dependency: missing not found in workspace')
     })
 
-    it.todo('transforms exports to conditional + records entrypointsToCopy vs entrypoints', () => {
+    it("replaces catalog: and catalog:name dependencies from rootPackageJson.catalogs", () => {
+        let rootPackageJson: PackageJson = {
+            catalogs: {
+                "": { zod: "4.3.6", picomatch: "4.0.4" },
+                frontend: { react: "19.0.0" },
+            },
+        }
+        let packageJsonOriginal: PackageJson = {
+            dependencies: { zod: "catalog:", react: "catalog:frontend", lodash: "^4.17.21" },
+            peerDependencies: { picomatch: "catalog:" },
+        }
+
+        let result = processPackageJson({ packageJson: packageJsonOriginal, rootPackageJson })
+
+        expect(result.packageJson.dependencies).toEqual({
+            zod: "4.3.6",
+            react: "19.0.0",
+            lodash: "^4.17.21",
+        })
+        expect(result.packageJson.peerDependencies).toEqual({ picomatch: "4.0.4" })
+    })
+
+    it("throws when catalogs are missing from the workspace root", () => {
+        let packageJsonOriginal: PackageJson = { dependencies: { zod: "catalog:" } }
+
+        expect(() => processPackageJson({ packageJson: packageJsonOriginal })).toThrow(
+            "catalogs are not available in the workspace root",
+        )
+    })
+
+    it("throws when the named catalog is missing", () => {
+        let rootPackageJson: PackageJson = { catalogs: { "": { zod: "4.3.6" } } }
+        let packageJsonOriginal: PackageJson = { dependencies: { react: "catalog:frontend" } }
+
+        expect(() => processPackageJson({ packageJson: packageJsonOriginal, rootPackageJson })).toThrow(
+            "catalog frontend not found in the workspace root",
+        )
+    })
+
+    it("throws when the catalog does not contain the dependency", () => {
+        let rootPackageJson: PackageJson = { catalogs: { "": { zod: "4.3.6" } } }
+        let packageJsonOriginal: PackageJson = { dependencies: { react: "catalog:" } }
+
+        expect(() => processPackageJson({ packageJson: packageJsonOriginal, rootPackageJson })).toThrow(
+            "default catalog does not contain react",
+        )
+    })
+
+    it("transforms exports to conditional + records entrypointsToCopy vs entrypoints", () => {
         let packageJsonOriginal: PackageJson = {
             exports: {
-                '.': './src/index.ts',
-                './foo': './src/foo.js',
-                './bar': './src/bar.d.ts',
+                ".": "./src/index.ts",
+                "./foo": "./src/foo.js",
+                "./bar": "./src/bar.d.ts",
             },
         }
 
-        let shouldCopyEntrypoint = (name: string, target: string) => target.match(RegExpMatcher) !== null
+        let result = processPackageJson({ packageJson: packageJsonOriginal })
 
-        let result = processPackageJson({
-            packageJson: packageJsonOriginal,
-            shouldCopyEntrypoint,
-        })
-
-        expect(result.entrypointsToCopy.get('.')).toBe('./src/index.ts')
-        expect(result.entrypointsToCopy.get('./bar')).toBe('./src/bar.d.ts')
-        expect(result.entrypoints.get('foo')).toBe('./src/foo.js')
+        expect(result.entrypointsToCopy.get("./bar")).toBe("./src/bar.d.ts")
+        expect(result.entrypoints.get("index")).toBe("./src/index.ts")
+        expect(result.entrypoints.get("foo")).toBe("./src/foo.js")
 
         expect(result.packageJson.exports).toEqual({
-            '.': '.',
-            './bar': './bar',
-            './foo': {
-                import: { types: './foo.d.ts', default: './foo.js' },
-                require: { types: './foo.d.cts', default: './foo.cjs' },
+            ".": {
+                import: { types: "./index.d.ts", default: "./index.js" },
+                require: { types: "./index.d.cts", default: "./index.cjs" },
             },
+            "./foo": {
+                import: { types: "./foo.d.ts", default: "./foo.js" },
+                require: { types: "./foo.d.cts", default: "./foo.cjs" },
+            },
+            "./bar": "./bar",
         })
     })
 

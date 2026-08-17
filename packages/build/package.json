@@ -1,10 +1,10 @@
 {
-  "name": "@yurozu/build",
+  "name": "@yorozu/build",
   "type": "module",
   "version": "0.1.0",
   "license": "MIT",
   "author": "inshinrei",
-  "description": "",
+  "description": "build and release utilities for yorozu packages",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
@@ -13,7 +13,7 @@
     "./vite-internal": "./dist_vite-internal.js"
   },
   "bin": {
-    "yorozu-build": "./src/cli.main.ts"
+    "yorozu-build": "./src/cli/main.ts"
   },
   "scripts": {
     "build-vite-plugin": "esbuild ./src/vite/index.ts --bundle --external:tinyglobby --platform=node --format=esm --outfile=dist_vite-internal.js --log-level=error"
