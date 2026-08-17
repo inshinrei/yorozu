@@ -2,13 +2,13 @@ import { bitLength } from "./math"
 import { u8 } from "../arrays"
 
 export function toBytes(value: bigint, length = 0, le = false): Uint8Array {
-    let bits = bitLength(value)
+    let bits = bitLength(value < 0n ? ~value : value) + (value < 0n ? 1 : 0)
     let bytes = Math.ceil(bits / 8)
     if (length !== 0 && bytes > length)
         throw new RangeError(`Value out of bounds: ${bytes.toString()}, ${length.toString()}.`)
     if (length === 0) length = bytes
     let buf = new ArrayBuffer(length)
-    let u8 = new Uint8Array(buf)
+    let arr = new Uint8Array(buf)
     let unaligned = length % 8
     let dv = new DataView(buf, 0, length - unaligned)
     for (let i = 0; i < dv.byteLength; i += 8) {
@@ -18,13 +18,13 @@ export function toBytes(value: bigint, length = 0, le = false): Uint8Array {
 
     if (unaligned > 0) {
         for (let i = length - unaligned; i < length; i++) {
-            u8[i] = Number(value & 0xffn)
+            arr[i] = Number(value & 0xffn)
             value >>= 8n
         }
     }
 
-    if (!le) u8.reverse()
-    return u8
+    if (!le) arr.reverse()
+    return arr
 }
 
 export function fromBytes(buffer: Uint8Array, le = false): bigint {

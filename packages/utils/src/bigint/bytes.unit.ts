@@ -32,6 +32,13 @@ describe("bigint byte conversion", () => {
             expect(toBytes(-1n, 1)).toEqual(new Uint8Array([0xff]))
         })
 
+        it("uses signed minimal length for negatives (bitLength(~value)+1)", () => {
+            expect(toBytes(-1n)).toEqual(new Uint8Array([0xff]))
+            expect(toBytes(-128n)).toEqual(new Uint8Array([0x80]))
+            expect(toBytes(-129n)).toEqual(new Uint8Array([0xff, 0x7f]))
+            expect(toBytes(-256n)).toEqual(new Uint8Array([0xff, 0x00]))
+        })
+
         it("zero with explicit length returns zero-filled array", () => {
             expect(toBytes(0n, 8)).toEqual(new Uint8Array(8))
         })

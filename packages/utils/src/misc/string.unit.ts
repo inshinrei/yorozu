@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { assertsEndsWith, assertStartsWith, splitOnce } from "./string"
+import { assertEndsWith, assertsEndsWith, assertStartsWith, splitOnce } from "./string"
 
 describe("string utilities", () => {
     describe("splitOnce", () => {
@@ -47,27 +47,38 @@ describe("string utilities", () => {
             assertStartsWith(str, "")
             expect(str).toBe("hello")
         })
+
+        it("narrows the prefix as a literal", () => {
+            let value: string = "https://example.com"
+            assertStartsWith(value, "https://")
+            let narrowed: `https://${string}` = value
+            expect(narrowed).toBe(value)
+        })
     })
 
-    describe("assertsEndsWith", () => {
+    describe("assertEndsWith", () => {
         it("passes and narrows type when suffix matches", () => {
             let str = "hello world"
 
-            assertsEndsWith(str, "world")
+            assertEndsWith(str, "world")
 
             expect(str.endsWith("world")).toBe(true)
             expect(str).toBe("hello world")
         })
 
         it("throws TypeError when suffix does not match", () => {
-            expect(() => assertsEndsWith("hello world", "hello")).toThrow(TypeError)
-            expect(() => assertsEndsWith("hello world", "hello")).toThrow("String does not ends with hello")
+            expect(() => assertEndsWith("hello world", "hello")).toThrow(TypeError)
+            expect(() => assertEndsWith("hello world", "hello")).toThrow("String does not ends with hello")
         })
 
         it("works with empty suffix", () => {
             let str = "hello"
-            assertsEndsWith(str, "")
+            assertEndsWith(str, "")
             expect(str).toBe("hello")
+        })
+
+        it("is re-exported as assertsEndsWith", () => {
+            expect(assertsEndsWith).toBe(assertEndsWith)
         })
     })
 
@@ -80,10 +91,10 @@ describe("string utilities", () => {
             expect(value.startsWith("https://")).toBe(true)
         })
 
-        it("assertsEndsWith narrows the type correctly", () => {
+        it("assertEndsWith narrows the type correctly", () => {
             let value: string = "file.json"
 
-            assertsEndsWith(value, ".json")
+            assertEndsWith(value, ".json")
 
             expect(value.endsWith(".json")).toBe(true)
         })

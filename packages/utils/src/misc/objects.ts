@@ -85,6 +85,13 @@ export function deepMerge<T extends object = object, S extends object = T>(
             }
 
             if (typeof value === "object" && value !== null) {
+                if (value instanceof Date || value instanceof Map || value instanceof Set || value instanceof RegExp) {
+                    if (propertiesStrategy === "ignore" && existing !== undefined) {
+                    } else {
+                        ;(into as any)[key] = value
+                    }
+                    continue
+                }
                 if (objectsStrategy === "merge" && typeof existing === "object" && existing !== null) {
                     ;(into as any)[key] = deepMerge(existing as any, value as any, options)
                 } else if (objectsStrategy === "ignore" && existing !== undefined) {
