@@ -1,1 +1,5 @@
-export {}
+export type { AttachHandle, Key, Playback } from "./core/types"
+export { prefersReducedMotion } from "./core/reduced-motion"
+export { dualRaf } from "./core/raf"
+export { createPlayback, animateElement } from "./core/playback"
+export { applyStyles, clearStyles } from "./core/styles"
