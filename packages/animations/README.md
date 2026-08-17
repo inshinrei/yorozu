@@ -45,9 +45,11 @@ const playback = se.play({
   imageUrl: thumb.src,
   hideTarget: stage,
 })
-// playback?.done → true if finished, false if cancelled
+// playback?.done is Promise<boolean> — true if finished, false if cancelled
 // se.cancel() aborts an in-flight clone
 ```
+
+`playSharedElement(opts)` is the same one-shot path without a retained controller (still returns `Playback | null`).
 
 `playOpen` / `playClose` accept seeds and viewport insets when the host does not already have both rects. Math helpers (`computeFlight`, `computeOpenFlight`, …) are exported for custom layouts.
 
@@ -136,4 +138,3 @@ Wire reduced motion into `getMode`, `isReduced`, and `enabled` from the host so 
 - **Cancel before retarget:** controllers cancel in-flight WAAPI before starting a new run; call `cancel` / `destroy` when unmounting hosts to avoid leaked animations and clones.
 - **`dualRaf`:** exported for hosts that need two animation frames before measuring or starting motion after a paint.
 - **First layout is a baseline:** first indicator measure and first reorder `sync` establish state without animating.
-```
