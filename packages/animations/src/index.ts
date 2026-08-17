@@ -99,3 +99,39 @@ export { DOCK_EASING, DOCK_FADE_OFFSET, DOCK_MS, createDock, dockTransforms } fr
 
 export type { Popover, PopoverPlayOptions } from "./popover/popover"
 export { POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN, createPopover } from "./popover/popover"
+
+export type { DigitSlot } from "./digit-flip/slots"
+export {
+    DIGIT_FLIP_MS,
+    MAX_SIMULTANEOUS_DIGIT_FLIPS,
+    buildDigitSlots,
+    formatCounterText,
+    scheduleDigitFlip,
+    shouldPresencePop,
+} from "./digit-flip/slots"
+export {
+    DIGIT_FLIP_EASING,
+    PRESENCE_POP_EASING,
+    PRESENCE_POP_MS,
+    playDigitFlip,
+    playPresencePop,
+} from "./digit-flip/play"
+
+export type { SendFlightOptions } from "./send-flight/flight"
+export { SEND_FLIGHT_EASING, SEND_FLIGHT_MS, playSendFlight } from "./send-flight/flight"
+
+export type { SwipeReveal, SwipeRevealOptions } from "./swipe-reveal/swipe"
+export {
+    SWIPE_MAX,
+    SWIPE_THRESHOLD,
+    SWIPE_TWEEN_MS,
+    createSwipeReveal,
+    rubberSwipeOffset,
+    shouldCommitSwipe,
+} from "./swipe-reveal/swipe"
+
+export type { ScrollTweenOptions } from "./scroll-tween/scroll"
+export { SCROLL_TWEEN_MS, playScrollTween } from "./scroll-tween/scroll"
+
+export type { RippleOptions } from "./ripple/ripple"
+export { RIPPLE_COLOR, RIPPLE_EASING, RIPPLE_MS, RIPPLE_SIZE_PX, playRipple } from "./ripple/ripple"
