@@ -144,4 +144,18 @@ describe("AsyncQueue", () => {
         expect(() => new AsyncQueue([1, 2], 1)).toThrow(/maxSize/)
         expect(() => new AsyncQueue(new Deque([1, 2]), 1)).toThrow(/maxSize/)
     })
+
+    it("does not exceed maxSize when next on empty wakes a second producer", async () => {
+        let q = new AsyncQueue<number>(undefined, 1)
+        await q.enqueue(1)
+        let p2 = q.enqueue(2)
+        let p3 = q.enqueue(3)
+        void p2.catch(() => {})
+        q.next()
+        q.next()
+        // empty next must not resolve p3; end() then rejects the still-queued waiter
+        q.end()
+        await expect(p3).rejects.toThrow("Queue has been ended.")
+        expect(q.length).toBeLessThanOrEqual(1)
+    })
 })

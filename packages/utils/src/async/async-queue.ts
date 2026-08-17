@@ -108,16 +108,20 @@ export class AsyncQueue<T> {
     }
 
     next(): T | undefined {
+        if (this.queue.length === 0) return undefined
         let item = this.queue.popFront()
         this.#wakeProducerIfNeeded()
         return item
     }
 
     async nextOrWait(): Promise<T | undefined> {
-        if (this.queue.length > 0 || this.#ended) {
+        if (this.queue.length > 0) {
             let item = this.queue.popFront()
             this.#wakeProducerIfNeeded()
             return item
+        }
+        if (this.#ended) {
+            return undefined
         }
 
         let waiter = new Deferred<T | undefined>()
