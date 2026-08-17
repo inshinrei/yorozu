@@ -17,8 +17,12 @@ const DEFAULT_EXCLUDE = ["**/*.unit.ts", "**/*.md"]
 
 async function defaultShouldInclude(file: ProjectChangedFile): Promise<boolean> {
     if (!file.file.endsWith(".ts")) return true
-    let tsconfigFiles = await getTsconfigFiles(join(file.root, file.package.path))
-    return tsconfigFiles.includes(file.file)
+    try {
+        let tsconfigFiles = await getTsconfigFiles(join(file.root, file.package.path))
+        return tsconfigFiles.includes(file.file)
+    } catch {
+        return true
+    }
 }
 
 function fileBelongsToPackage(file: string, pkgPath: string): boolean {

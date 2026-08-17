@@ -68,4 +68,35 @@ describe("findProjectChangedPackages", () => {
         })
         expect(packages.map(pkg => pkg.json.name)).toEqual(["@yorozu/utils"])
     })
+
+    it("includes .ts files when there is no tsconfig instead of throwing", async () => {
+        let dir = await mkdtemp(join(tmpdir(), "yorozu-changed-nots-"))
+        await git(dir, ["init", "-b", "main"])
+        await git(dir, ["config", "user.email", "test@example.com"])
+        await git(dir, ["config", "user.name", "Test"])
+        await git(dir, ["config", "commit.gpgsign", "false"])
+
+        let utilsDir = join(dir, "packages", "utils")
+        await mkdir(utilsDir, { recursive: true })
+        await writeFile(join(utilsDir, "index.ts"), "export {}\n")
+        await git(dir, ["add", "."])
+        await git(dir, ["commit", "-m", "chore: initial"])
+        let since = await git(dir, ["rev-parse", "HEAD"])
+
+        await writeFile(join(utilsDir, "index.ts"), "export const n = 1\n")
+        await git(dir, ["add", "."])
+        await git(dir, ["commit", "-m", "feat: change files"])
+
+        let workspace = [
+            workspacePackage({ name: "yorozu", version: "0.1.0" }, dir, true),
+            workspacePackage({ name: "@yorozu/utils", version: "0.1.0" }, utilsDir),
+        ]
+
+        let files = await findProjectChangedFiles({
+            workspace,
+            root: dir,
+            since,
+        })
+        expect(files.map(file => `${file.package.json.name}:${file.file}`)).toEqual(["@yorozu/utils:index.ts"])
+    })
 })

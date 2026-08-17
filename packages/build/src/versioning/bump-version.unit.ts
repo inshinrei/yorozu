@@ -209,6 +209,58 @@ describe("bumpVersion", () => {
         expect(io.json.version).toBe("0.1.1")
         expect(root.json.version).toBe("0.1.1")
     })
+
+    it("independently bumps a standalone package from its own tag when it has nested commits", async () => {
+        let dir = await mkdtemp(join(tmpdir(), "yorozu-bump-standalone-"))
+        await git(dir, ["init", "-b", "main"])
+        await git(dir, ["config", "user.email", "test@example.com"])
+        await git(dir, ["config", "user.name", "Test"])
+        await git(dir, ["config", "commit.gpgsign", "false"])
+
+        let utilsDir = join(dir, "packages", "utils")
+        let fetchDir = join(dir, "packages", "_standalone", "fetch")
+        let fetchSrc = join(fetchDir, "src")
+        await mkdir(utilsDir, { recursive: true })
+        await mkdir(fetchSrc, { recursive: true })
+        await writeFile(join(dir, "package.json"), '{"name":"yorozu","version":"0.1.0"}\n')
+        await writeFile(join(utilsDir, "index.ts"), "export {}\n")
+        await writeFile(join(fetchDir, "package.json"), '{"name":"@yorozu/fetch","version":"0.0.1"}\n')
+        await writeFile(join(fetchSrc, "index.ts"), "export {}\n")
+        await git(dir, ["add", "."])
+        await git(dir, ["commit", "-m", "chore: initial"])
+        await git(dir, ["tag", "v0.0.1"])
+
+        await writeFile(join(fetchSrc, "client.ts"), "export const n = 1\n")
+        await git(dir, ["add", "."])
+        await git(dir, ["commit", "-m", "feat: add fetch client"])
+
+        let root = workspacePackage(
+            { name: "yorozu", version: "0.1.0" },
+            { root: true, path: dir, packageJsonPath: join(dir, "package.json") },
+        )
+        let utils = workspacePackage({ name: "@yorozu/utils", version: "0.1.0" }, { path: utilsDir })
+        let fetch = workspacePackage(
+            { name: "@yorozu/fetch", version: "0.0.1", yorozu: { standalone: true } },
+            { path: fetchDir, packageJsonPath: join(fetchDir, "package.json") },
+        )
+
+        let result = await bumpVersion({
+            workspace: [root, utils, fetch],
+            type: "major",
+            since: "v0.0.1",
+            cwd: dir,
+            dryRun: true,
+            withRoot: true,
+        })
+
+        expect(result.nextVersion).toBe("1.0.0")
+        expect(utils.json.version).toBe("1.0.0")
+        expect(root.json.version).toBe("1.0.0")
+        expect(fetch.json.version).toBe("0.0.2")
+        expect(result.nextVersions["@yorozu/fetch"]).toBe("0.0.2")
+        expect(result.hasFeatures).toBe(false)
+        expect(result.hasBreakingChanges).toBe(false)
+    })
 })
 
 describe("determineBumpType", () => {

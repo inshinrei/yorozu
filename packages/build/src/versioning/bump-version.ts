@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises"
-import { join, relative } from "node:path"
+import { relative } from "node:path"
 import process from "node:process"
 import { asNonNull } from "@yorozu/utils"
 import detectIndent from "detect-indent"
@@ -55,7 +55,6 @@ function summarizeCommits(commits: Array<CommitInfo>): { hasBreakingChanges: boo
     return { hasBreakingChanges, hasFeatures }
 }
 
-// 0.x is not a stable public API: breaking 0.0.x stays patch, breaking 0.x.y (x > 0) is minor, and feat on 0.x is patch.
 function bumpFromFlags(
     oldVersion: string,
     flags: { hasBreakingChanges: boolean; hasFeatures: boolean },
@@ -76,6 +75,7 @@ function bumpFromFlags(
     return "patch"
 }
 
+// 0.x is not a stable public API: breaking 0.0.x stays patch, breaking 0.x.y (x > 0) is minor, and feat on 0.x is patch.
 export function determineBumpType(params: { oldVersion: string; commits: Array<CommitInfo> }): ReleaseType {
     return bumpFromFlags(params.oldVersion, summarizeCommits(params.commits))
 }
@@ -105,10 +105,11 @@ async function nextStandaloneVersion(pkg: WorkspacePackage, cwd: string | URL): 
     let commits: Array<CommitInfo>
     try {
         let rel = relative(normalizeFilePath(cwd), pkg.path)
+        let pathspec = rel === "" || rel === "." ? "." : rel.endsWith("/") ? rel : `${rel}/`
         commits = await getCommitsBetween({
             since: tag,
             cwd,
-            files: [join(rel || ".", "**")],
+            files: [pathspec],
         })
     } catch {
         return current
