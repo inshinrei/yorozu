@@ -12,6 +12,10 @@ const ReleaseResponseSchema = z.object({
     upload_url: z.string(),
 })
 
+function toBodyInit(body: Uint8Array<ArrayBuffer>): BodyInit {
+    return body
+}
+
 function githubHeaders(token: string, extra?: Record<string, string>): Record<string, string> {
     return {
         Accept: "application/vnd.github+json",
@@ -41,7 +45,7 @@ export async function createGithubRelease(params: {
     artifacts?: Array<{
         name: string
         type: string
-        body: Uint8Array
+        body: Uint8Array<ArrayBuffer>
     }>
     apiUrl?: string
 }): Promise<number> {
@@ -80,7 +84,7 @@ export async function createGithubRelease(params: {
                         "Content-Type": file.type,
                         "Content-Length": String(file.body.byteLength),
                     }),
-                    body: file.body,
+                    body: toBodyInit(file.body),
                     signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
                 })
 

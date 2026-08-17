@@ -1,1 +1,1 @@
-export type { LintConfig } from "../../config"
+export type { LintConfig } from "../../../config"

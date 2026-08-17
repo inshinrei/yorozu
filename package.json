@@ -1,12 +1,21 @@
 {
   "name": "yorozu",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
     "dev": "vitest watch",
+    "test": "vitest run",
+    "build": "tsx packages/build/src/cli/main.ts build :all",
+    "lint:workspace": "tsx packages/build/src/cli/main.ts lint",
+    "release": "tsx packages/build/src/cli/main.ts release --with-npm",
+    "release:dry": "tsx packages/build/src/cli/main.ts release --with-npm --dry-run",
     "prepare": "pnpm run -C packages/build build-vite-plugin"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inshinrei/yorozu.git"
   },
   "author": "inshinrei",
   "license": "MIT",

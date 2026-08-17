@@ -104,9 +104,8 @@ export let releaseCli = bc.command({
         let rootPackage = findRootPackage(workspaceWithRoot)
 
         let prevTag = await getLatestTag(root)
-        let firstRelease = prevTag == null
 
-        if (firstRelease) {
+        if (prevTag == null) {
             info("no previous tag found, assuming this is a first ever release")
         } else {
             info(`previous tag: ${prevTag}`)
@@ -116,7 +115,7 @@ export let releaseCli = bc.command({
         let nextVersion: string
         let changelog: string
 
-        if (firstRelease) {
+        if (prevTag == null) {
             nextVersion = asNonNull(rootPackage.json.version)
             changelog = "Initial release"
         } else {
@@ -149,7 +148,7 @@ export let releaseCli = bc.command({
         let taggingSchema = config?.versioning?.taggingSchema ?? "semver"
         let tagName: string
 
-        if (firstRelease || taggingSchema === "semver") {
+        if (prevTag == null || taggingSchema === "semver") {
             tagName = `v${nextVersion}`
             if (await gitTagExists(tagName, root)) {
                 throw new Error(
@@ -190,7 +189,7 @@ export let releaseCli = bc.command({
                     workspace: workspaceWithRoot,
                     workspaceRoot: root,
                     registryUrl: args.npmRegistry,
-                    token: args.npmToken,
+                    token: args.npmToken ?? process.env.NPM_TOKEN,
                     distDir: args.npmDistDir,
                     publishArgs: args.npmPublishArgs?.split(" "),
                     dryRun: args.dryRun,
@@ -344,7 +343,7 @@ export let releaseCli = bc.command({
                     artifacts: await parallelMap(tarballs, async file => ({
                         name: basename(file),
                         type: "application/gzip",
-                        body: await readFile(file),
+                        body: new Uint8Array(await readFile(file)),
                     })),
                 })
 

@@ -17,7 +17,7 @@
     "./vite-internal": "./dist_vite-internal.js"
   },
   "bin": {
-    "yorozu-build": "./src/cli/main.ts"
+    "yorozu-build": "./bin/yorozu-build.js"
   },
   "scripts": {
     "build-vite-plugin": "esbuild ./src/vite/index.ts --bundle --external:tinyglobby --platform=node --format=esm --outfile=dist_vite-internal.js --log-level=error"

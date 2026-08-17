@@ -63,7 +63,7 @@ export function filterPackageJsonsForPublish(
     packages: Array<WorkspacePackage>,
     registry: "jsr" | "npm",
 ): Array<WorkspacePackage> {
-    let otherRegistry = registry === "npm" ? "jsr" : "npm"
+    let otherRegistry: "jsr" | "npm" = registry === "npm" ? "jsr" : "npm"
     return packages.filter(pkg => {
         if (pkg.root) return false
 
