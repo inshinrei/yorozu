@@ -95,8 +95,7 @@ export function mountListLayer(root: HTMLElement): () => void {
                 nodes.set(key, node)
             }
             node.style.visibility = slide.isVisible(key) ? "visible" : "hidden"
-            let role = slide.role(key)
-            node.style.zIndex = role === "entering" || role === "active" ? "2" : "1"
+            node.style.zIndex = key === stored.id ? "2" : "1"
         }
         dropUnused()
     }
