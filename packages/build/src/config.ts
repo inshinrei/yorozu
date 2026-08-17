@@ -2,6 +2,9 @@ import type { AnyToNever, MaybePromise } from "@yorozu/utils"
 import type { TypeDocOptions } from "typedoc"
 import type { WorkspacePackage } from "./package-json/collect-package-jsons"
 import type { PackageJson } from "./package-json/types"
+import type { VersioningOptions } from "./versioning/types"
+
+export type { VersioningOptions }
 
 export interface BuildHookContext {
     outDir: string
@@ -40,14 +43,6 @@ export interface LintConfig {
             field: "dependencies" | "devDependencies" | "peerDependencies" | "optionalDependencies"
         }) => boolean
     }
-}
-
-export interface VersioningOptions {
-    taggingSchema?: "semver" | "date"
-    include?: Array<string> | null
-    exclude?: Array<string> | null
-    bumpWithDependants?: boolean | "only-minor"
-    beforeReleaseCommit?: (workspace: Array<WorkspacePackage>) => MaybePromise<void>
 }
 
 export interface RootConfigObject {
