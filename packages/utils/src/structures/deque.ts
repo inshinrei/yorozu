@@ -15,6 +15,7 @@ export class Deque<T> {
     protected _tail = 0
     protected _capacityMask = 3
     protected _capacity?: number
+    protected _size = 0
 
     constructor(array?: ArrayLike<T>, options: DequeOptions = {}) {
         this._capacity = options.capacity
@@ -26,17 +27,17 @@ export class Deque<T> {
     }
 
     get length(): number {
-        return (this._tail - this._head) & this._capacityMask
+        return this._size
     }
 
     isEmpty(): boolean {
-        return this._head === this._tail
+        return this._size === 0
     }
 
     at(index: number): T | undefined {
         let i = index
         if (i !== (i | 0)) return undefined
-        const len = this.length
+        let len = this._size
         if (i >= len || i < -len) return undefined
         if (i < 0) i += len
         return this._list[(this._head + i) & this._capacityMask]
@@ -51,59 +52,61 @@ export class Deque<T> {
     }
 
     pushFront(item: T): number {
+        if (this._size === this._list.length) this.#growArray()
         this._head = (this._head - 1 + this._list.length) & this._capacityMask
         this._list[this._head] = item
-        if (this._head === this._tail) this.#growArray()
-        if (this._capacity !== undefined && this.length > this._capacity) this.popBack()
-        return this.length
+        this._size++
+        if (this._capacity !== undefined && this._size > this._capacity) this.popBack()
+        return this._size
     }
 
     pushBack(item: T): number {
+        if (this._size === this._list.length) this.#growArray()
         this._list[this._tail] = item
         this._tail = (this._tail + 1) & this._capacityMask
-        if (this._head === this._tail) this.#growArray()
-        if (this._capacity !== undefined && this.length > this._capacity) this.popFront()
-        return this.length
+        this._size++
+        if (this._capacity !== undefined && this._size > this._capacity) this.popFront()
+        return this._size
     }
 
     popFront(): T | undefined {
         if (this.isEmpty()) return undefined
-        const item = this._list[this._head]
+        let item = this._list[this._head]
         this._list[this._head] = undefined
         this._head = (this._head + 1) & this._capacityMask
-        if (this._head < 2 && this._tail > 10000 && this._tail <= this._list.length >>> 2) this.#shrinkArray()
+        this._size--
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
         return item
     }
 
     popBack(): T | undefined {
         if (this.isEmpty()) return undefined
-        const idx = (this._tail - 1 + this._list.length) & this._capacityMask
-        const item = this._list[idx]
-        this._list[idx] = undefined
-        this._tail = idx
-        if (this._head < 2 && this._tail > 10000 && this._tail <= this._list.length >>> 2) this.#shrinkArray()
+        this._tail = (this._tail - 1 + this._list.length) & this._capacityMask
+        let item = this._list[this._tail]
+        this._list[this._tail] = undefined
+        this._size--
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
         return item
     }
 
     removeOne(idx: number): T | undefined {
-        const len = this.length
+        let len = this._size
         if (idx >= len || idx < -len) return undefined
         if (idx < 0) idx += len
-        const realIdx = (this._head + idx) & this._capacityMask
-        const item = this._list[realIdx] as T
+        let realIdx = (this._head + idx) & this._capacityMask
+        let item = this._list[realIdx] as T
         this.#remove(realIdx)
         return item
     }
 
     removeBy(predicate: (item: T) => boolean): void {
-        let i = this._head
-        while (i !== this._tail) {
-            const item = this._list[i]
+        for (let pos = 0; pos < this._size; pos++) {
+            let i = (this._head + pos) & this._capacityMask
+            let item = this._list[i]
             if (item !== undefined && predicate(item)) {
                 this.#remove(i)
                 return
             }
-            i = (i + 1) & this._capacityMask
         }
     }
 
@@ -111,36 +114,27 @@ export class Deque<T> {
         this._list = new Array(this._list.length)
         this._head = 0
         this._tail = 0
+        this._size = 0
     }
 
     indexOf(item: T): number {
-        let i = this._head
-        let pos = 0
-        while (i !== this._tail) {
-            if (this._list[i] === item) return pos
-            i = (i + 1) & this._capacityMask
-            pos++
+        for (let pos = 0; pos < this._size; pos++) {
+            if (this._list[(this._head + pos) & this._capacityMask] === item) return pos
         }
         return -1
     }
 
     findIndex(predicate: (item: T) => boolean): number {
-        let i = this._head
-        let pos = 0
-        while (i !== this._tail) {
-            if (predicate(this._list[i]!)) return pos
-            i = (i + 1) & this._capacityMask
-            pos++
+        for (let pos = 0; pos < this._size; pos++) {
+            if (predicate(this._list[(this._head + pos) & this._capacityMask]!)) return pos
         }
         return -1
     }
 
     find(predicate: (item: T) => boolean): T | undefined {
-        let i = this._head
-        while (i !== this._tail) {
-            const item = this._list[i]
+        for (let pos = 0; pos < this._size; pos++) {
+            let item = this._list[(this._head + pos) & this._capacityMask]
             if (item !== undefined && predicate(item)) return item
-            i = (i + 1) & this._capacityMask
         }
         return undefined
     }
@@ -150,91 +144,99 @@ export class Deque<T> {
     }
 
     toArray(): Array<T> {
-        const arr: T[] = new Array(this.length)
-        let i = this._head
-        let k = 0
-        while (i !== this._tail) {
-            arr[k++] = this._list[i]!
-            i = (i + 1) & this._capacityMask
+        let arr: T[] = new Array(this._size)
+        for (let k = 0; k < this._size; k++) {
+            arr[k] = this._list[(this._head + k) & this._capacityMask]!
         }
         return arr
     }
 
     [Symbol.iterator](): Iterator<T> {
-        let i = this._head
+        let pos = 0
         return {
             next: (): IteratorResult<T> => {
-                if (i === this._tail) return { done: true, value: undefined }
-                const value = this._list[i]!
-                i = (i + 1) & this._capacityMask
+                if (pos >= this._size) return { done: true, value: undefined }
+                let value = this._list[(this._head + pos) & this._capacityMask]!
+                pos++
                 return { done: false, value }
             },
         }
     }
 
     #fromArray(array: ArrayLike<T>): void {
-        const capacity = _nextPowerOf2(array.length)
+        let start = 0
+        let length = array.length
+        if (this._capacity !== undefined && length > this._capacity) {
+            start = length - this._capacity
+            length = this._capacity
+        }
+        let capacity = _nextPowerOf2(length)
         this._list = new Array(capacity)
         this._capacityMask = capacity - 1
-        this._tail = array.length
-        for (let i = 0; i < array.length; i++) this._list[i] = array[i]
+        this._head = 0
+        this._tail = length & this._capacityMask
+        this._size = length
+        for (let i = 0; i < length; i++) this._list[i] = array[start + i]
     }
 
     #growArray(): void {
-        const newCapacity = this._list.length << 1
-        const newList = new Array(newCapacity)
-
-        let k = 0
-        let i = this._head
-        while (i !== this._tail) {
-            newList[k++] = this._list[i]
-            i = (i + 1) & this._capacityMask
+        let oldMask = this._capacityMask
+        let oldList = this._list
+        let oldHead = this._head
+        let size = this._size
+        let newList = new Array(oldList.length << 1)
+        for (let i = 0; i < size; i++) {
+            newList[i] = oldList[(oldHead + i) & oldMask]
         }
-
         this._list = newList
         this._head = 0
-        this._tail = k
-        this._capacityMask = newCapacity - 1
+        this._tail = size
+        this._capacityMask = newList.length - 1
     }
 
     #shrinkArray(): void {
         if (this._list.length <= 4) return
-        const newCapacity = this._list.length >>> 1
-        const newList = new Array(newCapacity)
-
-        let k = 0
-        let i = this._head
-        while (i !== this._tail) {
-            newList[k++] = this._list[i]
-            i = (i + 1) & this._capacityMask
+        let oldMask = this._capacityMask
+        let oldList = this._list
+        let oldHead = this._head
+        let size = this._size
+        let newList = new Array(oldList.length >>> 1)
+        for (let i = 0; i < size; i++) {
+            newList[i] = oldList[(oldHead + i) & oldMask]
         }
-
         this._list = newList
         this._head = 0
-        this._tail = k
-        this._capacityMask = newCapacity - 1
+        this._tail = size
+        this._capacityMask = newList.length - 1
     }
 
     #remove(idx: number): void {
-        const mask = this._capacityMask
-        const len = this._list.length
+        let mask = this._capacityMask
+        let len = this._list.length
+        let distFromHead = (idx - this._head) & mask
 
-        if (idx - this._head < this.length - (idx - this._head)) {
+        if (distFromHead < this._size - distFromHead) {
             let i = idx
-            while (i > this._head) {
-                this._list[i] = this._list[(i - 1 + len) & mask]
-                i = (i - 1 + len) & mask
+            while (i !== this._head) {
+                let prev = (i - 1 + len) & mask
+                this._list[i] = this._list[prev]
+                i = prev
             }
             this._list[this._head] = undefined
             this._head = (this._head + 1) & mask
         } else {
             let i = idx
-            while (i !== this._tail) {
-                this._list[i] = this._list[(i + 1) & mask]
-                i = (i + 1) & mask
+            let last = (this._tail - 1 + len) & mask
+            while (i !== last) {
+                let next = (i + 1) & mask
+                this._list[i] = this._list[next]
+                i = next
             }
-            this._list[(this._tail - 1 + len) & mask] = undefined
-            this._tail = (this._tail - 1 + len) & mask
+            this._list[last] = undefined
+            this._tail = last
         }
+
+        this._size--
+        if (this._size <= this._list.length / 4 && this._list.length > 4) this.#shrinkArray()
     }
 }

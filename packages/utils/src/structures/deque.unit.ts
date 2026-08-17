@@ -41,7 +41,7 @@ describe("Deque", () => {
         expect(deque.length).toBe(0)
     })
 
-    it.todo("mix of pushFront and pushBack", () => {
+    it("mix of pushFront and pushBack", () => {
         deque.pushBack(1)
         deque.pushFront(2)
         deque.pushBack(3)
@@ -65,7 +65,7 @@ describe("Deque", () => {
         expect(deque.at(-99)).toBeUndefined()
     })
 
-    it.todo("respects optional capacity limit (drops from opposite end)", () => {
+    it("respects optional capacity limit (drops from opposite end)", () => {
         let limited = new Deque<number>(undefined, { capacity: 3 })
 
         limited.pushBack(1)
@@ -80,7 +80,7 @@ describe("Deque", () => {
         expect([...limited]).toEqual([0, 2, 3])
     })
 
-    it.todo("indexOf, includes, find, findIndex work correctly", () => {
+    it("indexOf, includes, find, findIndex work correctly", () => {
         deque.pushBack(10)
         deque.pushBack(20)
         deque.pushBack(30)
@@ -95,7 +95,7 @@ describe("Deque", () => {
         expect(deque.findIndex((x) => x === 30)).toBe(2)
     })
 
-    it.todo("removeOne removes by index", () => {
+    it("removeOne removes by index", () => {
         deque.pushBack(10)
         deque.pushBack(20)
         deque.pushBack(30)
@@ -105,7 +105,7 @@ describe("Deque", () => {
         expect([...deque]).toEqual([10, 30, 40])
     })
 
-    it.todo("removeBy removes first matching element", () => {
+    it("removeBy removes first matching element", () => {
         deque.pushBack(10)
         deque.pushBack(20)
         deque.pushBack(30)
@@ -136,7 +136,7 @@ describe("Deque", () => {
         expect(result).toEqual([5, 10, 20])
     })
 
-    it.todo("grows automatically when full", () => {
+    it("grows automatically when full", () => {
         for (let i = 0; i < 100; i++) {
             deque.pushBack(i)
         }
@@ -145,7 +145,7 @@ describe("Deque", () => {
         expect(deque.at(99)).toBe(99)
     })
 
-    it.todo("shrinks when very sparse", () => {
+    it("shrinks when very sparse", () => {
         for (let i = 0; i < 100; i++) deque.pushBack(i)
         for (let i = 0; i < 90; i++) deque.popFront()
 
@@ -167,5 +167,25 @@ describe("Deque", () => {
         let d = new Deque([10, 20, 30])
         expect([...d]).toEqual([10, 20, 30])
         expect(d.length).toBe(3)
+    })
+
+    it("constructs from a power-of-two array without looking empty", () => {
+        let d = new Deque([1, 2, 3, 4])
+        expect(d.length).toBe(4)
+        expect(d.isEmpty()).toBe(false)
+        expect([...d]).toEqual([1, 2, 3, 4])
+    })
+
+    it("removeOne works after the ring wraps", () => {
+        let d = new Deque<number>()
+        d.pushBack(1)
+        d.pushBack(2)
+        d.pushBack(3)
+        d.popFront()
+        d.pushBack(4)
+        d.pushBack(5)
+        expect([...d]).toEqual([2, 3, 4, 5])
+        expect(d.removeOne(1)).toBe(3)
+        expect([...d]).toEqual([2, 4, 5])
     })
 })
