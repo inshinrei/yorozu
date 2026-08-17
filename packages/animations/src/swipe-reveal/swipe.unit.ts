@@ -129,6 +129,17 @@ describe("createSwipeReveal", () => {
         expect(el.style.getPropertyValue("transform")).toBe("translateX(0px)")
     })
 
+    it("duration 0 snaps on release", () => {
+        let el = createFakeEl()
+        let onCommit = vi.fn()
+        createSwipeReveal(el as unknown as HTMLElement, { onCommit, durationMs: 0 })
+        el.listeners.get("pointerdown")!(pointer("pointerdown", 0))
+        el.listeners.get("pointermove")!(pointer("pointermove", 160))
+        el.listeners.get("pointerup")!(pointer("pointerup", 160))
+        expect(onCommit).toHaveBeenCalledOnce()
+        expect(el.style.getPropertyValue("transform")).toBe("translateX(80px)")
+    })
+
     it("destroy removes listeners so later pointers are ignored", () => {
         let el = createFakeEl()
         let onCommit = vi.fn()

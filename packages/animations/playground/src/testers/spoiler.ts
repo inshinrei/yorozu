@@ -2,8 +2,6 @@ import { canAnimate, createSpoiler, SPOILER_MS } from "@yorozu/animations"
 import { getAnimationLevel } from "../level"
 
 export function mountSpoiler(root: HTMLElement): () => void {
-    let revealed = false
-
     let tester = document.createElement("div")
     tester.className = "pg-tester"
 
@@ -36,21 +34,26 @@ export function mountSpoiler(root: HTMLElement): () => void {
     tester.append(toolbar, hint, cover)
     root.append(tester)
 
-    function make(): ReturnType<typeof createSpoiler> {
+    function make(startRevealed: boolean): ReturnType<typeof createSpoiler> {
         return createSpoiler(cover, {
-            revealed: () => revealed,
+            revealed: () => startRevealed,
             durationMs: canAnimate(getAnimationLevel()) ? SPOILER_MS : 0,
         })
     }
 
-    let spoiler = make()
+    let spoiler = make(false)
+
+    function remake(startRevealed: boolean): void {
+        spoiler.destroy()
+        spoiler = make(startRevealed)
+    }
 
     revealBtn.addEventListener("click", () => {
-        revealed = true
+        remake(false)
         spoiler.reveal()
     })
     resetBtn.addEventListener("click", () => {
-        revealed = false
+        remake(true)
         spoiler.reset()
     })
 

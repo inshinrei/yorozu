@@ -20,6 +20,7 @@ export type SwipeRevealOptions = {
     axis?: "x"
     threshold?: number
     max?: number
+    durationMs?: number
     onCommit: () => void
 }
 
@@ -51,7 +52,7 @@ export function createSwipeReveal(el: HTMLElement, options: SwipeRevealOptions):
         let run = tween({
             from,
             to: target,
-            durationMs: SWIPE_TWEEN_MS,
+            durationMs: options.durationMs ?? SWIPE_TWEEN_MS,
             onUpdate: (value) => {
                 current = value
                 applyOffset(el, value)

@@ -2,7 +2,10 @@ import { applyStyles } from "../core/styles"
 import type { Size } from "../rect/types"
 import {
     boundTranslate,
+    clampScale,
     nextScaleFromWheel,
+    PINCH_MAX_SCALE,
+    PINCH_MIN_SCALE,
     resetZoom,
     zoomAtOrigin,
     zoomTransform,
@@ -53,8 +56,9 @@ export function createPinchZoom(config: PinchZoomConfig): PinchZoom {
 
     let commit = (next: ZoomState): ZoomState => {
         let { layout, viewport } = sizes()
-        let bounded = boundTranslate(next.translateX, next.translateY, next.scale, layout.width, layout.height, viewport.width, viewport.height)
-        state = { scale: next.scale, translateX: bounded.translateX, translateY: bounded.translateY }
+        let scale = clampScale(next.scale, PINCH_MIN_SCALE, PINCH_MAX_SCALE)
+        let bounded = boundTranslate(next.translateX, next.translateY, scale, layout.width, layout.height, viewport.width, viewport.height)
+        state = { scale, translateX: bounded.translateX, translateY: bounded.translateY }
         let node = config.getEl()
         if (node) applyState(node, state)
         return state

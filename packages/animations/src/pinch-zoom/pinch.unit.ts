@@ -143,6 +143,14 @@ describe("createPinchZoom", () => {
         pinch.destroy()
     })
 
+    it("setState clamps scale before bounding", () => {
+        let { pinch } = mount()
+        expect(pinch.setState({ scale: 999, translateX: 0, translateY: 0 }).scale).toBe(20)
+        let low = pinch.setState({ scale: 0, translateX: 20, translateY: 20 })
+        expect(low).toEqual({ scale: 1, translateX: 0, translateY: 0 })
+        pinch.destroy()
+    })
+
     it("reset restores identity", () => {
         let { el, pinch } = mount()
         pinch.setState({ scale: 3, translateX: 10, translateY: 10 })

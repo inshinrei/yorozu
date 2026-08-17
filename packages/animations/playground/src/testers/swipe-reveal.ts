@@ -1,4 +1,5 @@
-import { createSwipeReveal } from "@yorozu/animations"
+import { canAnimate, createSwipeReveal, SWIPE_TWEEN_MS } from "@yorozu/animations"
+import { getAnimationLevel } from "../level"
 
 export function mountSwipeReveal(root: HTMLElement): () => void {
     let tester = document.createElement("div")
@@ -25,6 +26,9 @@ export function mountSwipeReveal(root: HTMLElement): () => void {
     root.append(tester)
 
     let swipe = createSwipeReveal(row, {
+        get durationMs() {
+            return canAnimate(getAnimationLevel()) ? SWIPE_TWEEN_MS : 0
+        },
         onCommit: () => {
             row.textContent = "Committed"
         },
