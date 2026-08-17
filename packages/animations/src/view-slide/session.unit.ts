@@ -237,6 +237,32 @@ describe("createViewSlide", () => {
         expect(animate).not.toHaveBeenCalled()
     })
 
+    it("attach().update cancels an in-flight anim tied to the old key", async () => {
+        let cancel = vi.fn()
+        animate = vi.fn(() => ({
+            finished: new Promise<void>(() => undefined),
+            cancel,
+        }))
+
+        let slide = makeSlide()
+        let fromEl = createFakeEl()
+        let toEl = createFakeEl()
+        slide.setActive("a")
+        let fromHandle = slide.attach(fromEl as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(toEl as unknown as HTMLElement, "b")
+        await flushFrames()
+
+        expect(slide.animating).toBe(true)
+        expect(fromEl.style.transform).not.toBe("")
+        expect(cancel).not.toHaveBeenCalled()
+
+        fromHandle.update("c")
+        expect(cancel).toHaveBeenCalled()
+        expect(fromEl.style.transform).toBe("")
+        expect(slide.animating).toBe(false)
+    })
+
     it("settle fallback uses durationMs + slack", async () => {
         animate = vi.fn(() => ({
             finished: new Promise<void>(() => undefined),

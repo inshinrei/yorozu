@@ -288,6 +288,15 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         return {
             update: (next: Key): void => {
                 if (destroyed || next === key) return
+                if (
+                    (pair && (pair.from === key || pair.to === key)) ||
+                    (pending && (pending.from === key || pending.to === key))
+                ) {
+                    slideGen++
+                    abortInFlight()
+                    animating = false
+                    leavingKey = undefined
+                }
                 if (panelEls.get(key) === el) panelEls.delete(key)
                 key = next
                 panelEls.set(key, el)

@@ -132,6 +132,58 @@ describe("createSharedElement", () => {
         ).toBeNull()
     })
 
+    it("invalid play cancels the in-flight clone and restores hideTarget", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let hideTarget = createFakeEl() as unknown as HTMLElement
+        hideTarget.style.visibility = "visible"
+        let se = createSharedElement()
+        let first = se.play({ host, from, to, hideTarget })
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+        expect(hideTarget.style.visibility).toBe("hidden")
+
+        let second = se.play({
+            host,
+            from: { top: 0, left: 0, width: 0, height: 0 },
+            to,
+            hideTarget,
+        })
+        expect(second).toBeNull()
+        expect(await first!.done).toBe(false)
+        expect((host as unknown as FakeNode).children).toHaveLength(0)
+        expect(hideTarget.style.visibility).toBe("visible")
+    })
+
+    it("playClose hideTarget stays hidden when interrupting playOpen", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let hideTarget = createFakeEl() as unknown as HTMLElement
+        hideTarget.style.visibility = "visible"
+        let se = createSharedElement()
+        let open = se.playOpen({
+            host,
+            seed: { rect: from },
+            to,
+            hideTarget,
+        })
+        expect(open).not.toBeNull()
+        expect(hideTarget.style.visibility).toBe("hidden")
+
+        let close = se.playClose({
+            host,
+            fromStage: to,
+            target: { rect: from },
+            hideTarget,
+        })
+        expect(close).not.toBeNull()
+        expect(await open!.done).toBe(false)
+        expect(hideTarget.style.visibility).toBe("hidden")
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+
+        await vi.runAllTimersAsync()
+        expect(await close!.done).toBe(true)
+        expect(hideTarget.style.visibility).toBe("visible")
+        expect((host as unknown as FakeNode).children).toHaveLength(0)
+    })
+
     it("cancel() removes the clone", async () => {
         let host = createFakeEl() as unknown as HTMLElement
         let se = createSharedElement()

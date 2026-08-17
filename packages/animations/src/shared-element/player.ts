@@ -59,6 +59,7 @@ export type SharedElementController = {
         fadeOut?: boolean
         durationMs?: number
         viewport?: Size
+        hideTarget?: HTMLElement | null
     }) => Playback | null
     cancel: () => void
 }
@@ -249,7 +250,10 @@ export function createSharedElement(): SharedElementController {
 
     let play = (opts: SharedElementPlayOptions): Playback | null => {
         let flight = computeFlight(opts.from, opts.to)
-        if (!flight) return null
+        if (!flight) {
+            cancel()
+            return null
+        }
         return start(opts, flight)
     }
 
@@ -272,7 +276,10 @@ export function createSharedElement(): SharedElementController {
             insets: opts.insets,
             to: opts.to,
         })
-        if (!flight) return null
+        if (!flight) {
+            cancel()
+            return null
+        }
         return start(
             {
                 host: opts.host,
@@ -298,6 +305,7 @@ export function createSharedElement(): SharedElementController {
         fadeOut?: boolean
         durationMs?: number
         viewport?: Size
+        hideTarget?: HTMLElement | null
     }): Playback | null => {
         let imageUrl = opts.imageUrl ?? opts.target?.imageUrl ?? null
         if (!opts.target) {
@@ -312,6 +320,7 @@ export function createSharedElement(): SharedElementController {
                     fadeOut: true,
                     roundedStart: false,
                     roundedEnd: false,
+                    hideTarget: opts.hideTarget,
                 },
                 {
                     to: { ...opts.fromStage },
@@ -334,7 +343,10 @@ export function createSharedElement(): SharedElementController {
             thumb,
             objectFit,
         })
-        if (!flight) return null
+        if (!flight) {
+            cancel()
+            return null
+        }
         return start(
             {
                 host: opts.host,
@@ -346,6 +358,7 @@ export function createSharedElement(): SharedElementController {
                 fadeOut: opts.fadeOut ?? false,
                 roundedStart: false,
                 roundedEnd: true,
+                hideTarget: opts.hideTarget,
             },
             flight,
         )

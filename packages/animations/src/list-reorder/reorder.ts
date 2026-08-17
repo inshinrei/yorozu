@@ -55,10 +55,17 @@ export function createListReorder<T>(options: {
     }
 
     let register = (el: HTMLElement, key: Key): AttachHandle => {
+        if (destroyed) {
+            return {
+                update: (): void => {},
+                destroy: (): void => {},
+            }
+        }
         itemEls.set(key, el)
         return {
             update: (next: Key): void => {
-                if (next === key) return
+                if (destroyed || next === key) return
+                cancelAnim(key)
                 if (itemEls.get(key) === el) itemEls.delete(key)
                 key = next
                 itemEls.set(key, el)

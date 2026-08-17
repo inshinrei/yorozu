@@ -120,6 +120,7 @@ export function mountSharedElement(root: HTMLElement): () => void {
             fromStage,
             target: thumb ? seedFor(thumb, imageUrl) : null,
             imageUrl,
+            hideTarget: media,
         })
         // playClose cancel() restores hideTarget from the interrupted open; keep media covered.
         media.style.visibility = "hidden"

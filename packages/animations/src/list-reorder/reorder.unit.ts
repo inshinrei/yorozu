@@ -6,11 +6,15 @@ import {
 } from "./reorder"
 
 type FakeNode = {
+    style: { transform: string; opacity: string }
     animate: ReturnType<typeof vi.fn>
 }
 
 function createFakeEl(): FakeNode {
-    return { animate }
+    return {
+        style: { transform: "", opacity: "" },
+        animate,
+    }
 }
 
 let animate = vi.fn(() => ({
@@ -196,5 +200,66 @@ describe("createListReorder", () => {
         expect(animate).toHaveBeenCalled()
         handleA.destroy()
         expect(cancel).toHaveBeenCalled()
+    })
+
+    it("register().update() cancels the old key animation on recycle", () => {
+        type Item = { id: string }
+        let cancel = vi.fn()
+        animate = vi.fn(function (this: FakeNode, frames: Keyframe[]) {
+            let first = frames[0]
+            if (first && typeof first.transform === "string") {
+                this.style.transform = first.transform
+            }
+            return {
+                finished: new Promise<void>(() => {}),
+                cancel: () => {
+                    this.style.transform = ""
+                    cancel()
+                },
+            }
+        })
+
+        let elA = createFakeEl()
+        let elB = createFakeEl()
+
+        let reorder = createListReorder<Item>({
+            getItemHeight: () => 48,
+            getKey: (item) => item.id,
+        })
+
+        let handleA = reorder.register(elA as unknown as HTMLElement, "a")
+        reorder.register(elB as unknown as HTMLElement, "b")
+
+        reorder.sync([
+            { id: "a" },
+            { id: "b" },
+        ])
+        reorder.sync([
+            { id: "b" },
+            { id: "a" },
+        ])
+
+        expect(animate).toHaveBeenCalled()
+        expect(elA.style.transform).toBe("translateY(-48px)")
+
+        handleA.update("c")
+        expect(cancel).toHaveBeenCalled()
+        expect(elA.style.transform).toBe("")
+    })
+
+    it("register after destroy is a no-op", () => {
+        type Item = { id: string }
+        let elA = createFakeEl()
+
+        let reorder = createListReorder<Item>({
+            getItemHeight: () => 48,
+            getKey: (item) => item.id,
+        })
+
+        reorder.destroy()
+        let handle = reorder.register(elA as unknown as HTMLElement, "a")
+        reorder.sync([{ id: "a" }])
+        handle.update("b")
+        expect(animate).not.toHaveBeenCalled()
     })
 })
