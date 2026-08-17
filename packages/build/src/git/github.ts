@@ -1,6 +1,5 @@
 import { asyncPool } from "@yorozu/utils"
 import { z } from "zod"
-import { error, warn } from "../cli/log"
 
 const USER_AGENT = "@yorozu/build"
 const GITHUB_API_VERSION = "2022-11-28"
@@ -87,16 +86,9 @@ export async function createGithubRelease(params: {
 
                 if (upload.status !== 201) {
                     throw new Error(
-                        `GitHub artifact upload failed with ${upload.status}: ${await readErrorBody(upload)}`,
+                        `failed to upload artifact: ${file.name}: GitHub artifact upload failed with ${upload.status}: ${await readErrorBody(upload)}`,
                     )
                 }
-            },
-            {
-                onErrorStrategy: (item, _idx, err) => {
-                    warn(`failed to upload artifact: ${item.name}`)
-                    error(err instanceof Error ? err : new Error(String(err)))
-                    return "ignore"
-                },
             },
         )
     }
