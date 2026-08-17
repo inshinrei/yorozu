@@ -44,3 +44,13 @@ export {
     INDICATOR_EASING,
     createSlidingIndicator,
 } from "./sliding-indicator/indicator"
+
+export type { ReorderAnimKind, OrderDiffByKey } from "./list-reorder/classify"
+export { buildOrderDiff, classifyReorderAnim } from "./list-reorder/classify"
+export type { ListReorder } from "./list-reorder/reorder"
+export {
+    LIST_REORDER_MS,
+    LIST_REORDER_EASING,
+    LIST_REORDER_EPSILON_PX,
+    createListReorder,
+} from "./list-reorder/reorder"
