@@ -1,5 +1,6 @@
 import type { AnyToNever, MaybePromise } from "@yorozu/utils"
 import type { TypeDocOptions } from "typedoc"
+import type { SourceFile } from "typescript"
 import type { WorkspacePackage } from "./package-json/collect-package-jsons"
 import type { PackageJson } from "./package-json/types"
 import type { VersioningOptions } from "./versioning/types"
@@ -29,6 +30,9 @@ export interface JsrConfig {
     dryRun?: boolean
     finalizeDenoJson?: (ctx: BuildHookContext, jsr: Record<string, unknown>) => void
     finalize?: (ctx: BuildHookContext) => MaybePromise<void>
+    transformAst?: (ast: SourceFile) => boolean
+    transformCode?: (path: string, code: string) => string
+    enableDenoDirectives?: boolean
 }
 
 export interface LintConfig {
