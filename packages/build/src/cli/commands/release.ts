@@ -6,7 +6,7 @@ import process from "node:process"
 import { asNonNull, parallelMap } from "@yorozu/utils"
 import { isRunningInGithubActions, writeGithubActionsOutput } from "../../ci/github-actions"
 import { createGithubRelease } from "../../git/github"
-import { getLatestTag, gitTagExists } from "../../git/utils"
+import { getCommitsBetween, getLatestTag, gitTagExists } from "../../git/utils"
 import { jsrCreatePackages } from "../../jsr/create-packages"
 import { generateDenoWorkspace } from "../../jsr/generate-workspace"
 import { getWorkspaceRoot } from "../../misc/_config"
@@ -37,6 +37,14 @@ function printPublishList(packages: Array<WorkspacePackage>): void {
     for (let pkg of packages) {
         info(`  ${pkg.json.name}@${pkg.json.version}`)
     }
+}
+
+export function shouldSkipAutoRelease(params: {
+    kind: string
+    prevTag: string | null
+    commitsSincePrevTag: ReadonlyArray<unknown>
+}): boolean {
+    return params.kind === "auto" && params.prevTag != null && params.commitsSincePrevTag.length === 0
 }
 
 async function nextDateTag(root: string): Promise<string> {
@@ -86,7 +94,7 @@ export let releaseCli = bc.command({
         jsrCreatePackages: bc.boolean("jsr-create-packages").desc("whether to create missing packages in jsr"),
 
         withNpm: bc.boolean("with-npm").desc("whether to publish to npm"),
-        npmToken: bc.string("npm-token").desc("npm token to use for publishing (note: this will override the global .npmrc file)"),
+        npmToken: bc.string("npm-token").desc("npm token to use for publishing (passed via env and a temporary local .npmrc)"),
         npmPublishArgs: bc.string("npm-publish-args").desc("additional arguments to pass to `npm publish`"),
         npmDistDir: bc.string("npm-dist-dir").desc("directory to publish to npm from, relative to package root (default: dist)"),
         npmRegistry: bc.string("npm-registry").desc("URL of the npm registry to publish to"),
@@ -119,6 +127,12 @@ export let releaseCli = bc.command({
             nextVersion = asNonNull(rootPackage.json.version)
             changelog = "Initial release"
         } else {
+            let commitsSincePrevTag = await getCommitsBetween({ since: prevTag, cwd: root })
+            if (shouldSkipAutoRelease({ kind: args.kind, prevTag, commitsSincePrevTag })) {
+                info(`no commits since ${prevTag}, nothing to do`)
+                process.exit(0)
+            }
+
             bumpVersionResult = await bumpVersion({
                 workspace: workspaceWithRoot,
                 since: prevTag,
@@ -129,11 +143,6 @@ export let releaseCli = bc.command({
                 dryRun: args.dryRun,
                 withRoot: true,
             })
-
-            if (bumpVersionResult.changedPackages.length === 0) {
-                info("no packages changed, nothing to do")
-                process.exit(1)
-            }
 
             info(formatBumpVersionResult(bumpVersionResult, args.kind === "auto"))
             nextVersion = bumpVersionResult.nextVersion
