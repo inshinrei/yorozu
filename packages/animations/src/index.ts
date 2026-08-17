@@ -82,3 +82,20 @@ export {
     LIST_REORDER_EPSILON_PX,
     createListReorder,
 } from "./list-reorder/reorder"
+
+export type { Fade, FadeOptions } from "./fade/fade"
+export { FADE_MS, FADE_EASING, createFade } from "./fade/fade"
+
+export type {
+    Dock,
+    DockConfig,
+    DockEdge,
+    DockHandle,
+    DockMode,
+    DockPanelState,
+    DockTransforms,
+} from "./dock/dock"
+export { DOCK_EASING, DOCK_FADE_OFFSET, DOCK_MS, createDock, dockTransforms } from "./dock/dock"
+
+export type { Popover, PopoverPlayOptions } from "./popover/popover"
+export { POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN, createPopover } from "./popover/popover"
