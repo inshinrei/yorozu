@@ -35,7 +35,7 @@ export function mountListReorder(root: HTMLElement): () => void {
     let moveBtn = document.createElement("button")
     moveBtn.type = "button"
     moveBtn.className = "pg-btn pg-btn-primary"
-    moveBtn.textContent = "Move first to top"
+    moveBtn.textContent = "Move last to top"
 
     let swapBtn = document.createElement("button")
     swapBtn.type = "button"

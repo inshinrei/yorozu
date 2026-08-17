@@ -121,6 +121,8 @@ export function mountSharedElement(root: HTMLElement): () => void {
             target: thumb ? seedFor(thumb, imageUrl) : null,
             imageUrl,
         })
+        // playClose cancel() restores hideTarget from the interrupted open; keep media covered.
+        media.style.visibility = "hidden"
         if (!playback) {
             finish()
             return
