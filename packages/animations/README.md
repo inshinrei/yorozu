@@ -85,7 +85,7 @@ canAnimate(level) // false only for low
 
 ## View slide
 
-Panel stack transitions driven by an active key. Built-in modes: `push` (full-width), `crossfade` (±1.5rem + opacity), `cover` (scale-out leave + 200% enter), `none`.
+Panel stack transitions driven by an active key. Built-in modes: `push` (full-width), `crossfade` (±1.5rem + opacity), `cover` (scale-out leave + 200% enter), `peek` (~20% back + dim), `lift` (vertical ±100%), `zoom` (scale 1.1 / 0.95), `reveal` (`clip-path` inset wipe), `none`.
 
 ```ts
 import { createViewSlide, slideDirectionByIndex, resolveViewSlideMode } from "@yorozu/animations"
@@ -151,40 +151,31 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 
 ## Motion catalog
 
-**Shipped**
-
 | Name | API | Notes |
 | --- | --- | --- |
 | Intensity | `AnimationLevel` | `low` / `med` / `high`; OS seed-only |
 | Stack slide | `createViewSlide` `push` | Full-width 100% translate |
 | Soft slide | `createViewSlide` `crossfade` | ±1.5rem + opacity |
 | Cover slide | `createViewSlide` `cover` | Scale-out leave + 200% enter (list-layer open/close) |
+| Peek slide | `createViewSlide` `peek` | Incoming full-width; outgoing ~20% back + dim |
+| Lift | `createViewSlide` `lift` | Vertical `translateY` ±100% |
+| Zoom | `createViewSlide` `zoom` | Scale 1.1 / 0.95 + short opacity |
+| Reveal | `createViewSlide` `reveal` | `clip-path` inset wipe |
 | Shared element | `createSharedElement` | Thumb ↔ stage flight |
 | Sliding indicator | `createSlidingIndicator` | Size snap, position tween |
 | List reorder | `createListReorder` | Index FLIP, fixed height |
-
-**Candidates** (not implemented)
-
-| Abstract name | What it is | Why later |
-| --- | --- | --- |
-| **Peek slide** | Incoming full-width slide; outgoing eases ~20% back + dim | Same session, new mode |
-| **Lift** | Vertical `translateY` ±100%, optional fade | Sheets, vertical pagers |
-| **Zoom** | Scale 1.1 / 0.95 + short opacity | Modal / viewer replace |
-| **Reveal** | `clip-path` inset wipe | Not compositor-cheap everywhere |
-| **Dock** | Single panel open/close from an edge + optional backdrop fade | Side info column |
-| **Fade** | Opacity-only show/hide with `onHidden` | Skeletons, overlays |
-| **Popover** | Scale + fade from an anchor; optional backdrop blur | Menus |
-| **Digit flip** | Right-aligned char slots + `rotateX` + global burst budget | Badge counters |
-| **Presence pop** | Scale-in only on 0 → N, never on remount | Badge enter |
-| **Send flight** | Clone flies from a composer origin to a list insert point | Same math as shared-element |
-| **Swipe reveal** | Pointer-driven rubber + release tween | Reply / action |
-| **Scroll tween** | Animate `scrollLeft` / `scrollTop` | Jump-to-unread |
-| **Ripple** | Touch ink at pointer | Host CSS / canvas |
-| **Pinch zoom** | Clamp / origin / pan / inertia | Presentation math |
-| **Waveform** | Live bar/path from samples | Audio domain |
-| **Spoiler** | Particle / dot reveal | Canvas/WebGL |
-
-Priority if a later change lands more primitives: **Dock → Fade → Digit flip / Presence pop → Peek / Lift**.
+| Dock | `createDock` | Edge open/close + backdrop fade |
+| Fade | `createFade` | Opacity-only show/hide |
+| Popover | `createPopover` | Scale + fade from an origin |
+| Digit flip | `buildDigitSlots` / `playDigitFlip` | Right-aligned slots + `rotateX` |
+| Presence pop | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N |
+| Send flight | `playSendFlight` | Clone from an origin to a list insert |
+| Swipe reveal | `createSwipeReveal` | Pointer rubber + release tween |
+| Scroll tween | `playScrollTween` | Animate `scrollLeft` / `scrollTop` |
+| Ripple | `playRipple` | Touch ink at pointer |
+| Pinch zoom | `createPinchZoom` | Clamp / origin zoom; pan when scale > 1 |
+| Waveform | `decodeWaveform` / `fitWaveform` | Packed 5-bit samples, resampled bars |
+| Spoiler | `createSpoiler` | Dot-field overlay; reveal fades it out |
 
 ## Reduced motion
 

@@ -135,3 +135,23 @@ export { SCROLL_TWEEN_MS, playScrollTween } from "./scroll-tween/scroll"
 
 export type { RippleOptions } from "./ripple/ripple"
 export { RIPPLE_COLOR, RIPPLE_EASING, RIPPLE_MS, RIPPLE_SIZE_PX, playRipple } from "./ripple/ripple"
+
+export type { Point, Translate, ZoomState, PinchZoom, PinchZoomConfig } from "./pinch-zoom/pinch"
+export {
+    PINCH_MAX_SCALE,
+    PINCH_MIN_SCALE,
+    PINCH_WHEEL_FACTOR,
+    boundTranslate,
+    clampScale,
+    createPinchZoom,
+    maxTranslate,
+    nextScaleFromWheel,
+    resetZoom,
+    zoomAtOrigin,
+    zoomTransform,
+} from "./pinch-zoom/pinch"
+
+export { decodeWaveform, fitWaveform } from "./waveform/decode"
+
+export type { Spoiler, SpoilerOptions } from "./spoiler/spoiler"
+export { SPOILER_EASING, SPOILER_MS, createSpoiler } from "./spoiler/spoiler"
