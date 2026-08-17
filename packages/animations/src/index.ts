@@ -17,3 +17,11 @@ export {
     isRectInViewport,
     offViewportLandingRect,
 } from "./shared-element/math"
+export type { SharedElementSeed, SharedElementPlayOptions, SharedElementController } from "./shared-element/player"
+export {
+    SHARED_ELEMENT_MS,
+    SHARED_ELEMENT_EASING,
+    SHARED_ELEMENT_END_MS,
+    createSharedElement,
+    playSharedElement,
+} from "./shared-element/player"
