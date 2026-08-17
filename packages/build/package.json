@@ -8,7 +8,11 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./vite": "./src/vite/index.ts",
+    "./vite": {
+      "types": "./src/vite/index.ts",
+      "import": "./dist_vite-internal.js",
+      "default": "./dist_vite-internal.js"
+    },
     "./jsr": "./src/jsr/index.ts",
     "./vite-internal": "./dist_vite-internal.js"
   },
@@ -33,6 +37,7 @@
     "@yorozu/utils": "workspace:^",
     "cross-spawn": "7.0.6",
     "detect-indent": "7.0.2",
+    "esbuild": "0.25.12",
     "js-yaml": "4.1.1",
     "json5": "2.2.3",
     "picomatch": "4.0.4",

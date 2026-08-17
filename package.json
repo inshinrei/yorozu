@@ -5,17 +5,22 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "vitest watch"
+    "dev": "vitest watch",
+    "prepare": "pnpm run -C packages/build build-vite-plugin"
   },
   "author": "inshinrei",
   "license": "MIT",
   "devDependencies": {
     "@rolldown/binding-darwin-arm64": "1.0.0-rc.16",
     "@types/node": "25.6.0",
+    "@yorozu/build": "workspace:^",
+    "esbuild": "0.25.12",
     "prettier": "3.8.3",
     "ts-node": "10.9.2",
+    "tsx": "4.23.12",
     "typescript": "6.0.2",
     "vite": "8.0.8",
+    "vite-plugin-dts": "5.0.3",
     "vitest": "4.1.4"
   }
 }

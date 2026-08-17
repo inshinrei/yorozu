@@ -2,5 +2,8 @@ packages:
   - packages/*
   - packages/_standalone/*
 
+allowBuilds:
+  esbuild: true
+
 catalog:
   zod: 4.3.6
