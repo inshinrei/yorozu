@@ -1,0 +1,9 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "paths": {
+            "@yorozu/animations": ["./src/index.ts"]
+        }
+    },
+    "include": ["src/**/*.ts", "playground/src/**/*.ts"]
+}
