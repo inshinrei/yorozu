@@ -73,6 +73,23 @@ describe("AsyncInterval", () => {
         expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1000)
     })
 
+    it("start() mid-flight does not start a second overlapping loop", async () => {
+        handlerMock.mockImplementation(async () => {
+            await new Promise((r) => setTimeout(r, 50))
+        })
+
+        interval.startNow()
+        expect(handlerMock).toHaveBeenCalledTimes(1)
+
+        interval.start()
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
+
+        await vi.advanceTimersByTimeAsync(50)
+
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
+        expect(handlerMock).toHaveBeenCalledTimes(1)
+    })
+
     it("stop() while handler is running aborts its signal", async () => {
         let abortSeen = false
         handlerMock.mockImplementationOnce(async (signal: AbortSignal) => {

@@ -14,6 +14,8 @@ export interface AsyncResourceContext<T> {
 
 export interface AsyncResourceOptions<T> {
     autoReload?: boolean
+    autoReloadAfter?: number
+    /** @deprecated Use `autoReloadAfter`. */
     authReloadAfter?: number
     swr?: boolean
     swrValidator?: (ctx: AsyncResourceContext<T>) => boolean
@@ -55,7 +57,7 @@ export class AsyncResource<T> {
 
         if (this.options.autoReload) {
             this.#clearTimer()
-            let delay = expiresIn + (this.options.authReloadAfter ?? 0)
+            let delay = expiresIn + (this.options.autoReloadAfter ?? this.options.authReloadAfter ?? 0)
             this.#timeout = timers.setTimeout(() => {
                 if (this.#destroyed) return
                 this.#ctx.isBackground = true
@@ -82,10 +84,9 @@ export class AsyncResource<T> {
         let result
         try {
             result = await this.options.fetcher(this.#ctx)
-        } catch (err: any) {
-            if (err.name === "AbortError") {
-                // Expected during destroy or race
-                this.#updating.resolve()
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === "AbortError") {
+                this.#updating?.resolve()
                 this.#updating = undefined
                 this.#ctx.abort = null
                 return
@@ -94,13 +95,13 @@ export class AsyncResource<T> {
             if (this.options.onError) this.options.onError(err, this.#ctx)
             else console.error(err)
 
-            this.#updating.resolve()
+            this.#updating?.resolve()
             this.#updating = undefined
             this.#ctx.abort = null
             return
         }
 
-        this.#updating.resolve()
+        this.#updating?.resolve()
         this.#updating = undefined
         this.#ctx.abort = null
 
@@ -138,10 +139,8 @@ export class AsyncResource<T> {
         this.#abort?.abort()
         this.onUpdated.clear()
 
-        if (this.#updating) {
-            this.#updating.resolve()
-            this.#updating = undefined
-        }
+        this.#updating?.resolve()
+        this.#updating = undefined
     }
 
     #clearTimer(): void {

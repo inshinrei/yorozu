@@ -83,7 +83,7 @@ describe("asyncPool", () => {
 
         setTimeout(() => controller.abort(), 30)
 
-        expect(asyncPool(items, executor, { signal: controller.signal })).rejects.toThrow()
+        await expect(asyncPool(items, executor, { signal: controller.signal })).rejects.toThrow()
     })
 })
 

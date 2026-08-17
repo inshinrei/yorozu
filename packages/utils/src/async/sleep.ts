@@ -7,15 +7,16 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
             return
         }
 
-        let timeoutId = setTimeout(resolve, ms)
+        let onAbort = (): void => {
+            clearTimeout(timeoutId)
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"))
+        }
 
-        signal?.addEventListener(
-            "abort",
-            () => {
-                clearTimeout(timeoutId)
-                reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"))
-            },
-            { once: true },
-        )
+        let timeoutId = setTimeout(() => {
+            signal?.removeEventListener("abort", onAbort)
+            resolve()
+        }, ms)
+
+        signal?.addEventListener("abort", onAbort, { once: true })
     })
 }

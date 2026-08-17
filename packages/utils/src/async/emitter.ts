@@ -47,19 +47,20 @@ export class Emitter<T> {
     }
 
     #emitFew = (value: T): void => {
-        let len = this.#listeners.length
-        this.#listeners[0](value)
+        let listeners = this.#listeners.slice()
+        let len = listeners.length
+        listeners[0](value)
 
-        len > 1 && this.#listeners[1](value)
-        len > 2 && this.#listeners[2](value)
-        len > 3 && this.#listeners[3](value)
-        len > 4 && this.#listeners[4](value)
+        len > 1 && listeners[1](value)
+        len > 2 && listeners[2](value)
+        len > 3 && listeners[3](value)
+        len > 4 && listeners[4](value)
     }
 
     #emitAll = (value: T): void => {
-        let len = this.#listeners.length
-        for (let i = 0; i < len; i++) {
-            this.#listeners[i](value)
+        let listeners = this.#listeners.slice()
+        for (let i = 0; i < listeners.length; i++) {
+            listeners[i](value)
         }
     }
 
@@ -67,8 +68,6 @@ export class Emitter<T> {
         let len = this.#listeners.length
         if (len === 0) {
             this.#emit = noop
-        } else if (len === 1) {
-            this.#emit = this.#listeners[0]
         } else if (len <= 5) {
             this.#emit = this.#emitFew
         } else {
