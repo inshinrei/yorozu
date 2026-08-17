@@ -296,4 +296,53 @@ describe("createViewSlide", () => {
         let toFrames = animate.mock.calls[1]![0] as Keyframe[]
         expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
     })
+
+    it("peek uses 300ms stack easing", async () => {
+        let slide = makeSlide({ mode: "peek" })
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "b")
+        await flushFrames()
+        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        expect(opts.duration).toBe(300)
+        expect(opts.easing).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+        let fromFrames = animate.mock.calls[0]![0] as Keyframe[]
+        expect(fromFrames[1]).toMatchObject({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
+    })
+
+    it("zoom uses 150ms ease", async () => {
+        let slide = makeSlide({ mode: "zoom" })
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "b")
+        await flushFrames()
+        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        expect(opts.duration).toBe(150)
+        expect(opts.easing).toBe("ease")
+        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        expect(toFrames[0]).toMatchObject({ transform: "scale(1.1)", opacity: "0" })
+        expect(toFrames[1]).toMatchObject({ transform: "scale(1)", opacity: "1" })
+    })
+
+    it("reveal uses 350ms ease-in and applies clip-path", async () => {
+        let fromEl = createFakeEl()
+        let toEl = createFakeEl()
+        let slide = makeSlide({ mode: "reveal" })
+        slide.setActive("a")
+        slide.attach(fromEl as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(toEl as unknown as HTMLElement, "b")
+        expect(toEl.style.getPropertyValue("clip-path")).toBe("inset(0 100% 0 0)")
+        await flushFrames()
+        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        expect(opts.duration).toBe(350)
+        expect(opts.easing).toBe("ease-in")
+        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        expect(toFrames[0]).toMatchObject({ clipPath: "inset(0 100% 0 0)" })
+        expect(toFrames[1]).toMatchObject({ clipPath: "inset(0 0 0 0)" })
+        slide.destroy()
+        expect(toEl.style.getPropertyValue("clip-path")).toBe("")
+    })
 })

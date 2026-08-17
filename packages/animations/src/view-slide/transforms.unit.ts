@@ -75,6 +75,86 @@ describe("viewSlideTransforms", () => {
         expect(t.toStart).toEqual({ transform: "scale(0.7)", opacity: "0" })
         expect(t.toEnd).toEqual({ transform: "scale(1)", opacity: "1" })
     })
+
+    it("peek forward leaves at -20% / 0.7 and enters from 100%", () => {
+        let t = viewSlideTransforms("forward", "peek")
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
+        expect(t.toStart).toEqual({ transform: "translate3d(100%, 0, 0)", opacity: "1" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
+
+    it("peek back reverses the peek and full-width enter", () => {
+        let t = viewSlideTransforms("back", "peek")
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(100%, 0, 0)", opacity: "1" })
+        expect(t.toStart).toEqual({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
+
+    it("lift forward uses vertical ±100% translate3d", () => {
+        let t = viewSlideTransforms("forward", "lift")
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(0, -100%, 0)", opacity: "1" })
+        expect(t.toStart).toEqual({ transform: "translate3d(0, 100%, 0)", opacity: "1" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
+
+    it("lift back reverses the vertical slide", () => {
+        let t = viewSlideTransforms("back", "lift")
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(0, 100%, 0)", opacity: "1" })
+        expect(t.toStart).toEqual({ transform: "translate3d(0, -100%, 0)", opacity: "1" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
+
+    it("zoom forward leaves at scale(0.95) / 0 and enters scale(1.1) → scale(1)", () => {
+        let t = viewSlideTransforms("forward", "zoom")
+        expect(t.fromStart).toEqual({ transform: "scale(1)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "scale(0.95)", opacity: "0" })
+        expect(t.toStart).toEqual({ transform: "scale(1.1)", opacity: "0" })
+        expect(t.toEnd).toEqual({ transform: "scale(1)", opacity: "1" })
+    })
+
+    it("zoom back reverses scale-out and scale-in", () => {
+        let t = viewSlideTransforms("back", "zoom")
+        expect(t.fromStart).toEqual({ transform: "scale(1)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "scale(1.1)", opacity: "0" })
+        expect(t.toStart).toEqual({ transform: "scale(0.95)", opacity: "0" })
+        expect(t.toEnd).toEqual({ transform: "scale(1)", opacity: "1" })
+    })
+
+    it("reveal forward wipes the entering panel from inset(0 100% 0 0)", () => {
+        let t = viewSlideTransforms("forward", "reveal")
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.toStart).toEqual({
+            transform: "translate3d(0, 0, 0)",
+            opacity: "1",
+            clipPath: "inset(0 100% 0 0)",
+        })
+        expect(t.toEnd).toEqual({
+            transform: "translate3d(0, 0, 0)",
+            opacity: "1",
+            clipPath: "inset(0 0 0 0)",
+        })
+    })
+
+    it("reveal back wipes the leaving panel", () => {
+        let t = viewSlideTransforms("back", "reveal")
+        expect(t.fromStart).toEqual({
+            transform: "translate3d(0, 0, 0)",
+            opacity: "1",
+            clipPath: "inset(0 0 0 0)",
+        })
+        expect(t.fromEnd).toEqual({
+            transform: "translate3d(0, 0, 0)",
+            opacity: "1",
+            clipPath: "inset(0 100% 0 0)",
+        })
+        expect(t.toStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
 })
 
 describe("resolveViewSlideMode", () => {
@@ -99,5 +179,19 @@ describe("view-slide timing", () => {
         expect(viewSlideDurationMs("crossfade")).toBe(300)
         expect(viewSlideEasing("push")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
         expect(viewSlideEasing("crossfade")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+    })
+
+    it("peek and lift keep the stack 300ms ease-out curve", () => {
+        expect(viewSlideDurationMs("peek")).toBe(300)
+        expect(viewSlideDurationMs("lift")).toBe(300)
+        expect(viewSlideEasing("peek")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+        expect(viewSlideEasing("lift")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+    })
+
+    it("zoom uses 150ms ease; reveal uses 350ms ease-in", () => {
+        expect(viewSlideDurationMs("zoom")).toBe(150)
+        expect(viewSlideEasing("zoom")).toBe("ease")
+        expect(viewSlideDurationMs("reveal")).toBe(350)
+        expect(viewSlideEasing("reveal")).toBe("ease-in")
     })
 })

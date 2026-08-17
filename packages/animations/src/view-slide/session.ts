@@ -19,7 +19,7 @@ export const VIEW_SLIDE_SETTLE_SLACK_MS: number = 80
 
 export type { PanelRole, SlideDirection, SlidePanelState, SlideTransforms, ViewSlideMode, ViewSlideMountPolicy }
 
-const PANEL_STYLE_KEYS: readonly string[] = ["transform", "opacity", "will-change"]
+const PANEL_STYLE_KEYS: readonly string[] = ["transform", "opacity", "will-change", "clip-path"]
 
 export type ViewSlideConfig = {
     getMode: () => ViewSlideMode
@@ -59,11 +59,13 @@ type ActivePair = {
 }
 
 function applyPanel(el: HTMLElement, state: SlidePanelState): void {
-    applyStyles(el, {
+    let styles: Record<string, string> = {
         transform: state.transform,
         opacity: state.opacity,
-        "will-change": "transform, opacity",
-    })
+        "will-change": state.clipPath != null ? "transform, opacity, clip-path" : "transform, opacity",
+    }
+    if (state.clipPath != null) styles["clip-path"] = state.clipPath
+    applyStyles(el, styles)
 }
 
 function clearPanel(el: HTMLElement): void {

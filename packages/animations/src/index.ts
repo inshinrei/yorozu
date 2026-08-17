@@ -13,6 +13,8 @@ export {
     pickAnimationLevelFromRatio,
     stepAnimationLevel,
 } from "./core/level"
+export type { TweenOptions } from "./core/tween"
+export { easeOutCubic, lerp, tween } from "./core/tween"
 
 export type { Rect, Size, Insets, ObjectFit } from "./rect/types"
 export { fitContain, centerFitInViewport } from "./rect/fit"
@@ -51,6 +53,10 @@ export {
     VIEW_SLIDE_EASING,
     VIEW_SLIDE_COVER_MS,
     VIEW_SLIDE_COVER_EASING,
+    VIEW_SLIDE_ZOOM_MS,
+    VIEW_SLIDE_ZOOM_EASING,
+    VIEW_SLIDE_REVEAL_MS,
+    VIEW_SLIDE_REVEAL_EASING,
     slideDirectionByIndex,
     resolveViewSlideMode,
     viewSlideDurationMs,
