@@ -1,3 +1,9 @@
 .idea
+.grok
+.superpowers
 
 node_modules
+dist
+**/dist
+dist_vite-internal.js
+packages/build/dist_vite-internal.js

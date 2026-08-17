@@ -65,7 +65,7 @@ function replaceWorkspaceDependencies(
     packageJson: PackageJson,
     workspaceVersions?: Map<string, string>,
     bundledWorkspaceDeps?: Array<RegExp>,
-    fixedVersion?: string
+    fixedVersion?: string,
 ): PackageJson {
     let result = { ...packageJson }
 
@@ -84,7 +84,9 @@ function replaceWorkspaceDependencies(
             }
 
             if (value !== "workspace:^" && value !== "workspace:*") {
-                throw new Error(`Cannot replace workspace dependency ${name} with ${value}. Only workspace:^ and workspace:* are supported.`)
+                throw new Error(
+                    `Cannot replace workspace dependency ${name} with ${value}. Only workspace:^ and workspace:* are supported.`,
+                )
             }
 
             if (workspaceVersions?.get(name) == null) {
@@ -92,9 +94,49 @@ function replaceWorkspaceDependencies(
             }
 
             let workspaceVersion = workspaceVersions.get(name)!
-            newDeps[name] = fixedVersion != null
-                ? fixedVersion
-                : value === "workspace:*" ? workspaceVersion : `^${workspaceVersion}`
+            newDeps[name] =
+                fixedVersion != null ? fixedVersion : value === "workspace:*" ? workspaceVersion : `^${workspaceVersion}`
+        }
+
+        result[field] = newDeps
+    }
+
+    replaceField("dependencies")
+    replaceField("peerDependencies")
+    replaceField("optionalDependencies")
+    return result
+}
+
+function catalogLabel(catalogName: string): string {
+    return catalogName === "" ? "default catalog" : `catalog ${catalogName}`
+}
+
+function replaceCatalogDependencies(packageJson: PackageJson, rootPackageJson?: PackageJson): PackageJson {
+    let result = { ...packageJson }
+
+    function replaceField(field: keyof PackageJson) {
+        if (result[field] == null) return
+        let deps = result[field] as Record<string, string>
+        let newDeps = { ...deps }
+
+        for (let name of Object.keys(deps)) {
+            let value = deps[name]
+            if (!value.startsWith("catalog:")) continue
+
+            if (rootPackageJson?.catalogs == null) {
+                throw new Error("catalogs are not available in the workspace root.")
+            }
+
+            let catalogName = value.slice("catalog:".length)
+            let catalog = rootPackageJson.catalogs[catalogName]
+            if (catalog == null) {
+                throw new Error(`${catalogLabel(catalogName)} not found in the workspace root.`)
+            }
+            if (catalog[name] == null) {
+                throw new Error(`${catalogLabel(catalogName)} does not contain ${name}.`)
+            }
+
+            newDeps[name] = catalog[name]
         }
 
         result[field] = newDeps
@@ -208,6 +250,7 @@ export function processPackageJson(params: ProcessPackageJsonParams): ProcessPac
         packageJson = filterKeepScripts(packageJson)
         packageJson = applyDistOnlyFields(packageJson)
         packageJson = replaceWorkspaceDependencies(packageJson, workspaceVersions, bundledWorkspaceDeps, fixedVersion)
+        packageJson = replaceCatalogDependencies(packageJson, rootPackageJson)
 
         delete packageJson.typedoc
         delete packageJson.eslintConfig
