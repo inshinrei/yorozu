@@ -110,4 +110,38 @@ describe("AsyncQueue", () => {
         expect(queue.next()).toBe(55)
         expect(queue.peek()).toBeUndefined()
     })
+
+    it("tryEnqueue delivers to a waiting consumer", async () => {
+        let q = new AsyncQueue<number>()
+        let p = q.nextOrWait()
+        expect(q.tryEnqueue(7)).toBe(true)
+        expect(await p).toBe(7)
+    })
+
+    it("bounded enqueue does not exceed maxSize after a wake race", async () => {
+        let q = new AsyncQueue<number>(undefined, 1)
+        await q.enqueue(1)
+        let blocked = q.enqueue(2)
+        let blockedSettled = false
+        void blocked.then(() => {
+            blockedSettled = true
+        })
+        q.next()
+        await q.enqueue(3)
+        // 3 took the freed slot before 2 resumed; 2 must wait again
+        await Promise.resolve()
+        expect(q.length).toBeLessThanOrEqual(1)
+        expect(blockedSettled).toBe(false)
+    })
+
+    it("throws on enqueue after end", async () => {
+        let q = new AsyncQueue<number>()
+        q.end()
+        await expect(q.enqueue(1)).rejects.toThrow(/end/)
+    })
+
+    it("throws when initial items exceed maxSize", () => {
+        expect(() => new AsyncQueue([1, 2], 1)).toThrow(/maxSize/)
+        expect(() => new AsyncQueue(new Deque([1, 2]), 1)).toThrow(/maxSize/)
+    })
 })
