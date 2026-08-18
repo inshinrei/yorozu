@@ -118,10 +118,6 @@ func Run(opts Options) (skipped bool, err error) {
 			return false, err
 		}
 		nextVersion = bumpResult.NextVersion
-		workspaceWithRoot, err = workspace.Collect(root, true)
-		if err != nil {
-			return false, err
-		}
 	}
 
 	taggingSchema := "semver"

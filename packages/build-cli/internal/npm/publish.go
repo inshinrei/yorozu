@@ -1,6 +1,7 @@
 package npm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -238,11 +239,14 @@ func rewriteDistVersion(path, version string) error {
 		return fmt.Errorf("Could not parse package.json at %s: %w", path, err)
 	}
 	obj["version"] = version
-	out, err := json.MarshalIndent(obj, "", "    ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "    ")
+	if err := enc.Encode(obj); err != nil {
 		return err
 	}
-	return os.WriteFile(path, out, 0o644)
+	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
 func hasArgPrefix(args []string, prefix string) bool {

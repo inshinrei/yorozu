@@ -259,6 +259,33 @@ func TestBumpVersion(t *testing.T) {
 		}
 	})
 
+	t.Run("write path only splices version and keeps scripts and key order", func(t *testing.T) {
+		dir := t.TempDir()
+		rootPath := filepath.Join(dir, "package.json")
+		orig := "{\n  \"name\": \"yorozu\",\n  \"scripts\": { \"build\": \"a && b\" },\n  \"dependencies\": { \"zod\": \"4.3.6\", \"vite\": \"8.0.8\" },\n  \"version\": \"0.1.0\"\n}\n"
+		writeFile(t, rootPath, orig)
+		root := workspacePackage(workspace.PackageJSON{Name: "yorozu", Version: "0.1.0"}, workspace.Package{
+			Root:            true,
+			Path:            dir,
+			PackageJSONPath: rootPath,
+		})
+		_, err := versioning.Bump(versioning.BumpOpts{
+			Workspace: []workspace.Package{root},
+			Type:      "minor",
+			Since:     "HEAD",
+			DryRun:    false,
+			WithRoot:  true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := readFile(t, rootPath)
+		want := "{\n  \"name\": \"yorozu\",\n  \"scripts\": { \"build\": \"a && b\" },\n  \"dependencies\": { \"zod\": \"4.3.6\", \"vite\": \"8.0.8\" },\n  \"version\": \"0.2.0\"\n}\n"
+		if got != want {
+			t.Fatalf("file=%q", got)
+		}
+	})
+
 	t.Run("auto type uses every commit since `since` and still writes all managed packages", func(t *testing.T) {
 		dir := initRepo(t)
 		utilsDir := filepath.Join(dir, "packages", "utils")

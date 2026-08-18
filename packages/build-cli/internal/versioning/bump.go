@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -143,95 +144,29 @@ func detectIndent(text string) string {
 	return "    "
 }
 
-func jsonObjectKeys(data []byte) ([]string, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	tok, err := dec.Token()
-	if err != nil {
-		return nil, err
+var versionFieldRe = regexp.MustCompile(`("version"\s*:\s*")([^"]*)(")`)
+
+func ReplaceJSONVersion(data []byte, version string) ([]byte, error) {
+	if !json.Valid(data) {
+		return nil, fmt.Errorf("package.json is not valid JSON")
 	}
-	d, ok := tok.(json.Delim)
-	if !ok || d != '{' {
+	if versionFieldRe.Match(data) {
+		return []byte(versionFieldRe.ReplaceAllString(string(data), `${1}`+version+`${3}`)), nil
+	}
+	idx := bytes.IndexByte(data, '{')
+	if idx < 0 {
 		return nil, fmt.Errorf("package.json is not an object")
 	}
-	var keys []string
-	for dec.More() {
-		keyTok, err := dec.Token()
-		if err != nil {
-			return nil, err
-		}
-		key, ok := keyTok.(string)
-		if !ok {
-			return nil, fmt.Errorf("package.json has a non-string key")
-		}
-		keys = append(keys, key)
-		var skip json.RawMessage
-		if err := dec.Decode(&skip); err != nil {
-			return nil, err
-		}
-	}
-	return keys, nil
-}
-
-func prettyJSONValue(v any, indent string) (string, error) {
-	switch v.(type) {
-	case map[string]any, []any:
-		b, err := json.MarshalIndent(v, indent, indent)
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
-	default:
-		b, err := json.Marshal(v)
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
-	}
+	indent := detectIndent(string(data))
+	insert := "\n" + indent + `"version": "` + version + `",`
+	out := append([]byte(nil), data[:idx+1]...)
+	out = append(out, insert...)
+	out = append(out, data[idx+1:]...)
+	return out, nil
 }
 
 func setPackageJSONVersion(data []byte, version string) ([]byte, error) {
-	var obj map[string]any
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return nil, err
-	}
-	obj["version"] = version
-	keys, err := jsonObjectKeys(data)
-	if err != nil {
-		return nil, err
-	}
-	hasVersion := false
-	for _, key := range keys {
-		if key == "version" {
-			hasVersion = true
-			break
-		}
-	}
-	if !hasVersion {
-		keys = append(keys, "version")
-	}
-	indent := detectIndent(string(data))
-	var b strings.Builder
-	b.WriteString("{\n")
-	for i, key := range keys {
-		pretty, err := prettyJSONValue(obj[key], indent)
-		if err != nil {
-			return nil, err
-		}
-		keyJSON, err := json.Marshal(key)
-		if err != nil {
-			return nil, err
-		}
-		b.WriteString(indent)
-		b.Write(keyJSON)
-		b.WriteString(": ")
-		b.WriteString(pretty)
-		if i < len(keys)-1 {
-			b.WriteByte(',')
-		}
-		b.WriteByte('\n')
-	}
-	b.WriteString("}\n")
-	return []byte(b.String()), nil
+	return ReplaceJSONVersion(data, version)
 }
 
 func writePackageVersion(pkg *workspace.Package, version string, dryRun bool) error {
