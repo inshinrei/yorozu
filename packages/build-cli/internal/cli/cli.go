@@ -7,6 +7,10 @@ import (
 
 var commands = map[string]func([]string) int{}
 
+func init() {
+	Register("lint", lintCmd)
+}
+
 func Register(name string, fn func([]string) int) {
 	commands[name] = fn
 }
