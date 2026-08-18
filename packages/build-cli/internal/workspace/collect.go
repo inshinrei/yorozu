@@ -40,14 +40,21 @@ func Collect(root string, includeRoot bool) ([]Package, error) {
 	fsys := os.DirFS(root)
 	for _, raw := range rootJSON.Workspaces {
 		pattern := filepath.ToSlash(filepath.Clean(raw))
-		err := doublestar.GlobWalk(fsys, pattern, func(rel string, d fs.DirEntry) error {
-			if !d.IsDir() {
+		err := doublestar.GlobWalk(fsys, pattern, func(rel string, _ fs.DirEntry) error {
+			dir := filepath.Join(root, filepath.FromSlash(rel))
+			info, err := os.Stat(dir)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
+			if !info.IsDir() {
 				return nil
 			}
 			if globDepth(rel) > depth {
 				return doublestar.SkipDir
 			}
-			dir := filepath.Join(root, filepath.FromSlash(rel))
 			pkgPath, pkgJSON, err := ParseDir(dir)
 			if err != nil {
 				if isPackageNotFound(err) {

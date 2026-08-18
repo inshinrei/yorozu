@@ -56,6 +56,45 @@ func TestCollectThrowsWithoutWorkspaces(t *testing.T) {
 	}
 }
 
+func TestCollectFollowsSymlinkWorkspaceMember(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(root, "outside", "linked")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "package.json"), []byte(`{"name":"linked","version":"1.0.0"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"name":"ws","private":true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "pnpm-workspace.yaml"), []byte("packages:\n  - \"packages/*\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkgsDir := filepath.Join(root, "packages")
+	if err := os.MkdirAll(filepath.Join(pkgsDir, "real"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgsDir, "real", "package.json"), []byte(`{"name":"real","version":"1.0.0"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgsDir, "note.txt"), []byte("not a package"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "outside", "linked"), filepath.Join(pkgsDir, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	pkgs, err := workspace.Collect(root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := namesOf(pkgs)
+	if !contains(names, "real") || !contains(names, "linked") || len(pkgs) != 2 {
+		t.Fatalf("%v", names)
+	}
+}
+
 func TestFilterForPublish(t *testing.T) {
 	rootP := pkg("root", true, nil)
 	plain := pkg("plain", false, nil)
