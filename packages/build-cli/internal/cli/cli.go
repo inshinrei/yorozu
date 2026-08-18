@@ -14,6 +14,10 @@ func init() {
 	Register("bump-version", bumpVersionCmd)
 	Register("gen-changelog", genChangelogCmd)
 	Register("find-changed-packages", findChangedPackagesCmd)
+	Register("release", releaseCmd)
+	Register("cr", crCmd)
+	Register("docs", leftoverCmd("docs"))
+	Register("jsr", leftoverCmd("jsr"))
 }
 
 func Register(name string, fn func([]string) int) {
