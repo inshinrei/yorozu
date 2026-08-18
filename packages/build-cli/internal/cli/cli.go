@@ -18,6 +18,7 @@ func init() {
 	Register("cr", crCmd)
 	Register("docs", leftoverCmd("docs"))
 	Register("jsr", leftoverCmd("jsr"))
+	Register("gen-deps-graph", depsGraphCmd)
 }
 
 func Register(name string, fn func([]string) int) {
