@@ -27,6 +27,7 @@ export default {
     preparePackageJson({ packageJson }) {
         delete packageJson.exports["./vite-internal"]
         packageJson.exports["./vite"] = "./src/vite/index.ts"
+        packageJson.bin = { "yorozu-build": "./src/cli/main.ts" }
     },
     async finalize({ outDir }) {
         await writeFile(join(outDir, "vite.d.ts"), 'export * from "./vite/index.js"\n')
