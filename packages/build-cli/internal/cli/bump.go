@@ -57,15 +57,17 @@ func bumpVersionCmd(args []string) int {
 			root = args[i]
 		case strings.HasPrefix(arg, "--root="):
 			root = strings.TrimPrefix(arg, "--root=")
-		case arg == "--kind":
+		case arg == "--kind" || arg == "--type":
 			if i+1 >= len(args) {
-				fmt.Fprintln(os.Stderr, "missing --kind value")
+				fmt.Fprintln(os.Stderr, "missing --type value")
 				return 2
 			}
 			i++
 			kind = args[i]
 		case strings.HasPrefix(arg, "--kind="):
 			kind = strings.TrimPrefix(arg, "--kind=")
+		case strings.HasPrefix(arg, "--type="):
+			kind = strings.TrimPrefix(arg, "--type=")
 		case arg == "--since":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "missing --since value")
