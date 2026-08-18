@@ -1,4 +1,6 @@
 import process from "node:process"
+import type { RootConfigObject } from "../config"
+import { loadBuildConfig } from "../misc/_config"
 import { validatePreferProtected } from "./commands/lint/validate-prefer-protected"
 
 let args = process.argv.slice(2)
@@ -22,5 +24,6 @@ if (command !== "prefer-protected") {
     process.exit(1)
 }
 
-let errors = await validatePreferProtected({ workspaceRoot: root })
+let loaded = await loadBuildConfig<RootConfigObject>(root)
+let errors = await validatePreferProtected({ workspaceRoot: root, config: loaded?.lint })
 console.log(JSON.stringify(errors))
