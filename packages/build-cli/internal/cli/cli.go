@@ -9,6 +9,9 @@ var commands = map[string]func([]string) int{}
 
 func init() {
 	Register("lint", lintCmd)
+	Register("bump-version", bumpVersionCmd)
+	Register("gen-changelog", genChangelogCmd)
+	Register("find-changed-packages", findChangedPackagesCmd)
 }
 
 func Register(name string, fn func([]string) int) {
