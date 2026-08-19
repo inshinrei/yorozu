@@ -7,3 +7,5 @@ dist
 **/dist
 dist_vite-internal.js
 packages/build/dist_vite-internal.js
+
+.worktrees
