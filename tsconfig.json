@@ -13,8 +13,6 @@
         "resolveJsonModule": true,
         "types": [
             "node",
-            "bun",
-            "deno",
             "vite/client"
         ],
         "strict": true,
