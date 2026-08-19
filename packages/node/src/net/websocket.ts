@@ -177,17 +177,9 @@ abstract class NodeWebSocketServerBase<Connection> {
         server.on("close", onClose)
     }
 
-    get address(): TCPEndpoint | null {
+    get address(): TCPEndpoint {
         let addr = this.server.address()
-        if (addr == null) return null
-        if (typeof addr === "string") {
-            let [host, port] = addr.split(":")
-            return {
-                address: host,
-                port: Number.parseInt(port),
-            }
-        }
-
+        if (addr == null || typeof addr === "string") throw new Error("Listener is not bound.")
         return {
             address: addr.address,
             port: addr.port,
