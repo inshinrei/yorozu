@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createPopover, POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN } from "./popover"
 
 type FakeNode = {
     style: CSSStyleDeclaration
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeStyle(): CSSStyleDeclaration {
@@ -39,11 +40,11 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 describe("createPopover", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
     })
 
     afterEach(() => {
@@ -59,8 +60,8 @@ describe("createPopover", () => {
         let popover = createPopover()
         let playback = popover.playOpen(el as unknown as HTMLElement)
         expect(el.style.getPropertyValue("transform-origin")).toBe("center top")
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([
             { transform: "scale(0.92)", opacity: "0" },
             { transform: "scale(1)", opacity: "1" },
@@ -83,7 +84,7 @@ describe("createPopover", () => {
         await popover.playOpen(el as unknown as HTMLElement).done
         animate.mockClear()
         let playback = popover.playClose(el as unknown as HTMLElement)
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames).toEqual([
             { transform: "scale(1)", opacity: "1" },
             { transform: "scale(0.92)", opacity: "0" },
@@ -106,7 +107,7 @@ describe("createPopover", () => {
 
     it("resolves false when cancelled mid-run", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -120,7 +121,7 @@ describe("createPopover", () => {
 
     it("playClose cancels an in-flight playOpen", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -130,7 +131,7 @@ describe("createPopover", () => {
         let close = popover.playClose(el as unknown as HTMLElement)
         expect(await open.done).toBe(false)
         expect(cancel).toHaveBeenCalled()
-        let frames = animate.mock.calls[1]![0] as Keyframe[]
+        let frames = animate.mock.calls[1]![0]
         expect(frames[0]).toMatchObject({ transform: "scale(1)", opacity: "1" })
         expect(frames[1]).toMatchObject({ transform: "scale(0.92)", opacity: "0" })
         close.cancel()

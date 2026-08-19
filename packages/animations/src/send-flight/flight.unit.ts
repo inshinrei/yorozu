@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { computeFlight } from "../shared-element/math"
 import { playSendFlight } from "./flight"
 
@@ -7,7 +8,7 @@ type FakeNode = {
     style: CSSStyleDeclaration
     children: FakeNode[]
     parentNode: FakeNode | null
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
     src: string
     cloneNode: (deep?: boolean) => FakeNode
     setAttribute: ReturnType<typeof vi.fn>
@@ -69,14 +70,14 @@ function createFakeEl(tag = "div"): FakeNode {
     return node
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 let from = { top: 10, left: 20, width: 40, height: 40 }
 let to = { top: 100, left: 80, width: 200, height: 200 }
 
 describe("playSendFlight", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
         vi.stubGlobal("document", {
             createElement: (tag: string) => createFakeEl(tag),
         })
@@ -116,7 +117,7 @@ describe("playSendFlight", () => {
         expect(kids).toHaveLength(1)
         expect(kids[0]!.tagName).toBe("SPAN")
         let flight = computeFlight(from, to)!
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames[0]).toMatchObject({
             transform: `translate3d(${flight.fromTranslateX}px, ${flight.fromTranslateY}px, 0) scale(${flight.fromScaleX}, ${flight.fromScaleY})`,
         })
@@ -135,7 +136,7 @@ describe("playSendFlight", () => {
 
     it("removes the clone when cancelled", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))

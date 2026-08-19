@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import type { AttachHandle, Key } from "../core/types"
 import { createViewSlide, VIEW_SLIDE_MS, VIEW_SLIDE_SETTLE_SLACK_MS } from "./session"
 import type { SlideDirection, ViewSlideMode } from "./transforms"
@@ -6,7 +7,7 @@ import type { SlideDirection, ViewSlideMode } from "./transforms"
 type FakeNode = {
     style: CSSStyleDeclaration
     offsetWidth: number
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
     addEventListener: ReturnType<typeof vi.fn>
     removeEventListener: ReturnType<typeof vi.fn>
 }
@@ -47,7 +48,7 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+let animate = createFakeAnimate()
 
 function directionByKey(from: Key, to: Key): SlideDirection | null {
     if (from === to) return null
@@ -76,7 +77,7 @@ async function flushFrames(): Promise<void> {
 
 describe("createViewSlide", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+        animate = createFakeAnimate()
         vi.useFakeTimers()
         vi.stubGlobal(
             "requestAnimationFrame",
@@ -134,7 +135,7 @@ describe("createViewSlide", () => {
 
     it("overlapping setActive cancels the previous generation", async () => {
         let cancels: Array<ReturnType<typeof vi.fn>> = []
-        animate = vi.fn(() => {
+        animate = createFakeAnimate(() => {
             let cancel = vi.fn()
             cancels.push(cancel)
             let finished = new Promise<void>(() => undefined)
@@ -192,7 +193,7 @@ describe("createViewSlide", () => {
     })
 
     it("destroy clears styles and listeners", async () => {
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel() {},
         }))
@@ -239,7 +240,7 @@ describe("createViewSlide", () => {
 
     it("attach().update cancels an in-flight anim tied to the old key", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -264,7 +265,7 @@ describe("createViewSlide", () => {
     })
 
     it("settle fallback uses durationMs + slack", async () => {
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel() {},
         }))
@@ -288,12 +289,12 @@ describe("createViewSlide", () => {
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         await flushFrames()
         expect(animate).toHaveBeenCalled()
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(250)
         expect(opts.easing).toBe("ease-in-out")
-        let fromFrames = animate.mock.calls[0]![0] as Keyframe[]
+        let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "scale(0.7)", opacity: "0" })
-        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
     })
 
@@ -304,10 +305,10 @@ describe("createViewSlide", () => {
         slide.setActive("b")
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         await flushFrames()
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(300)
         expect(opts.easing).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
-        let fromFrames = animate.mock.calls[0]![0] as Keyframe[]
+        let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
     })
 
@@ -318,10 +319,10 @@ describe("createViewSlide", () => {
         slide.setActive("b")
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         await flushFrames()
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(150)
         expect(opts.easing).toBe("ease")
-        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ transform: "scale(1.1)", opacity: "0" })
         expect(toFrames[1]).toMatchObject({ transform: "scale(1)", opacity: "1" })
     })
@@ -336,10 +337,10 @@ describe("createViewSlide", () => {
         slide.attach(toEl as unknown as HTMLElement, "b")
         expect(toEl.style.getPropertyValue("clip-path")).toBe("inset(0 100% 0 0)")
         await flushFrames()
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(350)
         expect(opts.easing).toBe("ease-in")
-        let toFrames = animate.mock.calls[1]![0] as Keyframe[]
+        let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ clipPath: "inset(0 100% 0 0)" })
         expect(toFrames[1]).toMatchObject({ clipPath: "inset(0 0 0 0)" })
         slide.destroy()

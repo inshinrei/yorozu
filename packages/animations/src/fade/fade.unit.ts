@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createFade, FADE_EASING, FADE_MS } from "./fade"
 
 type FakeNode = {
     style: CSSStyleDeclaration
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeStyle(): CSSStyleDeclaration {
@@ -39,11 +40,11 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 describe("createFade", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
     })
 
     afterEach(() => {
@@ -58,8 +59,8 @@ describe("createFade", () => {
         let fade = createFade(el as unknown as HTMLElement)
         let playback = fade.setVisible(true)
         expect(animate).toHaveBeenCalledOnce()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([{ opacity: "0" }, { opacity: "1" }])
         expect(opts.duration).toBe(120)
         expect(opts.easing).toBe("ease-out")
@@ -72,7 +73,7 @@ describe("createFade", () => {
         await fade.setVisible(true).done
         animate.mockClear()
         let playback = fade.setVisible(false)
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames).toEqual([{ opacity: "1" }, { opacity: "0" }])
         expect(await playback.done).toBe(true)
         expect(el.style.getPropertyValue("opacity")).toBe("0")
@@ -92,14 +93,14 @@ describe("createFade", () => {
         let el = createFakeEl()
         let fade = createFade(el as unknown as HTMLElement, { durationMs: 40, easing: "linear" })
         fade.setVisible(true)
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(40)
         expect(opts.easing).toBe("linear")
     })
 
     it("resolves false when cancelled mid-run", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -113,7 +114,7 @@ describe("createFade", () => {
 
     it("a new setVisible cancels the in-flight playback", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -123,7 +124,7 @@ describe("createFade", () => {
         let second = fade.setVisible(false)
         expect(await first.done).toBe(false)
         expect(cancel).toHaveBeenCalled()
-        let frames = animate.mock.calls[1]![0] as Keyframe[]
+        let frames = animate.mock.calls[1]![0]
         expect(frames).toEqual([{ opacity: "1" }, { opacity: "0" }])
         second.cancel()
         expect(await second.done).toBe(false)

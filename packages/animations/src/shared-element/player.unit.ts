@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createSharedElement, playSharedElement } from "./player"
 
 type FakeNode = {
@@ -6,7 +7,7 @@ type FakeNode = {
     style: CSSStyleDeclaration
     children: FakeNode[]
     parentNode: FakeNode | null
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
     src: string
     alt: string
     draggable: boolean
@@ -68,14 +69,14 @@ function createFakeEl(tag = "div"): FakeNode {
     return node
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+let animate = createFakeAnimate()
 
 let from = { top: 10, left: 20, width: 40, height: 40 }
 let to = { top: 100, left: 80, width: 200, height: 200 }
 
 describe("createSharedElement", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+        animate = createFakeAnimate()
         vi.stubGlobal("document", {
             createElement: (tag: string) => createFakeEl(tag),
         })
@@ -255,7 +256,7 @@ describe("createSharedElement", () => {
         await vi.runAllTimersAsync()
         expect(await playback!.done).toBe(true)
         expect(animate).toHaveBeenCalled()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames[1]!.opacity).toBe("0")
     })
 
@@ -276,7 +277,7 @@ describe("createSharedElement", () => {
 
 describe("playSharedElement", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+        animate = createFakeAnimate()
         vi.stubGlobal("document", {
             createElement: (tag: string) => createFakeEl(tag),
         })

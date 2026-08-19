@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { DIGIT_FLIP_MS } from "./slots"
 import { playDigitFlip, playPresencePop, PRESENCE_POP_MS } from "./play"
 
 type FakeNode = {
     style: CSSStyleDeclaration
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeStyle(): CSSStyleDeclaration {
@@ -40,11 +41,11 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 describe("playDigitFlip", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
     })
 
     afterEach(() => {
@@ -56,8 +57,8 @@ describe("playDigitFlip", () => {
         let el = createFakeEl()
         let playback = playDigitFlip(el as unknown as HTMLElement)
         expect(animate).toHaveBeenCalledOnce()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }])
         expect(opts.duration).toBe(200)
         expect(await playback.done).toBe(true)
@@ -65,7 +66,7 @@ describe("playDigitFlip", () => {
 
     it("resolves false when cancelled mid-run", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -79,15 +80,15 @@ describe("playDigitFlip", () => {
 
 describe("playPresencePop", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
     })
 
     it("scales 0.6 → 1 with opacity over 200ms", async () => {
         expect(PRESENCE_POP_MS).toBe(200)
         let el = createFakeEl()
         let playback = playPresencePop(el as unknown as HTMLElement)
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([
             { transform: "scale(0.6)", opacity: "0" },
             { transform: "scale(1)", opacity: "1" },

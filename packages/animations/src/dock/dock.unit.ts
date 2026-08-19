@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createDock } from "./dock"
 import { DOCK_EASING, DOCK_MS } from "./transforms"
 import type { DockEdge, DockMode } from "./transforms"
@@ -6,7 +7,7 @@ import type { DockEdge, DockMode } from "./transforms"
 type FakeNode = {
     style: CSSStyleDeclaration
     offsetWidth: number
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeStyle(): CSSStyleDeclaration {
@@ -43,7 +44,7 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 function makeDock(opts?: { mode?: DockMode; edge?: DockEdge }) {
     return createDock({
@@ -62,7 +63,7 @@ async function flushFrames(): Promise<void> {
 
 describe("createDock", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
         vi.useFakeTimers()
         vi.stubGlobal(
             "requestAnimationFrame",
@@ -106,8 +107,8 @@ describe("createDock", () => {
 
         await flushFrames()
         expect(animate).toHaveBeenCalled()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([
             { transform: "translateX(100%)", opacity: "1" },
             { transform: "translateX(0)", opacity: "1" },
@@ -121,7 +122,7 @@ describe("createDock", () => {
         dock.attach(createFakeEl() as unknown as HTMLElement)
         dock.setOpen(true)
         await flushFrames()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames).toEqual([
             { transform: "translateX(1.5rem)", opacity: "0" },
             { transform: "translateX(0)", opacity: "1" },
@@ -137,12 +138,12 @@ describe("createDock", () => {
         dock.setOpen(true)
         await flushFrames()
         expect(animate).toHaveBeenCalledTimes(2)
-        let backdropFrames = animate.mock.calls[1]![0] as Keyframe[]
+        let backdropFrames = animate.mock.calls[1]![0]
         expect(backdropFrames).toEqual([{ opacity: "0" }, { opacity: "1" }])
     })
 
     it("close runs a leave phase then unmounts", async () => {
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel: vi.fn(),
         }))
@@ -158,7 +159,7 @@ describe("createDock", () => {
         expect(dock.mounted).toBe(true)
         expect(dock.leaving).toBe(true)
         expect(dock.animating).toBe(true)
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames).toEqual([
             { transform: "translateX(0)", opacity: "1" },
             { transform: "translateX(100%)", opacity: "1" },
@@ -178,7 +179,7 @@ describe("createDock", () => {
 
     it("cancelling mid-open resolves false and stops the animation", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -195,7 +196,7 @@ describe("createDock", () => {
 
     it("a newer setOpen cancels the previous generation", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
@@ -213,7 +214,7 @@ describe("createDock", () => {
 
     it("destroy clears styles and aborts in-flight motion", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))

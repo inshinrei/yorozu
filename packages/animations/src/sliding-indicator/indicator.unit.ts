@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createSlidingIndicator, INDICATOR_EASING, INDICATOR_MS } from "./indicator"
 
 type FakeNode = {
@@ -7,7 +8,7 @@ type FakeNode = {
     offsetTop: number
     offsetWidth: number
     offsetHeight: number
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeStyle(): CSSStyleDeclaration {
@@ -52,7 +53,7 @@ function createFakeEl(box?: {
     }
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+let animate = createFakeAnimate()
 let observe = vi.fn()
 let disconnect = vi.fn()
 let unobserve = vi.fn()
@@ -60,7 +61,7 @@ let ResizeObserverMock: ReturnType<typeof vi.fn>
 
 describe("createSlidingIndicator", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel() {} }))
+        animate = createFakeAnimate()
         observe = vi.fn()
         disconnect = vi.fn()
         unobserve = vi.fn()

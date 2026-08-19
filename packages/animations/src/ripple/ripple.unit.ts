@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { playRipple, RIPPLE_MS } from "./ripple"
 
 type FakeNode = {
@@ -6,7 +7,7 @@ type FakeNode = {
     style: CSSStyleDeclaration
     children: FakeNode[]
     parentNode: FakeNode | null
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
     setAttribute: ReturnType<typeof vi.fn>
     appendChild: (child: FakeNode) => FakeNode
     remove: () => void
@@ -62,11 +63,11 @@ function createFakeEl(tag = "div"): FakeNode {
     return node
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 describe("playRipple", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
         vi.stubGlobal("document", {
             createElement: (tag: string) => createFakeEl(tag),
         })
@@ -88,8 +89,8 @@ describe("playRipple", () => {
         expect(ink.style.getPropertyValue("border-radius")).toBe("50%")
         expect(ink.style.getPropertyValue("background")).toBe("rgba(0, 0, 0, 0.2)")
         expect(ink.style.getPropertyValue("pointer-events")).toBe("none")
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([
             { transform: "translate(-50%, -50%) scale(0)", opacity: "1" },
             { transform: "translate(-50%, -50%) scale(1)", opacity: "0" },
@@ -101,7 +102,7 @@ describe("playRipple", () => {
 
     it("removes the ink when cancelled", async () => {
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
             cancel,
         }))

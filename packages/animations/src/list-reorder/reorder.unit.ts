@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate, type FakeAnimate } from "../_test/fake-animate"
 import {
     createListReorder,
     LIST_REORDER_EASING,
@@ -7,7 +8,7 @@ import {
 
 type FakeNode = {
     style: { transform: string; opacity: string }
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
 }
 
 function createFakeEl(): FakeNode {
@@ -17,17 +18,11 @@ function createFakeEl(): FakeNode {
     }
 }
 
-let animate = vi.fn(() => ({
-    finished: Promise.resolve(),
-    cancel: vi.fn(),
-}))
+let animate = createFakeAnimate()
 
 describe("createListReorder", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({
-            finished: Promise.resolve(),
-            cancel: vi.fn(),
-        }))
+        animate = createFakeAnimate()
     })
 
     it("exports default timing constants", () => {
@@ -84,7 +79,7 @@ describe("createListReorder", () => {
         expect(animate).toHaveBeenCalled()
 
         let moveCalls = animate.mock.calls.filter((call) => {
-            let frames = call[0] as Keyframe[]
+            let frames = call[0]
             return frames.some((f) => "transform" in f)
         })
         expect(moveCalls.length).toBeGreaterThanOrEqual(1)
@@ -102,7 +97,7 @@ describe("createListReorder", () => {
 
         // b should fade (opacity)
         let opacityCalls = animate.mock.calls.filter((call) => {
-            let frames = call[0] as Keyframe[]
+            let frames = call[0]
             return frames.some((f) => "opacity" in f)
         })
         expect(opacityCalls.length).toBe(1)
@@ -172,7 +167,7 @@ describe("createListReorder", () => {
     it("register().destroy() cancels the in-flight animation for that key", () => {
         type Item = { id: string }
         let cancel = vi.fn()
-        animate = vi.fn(() => ({
+        animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => {}),
             cancel,
         }))
@@ -205,7 +200,7 @@ describe("createListReorder", () => {
     it("register().update() cancels the old key animation on recycle", () => {
         type Item = { id: string }
         let cancel = vi.fn()
-        animate = vi.fn(function (this: FakeNode, frames: Keyframe[]) {
+        animate = createFakeAnimate(function (this: FakeNode, frames, _options) {
             let first = frames[0]
             if (first && typeof first.transform === "string") {
                 this.style.transform = first.transform
@@ -217,7 +212,7 @@ describe("createListReorder", () => {
                     cancel()
                 },
             }
-        })
+        } as FakeAnimate)
 
         let elA = createFakeEl()
         let elB = createFakeEl()

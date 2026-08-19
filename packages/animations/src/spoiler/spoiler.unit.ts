@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createFakeAnimate } from "../_test/fake-animate"
 import { createSpoiler, SPOILER_EASING, SPOILER_MS } from "./spoiler"
 
 type FakeNode = {
@@ -8,7 +9,7 @@ type FakeNode = {
     parentNode: FakeNode | null
     clientWidth: number
     clientHeight: number
-    animate: ReturnType<typeof vi.fn>
+    animate: ReturnType<typeof createFakeAnimate>
     getContext: ReturnType<typeof vi.fn>
     appendChild: (child: FakeNode) => FakeNode
     remove: () => void
@@ -72,11 +73,11 @@ function createFakeEl(tag = "div"): FakeNode {
     return node
 }
 
-let animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+let animate = createFakeAnimate()
 
 describe("createSpoiler", () => {
     beforeEach(() => {
-        animate = vi.fn(() => ({ finished: Promise.resolve(), cancel: vi.fn() }))
+        animate = createFakeAnimate()
         vi.stubGlobal("document", {
             createElement: (tag: string) => createFakeEl(tag),
         })
@@ -103,8 +104,8 @@ describe("createSpoiler", () => {
         let spoiler = createSpoiler(el as unknown as HTMLElement, { revealed: () => false })
         let playback = spoiler.reveal()
         expect(animate).toHaveBeenCalledOnce()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
-        let opts = animate.mock.calls[0]![1] as KeyframeAnimationOptions
+        let frames = animate.mock.calls[0]![0]
+        let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([{ opacity: "1" }, { opacity: "0" }])
         expect(opts.duration).toBe(200)
         expect(opts.easing).toBe("ease-out")
@@ -119,7 +120,7 @@ describe("createSpoiler", () => {
         await spoiler.reveal().done
         animate.mockClear()
         let playback = spoiler.reset()
-        let frames = animate.mock.calls[0]![0] as Keyframe[]
+        let frames = animate.mock.calls[0]![0]
         expect(frames).toEqual([{ opacity: "0" }, { opacity: "1" }])
         expect(await playback.done).toBe(true)
         expect(el.children[0]!.style.getPropertyValue("opacity")).toBe("1")
