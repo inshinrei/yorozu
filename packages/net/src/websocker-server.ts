@@ -1,7 +1,7 @@
-import { Connection, TCPConnection } from "./types"
+import { Connection, TCPEndpoint } from "./types"
 import { WebSocketConnectionFramed } from "./websocket"
 
-export interface WebSocketServerConnection extends Connection<TCPConnection> {
+export interface WebSocketServerConnection extends Connection<TCPEndpoint> {
     readonly headers: Headers
     readonly url: string
 }
