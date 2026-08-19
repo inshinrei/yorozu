@@ -3,6 +3,7 @@ import process from "node:process"
 import { error } from "./log"
 import { bc } from "./commands/_utils"
 import { lintCli } from "./commands/lint/index"
+import { typecheckCli } from "./commands/typecheck"
 import { buildPackageCli } from "./commands/build"
 import { publishPackagesCli } from "./commands/publish"
 import { bumpVersionCli } from "./commands/bump-version"
@@ -17,6 +18,7 @@ import { runContinuousReleaseCli } from "./commands/cr"
 await bc.run(
     [
         lintCli,
+        typecheckCli,
         buildPackageCli,
         publishPackagesCli,
         bumpVersionCli,
