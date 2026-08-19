@@ -9,7 +9,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 
         let onAbort = (): void => {
             clearTimeout(timeoutId)
-            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"))
+            reject(signal?.reason ?? new DOMException("The operation was aborted.", "AbortError"))
         }
 
         let timeoutId = setTimeout(() => {

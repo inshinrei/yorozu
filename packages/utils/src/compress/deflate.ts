@@ -397,7 +397,7 @@ export class Compressor {
             this._state.index = 32766
             this._state.wait = 32768
             this._state.last = final ? 1 : 0
-            let rest = new Uint8Array(0)
+            let rest: Uint8Array = new Uint8Array(0)
             if (this._state.end > this._state.wait + 8191 || final) {
                 rest = this._emit(!!final)
                 this._state.wait = this._state.index
@@ -418,7 +418,7 @@ export class Compressor {
         this._buffer.set(chunk, this._state.end)
         this._state.end! += chunk.length
         this._state.last = final ? 1 : 0
-        let out = u8.empty
+        let out: Uint8Array = u8.empty
         if (this._state.end! > this._state.wait! + 8191 || final) {
             out = this._emit(!!final)
             this._state.wait = this._state.index

@@ -77,7 +77,7 @@ describe("composeMiddlewares", () => {
         let calls = 0
 
         await expect(
-            composed({}, (async (_ctx, next: any) => {
+            composed({}, (async (_ctx: {}, next: any) => {
                 calls++
                 if (calls > 3) throw new Error("recursed")
                 await next({})

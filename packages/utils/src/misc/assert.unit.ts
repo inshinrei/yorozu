@@ -44,7 +44,7 @@ describe("assertNotNull", () => {
 
 describe("asNonNull", () => {
     it("asNonNull returns the value or throws", () => {
-        expect(asNonNull(0)).toBe(0)
+        expect(asNonNull(0 as number | null)).toBe(0)
         expect(() => asNonNull(undefined)).toThrow()
         expect(() => asNonNull(null)).toThrow()
     })
