@@ -19,3 +19,15 @@ export type { LongPressBinding } from "./long-press"
 
 export { MENU_HISTORY_STATE, isMenuHistoryState, bindHistoryLayer } from "./history"
 export type { HistoryLayer } from "./history"
+
+export {
+    MENU_POPOVER_OPEN_MS,
+    MENU_POPOVER_CLOSE_MS,
+    MENU_POPOVER_OPEN_EASING,
+    MENU_POPOVER_CLOSE_EASING,
+    MENU_POPOVER_SCALE,
+    createMenuPopover,
+} from "./popover"
+
+export { createMenuSession } from "./session"
+export type { PlacePointerOpts, MenuSessionOpts, MenuSession } from "./session"
