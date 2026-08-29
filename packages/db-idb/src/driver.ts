@@ -17,7 +17,14 @@ import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
 import { toIdbKeyRange } from "./range"
 
 type Row = Record<string, unknown>
-type Pending = Map<string, Map<string, Row>>
+type PendingEntry = { row: Row; seq: number }
+type Pending = Map<string, Map<string, PendingEntry>>
+type SeqBox = { n: number }
+
+function nextSeq(box: SeqBox): number {
+    box.n++
+    return box.n
+}
 
 function reportError(log: Logger, err: unknown): void {
     if (err instanceof Error) log.error(err)
@@ -166,6 +173,9 @@ function openIdb(factory: IDBFactory, name: string, schema: DbSchema, log: Logge
                 fail(err)
             }
         }
+        req.onblocked = () => {
+            // wait — live connections close on versionchange
+        }
         req.onsuccess = () => succeed(req.result)
         req.onerror = () => fail(req.error ?? new Error("indexedDB open failed"))
     })
@@ -216,12 +226,14 @@ class IdbCollection<T extends Row> implements Collection<T> {
     protected _indexes: Map<string, IndexDef>
     protected _idb: () => IDBDatabase
     protected _pending: Pending
+    protected _seq: SeqBox
     protected _deferPut: (collectionName: string) => boolean
 
     constructor(
         def: CollectionDef,
         idb: () => IDBDatabase,
         pending: Pending,
+        seq: SeqBox,
         deferPut: (collectionName: string) => boolean,
     ) {
         this.name = def.name
@@ -231,14 +243,15 @@ class IdbCollection<T extends Row> implements Collection<T> {
         for (let index of def.indexes ?? []) this._indexes.set(index.name, index)
         this._idb = idb
         this._pending = pending
+        this._seq = seq
         this._deferPut = deferPut
     }
 
-    protected _colPending(): Map<string, Row> | undefined {
+    protected _colPending(): Map<string, PendingEntry> | undefined {
         return this._pending.get(this.name)
     }
 
-    protected _ensurePending(): Map<string, Row> {
+    protected _ensurePending(): Map<string, PendingEntry> {
         let map = this._pending.get(this.name)
         if (!map) {
             map = new Map()
@@ -253,7 +266,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
     async get(key: string): Promise<T | null> {
         let pending = this._colPending()?.get(key)
-        if (pending !== undefined) return pending as T
+        if (pending !== undefined) return pending.row as T
         let req!: IDBRequest
         await runTx(this._idb(), [this.name], "readonly", (tx) => {
             req = tx.objectStore(this.name).get(key)
@@ -270,7 +283,8 @@ class IdbCollection<T extends Row> implements Collection<T> {
         })
         let pending = this._colPending()
         return keys.map((key, i) => {
-            if (pending?.has(key)) return pending.get(key) as T
+            let hit = pending?.get(key)
+            if (hit) return hit.row as T
             return (reqs[i]!.result as T | undefined) ?? null
         })
     }
@@ -279,10 +293,11 @@ class IdbCollection<T extends Row> implements Collection<T> {
         let pk = primaryKeyOf(row, this._keyPath)
         let stored = withStringPk(row, this._keyPath, pk)
         if ((opts?.flush ?? "now") === "batch" && this._batchEnabled()) {
-            this._ensurePending().set(pk, stored)
+            this._ensurePending().set(pk, { row: stored, seq: nextSeq(this._seq) })
             return
         }
         this._colPending()?.delete(pk)
+        nextSeq(this._seq)
         await runTx(this._idb(), [this.name], "readwrite", (tx) => {
             tx.objectStore(this.name).put(stored)
         })
@@ -295,7 +310,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
             let pending = this._ensurePending()
             for (let row of rows) {
                 let pk = primaryKeyOf(row, this._keyPath)
-                pending.set(pk, withStringPk(row, this._keyPath, pk))
+                pending.set(pk, { row: withStringPk(row, this._keyPath, pk), seq: nextSeq(this._seq) })
             }
             return
         }
@@ -305,6 +320,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
             for (let row of rows) {
                 let pk = primaryKeyOf(row, this._keyPath)
                 live?.delete(pk)
+                nextSeq(this._seq)
                 store.put(withStringPk(row, this._keyPath, pk))
             }
         })
@@ -315,6 +331,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         if (pending) {
             for (let key of keys) pending.delete(key)
         }
+        if (keys.length > 0) nextSeq(this._seq)
         if (keys.length === 0) return
         await runTx(this._idb(), [this.name], "readwrite", (tx) => {
             let store = tx.objectStore(this.name)
@@ -324,6 +341,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
     async clear(): Promise<void> {
         this._pending.delete(this.name)
+        nextSeq(this._seq)
         await runTx(this._idb(), [this.name], "readwrite", (tx) => {
             tx.objectStore(this.name).clear()
         })
@@ -358,7 +376,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         }
         let pending = this._colPending()
         if (pending) {
-            for (let [pk, row] of pending) map.set(pk, row as T)
+            for (let [pk, entry] of pending) map.set(pk, entry.row as T)
         }
         let entries = [...map.entries()]
         entries.sort((a, b) => compareIndexKey(a[0], b[0]))
@@ -408,17 +426,17 @@ class IdbCollection<T extends Row> implements Collection<T> {
         index: string,
         bound: ScanBound,
         hits: Array<ScanHit<T>>,
-        pending: Map<string, Row>,
+        pending: Map<string, PendingEntry>,
     ): Array<ScanHit<T>> {
         let replaced = new Set(pending.keys())
         let out = hits.filter((h) => !replaced.has(h.primaryKey))
         let keyPath = indexKeyPath(this._def, index)
-        for (let [pk, row] of pending) {
-            let indexKey: IndexKey | undefined = index === "__pk" ? pk : projectIndexKey(row, keyPath)
+        for (let [pk, entry] of pending) {
+            let indexKey: IndexKey | undefined = index === "__pk" ? pk : projectIndexKey(entry.row, keyPath)
             if (indexKey === undefined) continue
             if (!inRange(indexKey, bound)) continue
             if (bound.keysOnly) out.push({ primaryKey: pk, indexKey })
-            else out.push({ primaryKey: pk, indexKey, value: row as T })
+            else out.push({ primaryKey: pk, indexKey, value: entry.row as T })
         }
         out.sort((a, b) => {
             let c = compareIndexKey(a.indexKey, b.indexKey)
@@ -434,9 +452,11 @@ class IdbDb implements Db {
     protected _idb: IDBDatabase
     protected _collections: Map<string, IdbCollection<Row>>
     protected _pending: Pending = new Map()
+    protected _seq: SeqBox = { n: 0 }
     protected _lock: SerialQueue = new SerialQueue()
     protected _txView: Db
     protected _onClose: () => void
+    protected _closed = false
 
     constructor(
         schema: DbSchema,
@@ -449,8 +469,13 @@ class IdbDb implements Db {
         this._onClose = onClose
         this._collections = new Map()
         this._txView = new NestedTxDb(this, () => this._flushPending())
+        this._idb.onversionchange = () => {
+            this._closed = true
+            this._idb.close()
+            this._onClose()
+        }
         for (let def of schema.collections) {
-            this._collections.set(def.name, new IdbCollection(def, () => this._idb, this._pending, deferPut))
+            this._collections.set(def.name, new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut))
         }
     }
 
@@ -476,40 +501,43 @@ class IdbDb implements Db {
     }
 
     async close(): Promise<void> {
-        await this._flushPending()
-        this._idb.close()
-        this._onClose()
+        if (this._closed) return
+        this._closed = true
+        try {
+            await this._flushPending()
+        } finally {
+            this._idb.close()
+            this._onClose()
+        }
     }
 
     protected async _flushPending(): Promise<void> {
-        let names: string[] = []
-        let snapshot: Array<[string, Map<string, Row>]> = []
+        let snapshot: Array<[string, Array<[string, PendingEntry]>]> = []
         for (let [name, rows] of this._pending) {
             if (rows.size === 0) continue
-            names.push(name)
-            snapshot.push([name, new Map(rows)])
-            rows.clear()
+            snapshot.push([name, [...rows.entries()]])
         }
-        if (names.length === 0) return
-        try {
-            await runTx(this._idb, names, "readwrite", (tx) => {
-                for (let [name, rows] of snapshot) {
-                    let store = tx.objectStore(name)
-                    for (let row of rows.values()) store.put(row)
-                }
-            })
-        } catch (err) {
-            for (let [name, rows] of snapshot) {
-                let cur = this._pending.get(name)
-                if (!cur) {
-                    this._pending.set(name, rows)
-                    continue
-                }
-                for (let [pk, row] of rows) {
-                    if (!cur.has(pk)) cur.set(pk, row)
+        if (snapshot.length === 0) return
+        await Promise.resolve()
+        let names = snapshot.map(([name]) => name)
+        await runTx(this._idb, names, "readwrite", (tx) => {
+            for (let [name, entries] of snapshot) {
+                let live = this._pending.get(name)
+                let store = tx.objectStore(name)
+                for (let [pk, entry] of entries) {
+                    let cur = live?.get(pk)
+                    if (!cur || cur.seq !== entry.seq) continue
+                    store.put(entry.row)
                 }
             }
-            throw err
+        })
+        for (let [name, entries] of snapshot) {
+            let live = this._pending.get(name)
+            if (!live) continue
+            for (let [pk, entry] of entries) {
+                let cur = live.get(pk)
+                if (cur && cur.seq === entry.seq) live.delete(pk)
+            }
         }
     }
 }

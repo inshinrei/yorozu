@@ -290,4 +290,57 @@ describe("createIdbDriver", () => {
         expect(await db.collection<ContactRow>("contacts").get("c1")).toEqual({ id: "c1", name: "Ada" })
         await db.close()
     })
+
+    it("flush does not resurrect a pk deleted concurrently", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let row = fileRow({ key: "a", storedAt: 1, bytes: 1 })
+        await col.put(row, { flush: "batch" })
+        let flushP = db.flush()
+        await Promise.resolve()
+        await col.delete(["a"])
+        await flushP
+        expect(await col.get("a")).toBeNull()
+        await db.close()
+    })
+
+    it("flush does not overwrite a concurrent put-now of the same pk", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let oldRow = fileRow({ key: "a", storedAt: 1, bytes: 1, meta: { n: 1 } })
+        let newRow = fileRow({ key: "a", storedAt: 2, bytes: 2, meta: { n: 2 } })
+        await col.put(oldRow, { flush: "batch" })
+        let flushP = db.flush()
+        await Promise.resolve()
+        await col.put(newRow)
+        await flushP
+        expect(await col.get("a")).toEqual(newRow)
+        await db.close()
+    })
+
+    it("drop completes while another live connection is open", async () => {
+        let dbName = nextName()
+        let opener = createIdbDriver({ dbName })
+        let dropper = createIdbDriver({ dbName })
+        let live = await opener.open(schema)
+        await live.collection<FileRow>("files").put(fileRow({ key: "a", storedAt: 1, bytes: 1 }))
+        await expect(dropper.drop!(schema)).resolves.toBeUndefined()
+        let db2 = await dropper.open(schema)
+        expect(await db2.collection<FileRow>("files").count()).toBe(0)
+        await db2.close()
+    }, 2000)
+
+    it("open with a higher version completes while a connection is live", async () => {
+        let dbName = nextName()
+        let first = createIdbDriver({ dbName })
+        let live = await first.open(schema)
+        await live.collection<FileRow>("files").put(fileRow({ key: "a", storedAt: 1, bytes: 1 }))
+        let second = createIdbDriver({ dbName })
+        let upgraded = { ...schema, version: 2 }
+        let db2 = await second.open(upgraded)
+        expect(await db2.collection<FileRow>("files").get("a")).toEqual(fileRow({ key: "a", storedAt: 1, bytes: 1 }))
+        await db2.close()
+    }, 2000)
 })
