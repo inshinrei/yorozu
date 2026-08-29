@@ -94,7 +94,7 @@ class MemoryOutboxStore implements OutboxStore {
     async retry(id: string): Promise<void> {
         let idx = this._items.findIndex((e) => e.id === id)
         if (idx === -1) return
-        let { failedAt: _failedAt, ...rest } = this._items[idx]!
+        let { failedAt: _failedAt, lastError: _lastError, ...rest } = this._items[idx]!
         this._items[idx] = { ...rest, attempts: 0, reservedTo: 0 }
     }
 

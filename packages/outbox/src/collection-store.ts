@@ -52,9 +52,11 @@ class CollectionOutboxStore implements OutboxStore {
         rollbackType?: string
         rollbackPayload?: unknown
     }): Promise<string> {
-        let entry = newOutboxEntry(this._clock.now(), params)
-        await this._col.put(asRow(entry))
-        return entry.id
+        return this._transact(async (col) => {
+            let entry = newOutboxEntry(this._clock.now(), params)
+            await col.put(asRow(entry))
+            return entry.id
+        })
     }
 
     async get(id: string): Promise<OutboxEntry | null> {
@@ -85,12 +87,14 @@ class CollectionOutboxStore implements OutboxStore {
                 attempts: best.attempts + 1,
             }
             await col.put(asRow(updated))
-            return updated
+            return fromRow(asRow(updated))
         })
     }
 
     async delete(id: string): Promise<void> {
-        await this._col.delete([id])
+        await this._transact(async (col) => {
+            await col.delete([id])
+        })
     }
 
     async release(id: string): Promise<void> {
@@ -151,7 +155,7 @@ class CollectionOutboxStore implements OutboxStore {
         await this._transact(async (col) => {
             let row = await col.get(id)
             if (!row) return
-            let { failedAt: _failedAt, ...rest } = fromRow(row)
+            let { failedAt: _failedAt, lastError: _lastError, ...rest } = fromRow(row)
             await col.put(asRow({ ...rest, attempts: 0, reservedTo: 0 }))
         })
     }
@@ -173,7 +177,9 @@ class CollectionOutboxStore implements OutboxStore {
     }
 
     async deleteAll(): Promise<void> {
-        await this._col.clear()
+        await this._transact(async (col) => {
+            await col.clear()
+        })
     }
 
     async count(): Promise<number> {

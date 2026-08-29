@@ -205,6 +205,31 @@ export function testOutboxStore(factory: () => Promise<{ store: OutboxStore; clo
             expect(claimed?.attempts).toBe(1)
         })
 
+        it("claim return value is not aliased to storage", async () => {
+            let id = await store.enqueue({ type: "t", payload: 1 })
+            let claimed = await store.claim(1000)
+            claimed!.payload = 999
+            let again = await store.get(id)
+            expect(again!.payload).toBe(1)
+        })
+
+        it("retry clears lastError", async () => {
+            let id = await store.enqueue({ type: "t", payload: 1 })
+            await store.claim(1)
+            await store.markFailed(id, "boom")
+            await store.retry(id)
+            let row = await store.get(id)
+            expect(row!.lastError).toBeUndefined()
+            expect(row!.failedAt).toBeUndefined()
+        })
+
+        it("enqueue is visible to a subsequent claim in the same process", async () => {
+            // Collection enqueue uses _transact so it cannot race claim's scan+put on sqlite/idb
+            let id = await store.enqueue({ type: "t", payload: 1 })
+            let claimed = await store.claim(1000)
+            expect(claimed?.id).toBe(id)
+        })
+
         it("releaseUncounted undoes the claim's attempt increment and makes the entry claimable", async () => {
             clock.nowMs = 1000
             let id = await store.enqueue({ type: "u", payload: {} })

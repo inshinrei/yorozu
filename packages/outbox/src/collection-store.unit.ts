@@ -39,6 +39,31 @@ describe("createOutboxStore", () => {
         return { store, clock }
     })
 
+    it("enqueue is visible to a subsequent claim in the same process", async () => {
+        // enqueue uses _transact so it cannot race claim's scan+put on sqlite/idb
+        let clock = mutableClock(1000)
+        let { store, db } = await openCollectionOutbox(clock)
+        let id = await store.enqueue({ type: "t", payload: 1 })
+        let claimed = await store.claim(1000)
+        expect(claimed?.id).toBe(id)
+        expect(claimed?.payload).toBe(1)
+        await db.close()
+    })
+
+    it("enqueue, delete, and deleteAll go through transact", async () => {
+        let { store, db } = await openCollectionOutbox()
+        let transact = vi.spyOn(db, "transact")
+        let id = await store.enqueue({ type: "t", payload: 1 })
+        expect(transact).toHaveBeenCalledWith(["outbox"], "rw", expect.any(Function))
+        transact.mockClear()
+        await store.delete(id)
+        expect(transact).toHaveBeenCalledWith(["outbox"], "rw", expect.any(Function))
+        transact.mockClear()
+        await store.deleteAll()
+        expect(transact).toHaveBeenCalledWith(["outbox"], "rw", expect.any(Function))
+        await db.close()
+    })
+
     it("claim scans by-claim with lte [now, MAX_SAFE_INTEGER] inside transact", async () => {
         let clock = mutableClock(1000)
         let { store, db } = await openCollectionOutbox(clock)
