@@ -192,10 +192,66 @@ function deleteIdb(factory: IDBFactory, name: string): Promise<void> {
     })
 }
 
+class WriteGuardCollection<T extends Row> implements Collection<T> {
+    readonly name: string
+
+    constructor(
+        protected _inner: Collection<T>,
+        protected _mode: { value: TxMode | null },
+    ) {
+        this.name = _inner.name
+    }
+
+    protected _assertWritable(): void {
+        if (this._mode.value === "r") throw new Error("write is not allowed in a read-only transact")
+    }
+
+    get(key: string): Promise<T | null> {
+        return this._inner.get(key)
+    }
+
+    getMany(keys: readonly string[]): Promise<Array<T | null>> {
+        return this._inner.getMany(keys)
+    }
+
+    async put(row: T, opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.put(row, opts)
+    }
+
+    async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.putMany(rows, opts)
+    }
+
+    async delete(keys: readonly string[]): Promise<void> {
+        this._assertWritable()
+        await this._inner.delete(keys)
+    }
+
+    async clear(): Promise<void> {
+        this._assertWritable()
+        await this._inner.clear()
+    }
+
+    count(): Promise<number> {
+        return this._inner.count()
+    }
+
+    getAll(): Promise<T[]> {
+        return this._inner.getAll()
+    }
+
+    scan(index: string, bound?: ScanBound): Promise<Array<ScanHit<T>>> {
+        return this._inner.scan(index, bound)
+    }
+}
+
 class NestedTxDb implements Db {
     constructor(
         protected _inner: Db,
         protected _flushUnlocked: () => Promise<void>,
+        protected _mode: { value: TxMode | null },
     ) {}
 
     get schema(): DbSchema {
@@ -203,7 +259,7 @@ class NestedTxDb implements Db {
     }
 
     collection<T extends Row>(name: string): Collection<T> {
-        return this._inner.collection(name)
+        return new WriteGuardCollection(this._inner.collection(name), this._mode)
     }
 
     transact<R>(_names: readonly string[], _mode: TxMode, _fn: (db: Db) => Promise<R>): Promise<R> {
@@ -211,6 +267,7 @@ class NestedTxDb implements Db {
     }
 
     flush(): Promise<void> {
+        if (this._mode.value === "r") return Promise.resolve()
         return this._flushUnlocked()
     }
 
@@ -228,7 +285,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
     protected _pending: Pending
     protected _seq: SeqBox
     protected _deferPut: (collectionName: string) => boolean
-    protected _txMode: { value: TxMode | null }
 
     constructor(
         def: CollectionDef,
@@ -236,7 +292,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
         pending: Pending,
         seq: SeqBox,
         deferPut: (collectionName: string) => boolean,
-        txMode: { value: TxMode | null },
     ) {
         this.name = def.name
         this._def = def
@@ -247,11 +302,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
         this._pending = pending
         this._seq = seq
         this._deferPut = deferPut
-        this._txMode = txMode
-    }
-
-    protected _assertWritable(): void {
-        if (this._txMode.value === "r") throw new Error("write is not allowed in a read-only transact")
     }
 
     protected _colPending(): Map<string, PendingEntry> | undefined {
@@ -297,7 +347,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async put(row: T, opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         let pk = primaryKeyOf(row, this._keyPath)
         let stored = withStringPk(row, this._keyPath, pk)
         if ((opts?.flush ?? "now") === "batch" && this._batchEnabled()) {
@@ -312,7 +361,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         if (rows.length === 0) return
         let batch = (opts?.flush ?? "now") === "batch" && this._batchEnabled()
         if (batch) {
@@ -336,7 +384,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async delete(keys: readonly string[]): Promise<void> {
-        this._assertWritable()
         let pending = this._colPending()
         if (pending) {
             for (let key of keys) pending.delete(key)
@@ -350,7 +397,6 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async clear(): Promise<void> {
-        this._assertWritable()
         this._pending.delete(this.name)
         nextSeq(this._seq)
         await runTx(this._idb(), [this.name], "readwrite", (tx) => {
@@ -480,7 +526,7 @@ class IdbDb implements Db {
         this._idb = idb
         this._onClose = onClose
         this._collections = new Map()
-        this._txView = new NestedTxDb(this, () => this._flushPending())
+        this._txView = new NestedTxDb(this, () => this._flushPending(), this._txMode)
         this._idb.onversionchange = () => {
             this._closed = true
             this._idb.close()
@@ -489,7 +535,7 @@ class IdbDb implements Db {
         for (let def of schema.collections) {
             this._collections.set(
                 def.name,
-                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut, this._txMode),
+                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut),
             )
         }
     }

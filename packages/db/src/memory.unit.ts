@@ -156,6 +156,31 @@ describe("openMemoryDb", () => {
         expect(await col.get("b")).toEqual(row({ key: "b" }))
     })
 
+    it("outer put during read transact is allowed", async () => {
+        let db = await openMemoryDb(schema)
+        let started!: () => void
+        let gate = new Promise<void>((r) => {
+            started = r
+        })
+        let txP = db.transact(["files"], "r", async (tx) => {
+            started()
+            await tx.collection("files").get("a")
+            await new Promise((r) => setTimeout(r, 20))
+            return tx.collection("files").get("a")
+        })
+        await gate
+        await db.collection("files").put({ key: "a", storedAt: 1, bytes: 0, meta: {} })
+        await txP
+        expect(await db.collection("files").get("a")).toMatchObject({ key: "a" })
+    })
+
+    it("callback collection rejects writes in read transact", async () => {
+        let db = await openMemoryDb(schema)
+        await expect(
+            db.transact(["files"], "r", (tx) => tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} })),
+        ).rejects.toThrow(/read-only/)
+    })
+
     it("unknown collection / unknown index throws", async () => {
         let db = await openMemoryDb(schema)
         expect(() => db.collection("nope")).toThrow()

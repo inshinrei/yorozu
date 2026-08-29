@@ -341,6 +341,50 @@ describe("createSqliteDriver", () => {
         await db.close()
     })
 
+    it("outer put during read transact is allowed", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let started!: () => void
+        let gate = new Promise<void>((r) => {
+            started = r
+        })
+        let txP = db.transact(["files"], "r", async (tx) => {
+            started()
+            await tx.collection("files").get("a")
+            await new Promise((r) => setTimeout(r, 20))
+            return tx.collection("files").get("a")
+        })
+        await gate
+        await db.collection("files").put({ key: "a", storedAt: 1, bytes: 0, meta: {} })
+        await txP
+        expect(await db.collection("files").get("a")).toMatchObject({ key: "a" })
+        await db.close()
+    })
+
+    it("callback collection rejects writes in read transact", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        await expect(
+            db.transact(["files"], "r", (tx) => tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} })),
+        ).rejects.toThrow(/read-only/)
+        await db.close()
+    })
+
+    it("flush inside read transact does not persist batch puts", async () => {
+        let sql: string[] = []
+        let driver = createSqliteDriver({ filename: ":memory:", native: nativeWithLog(sql) })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put({ key: "b", storedAt: 1, bytes: 0, meta: {} }, { flush: "batch" })
+        sql.length = 0
+        await db.transact(["files"], "r", (tx) => tx.flush())
+        expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(false)
+        expect(await col.get("b")).toMatchObject({ key: "b" })
+        await db.flush()
+        expect(await col.get("b")).toMatchObject({ key: "b" })
+        await db.close()
+    })
+
     it("async transact uses BEGIN IMMEDIATE", async () => {
         let sql: string[] = []
         let driver = createSqliteDriver({ filename: ":memory:", native: nativeWithLog(sql) })

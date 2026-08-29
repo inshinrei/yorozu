@@ -304,11 +304,67 @@ class SerialQueue {
     }
 }
 
+class WriteGuardCollection<T extends Row> implements Collection<T> {
+    readonly name: string
+
+    constructor(
+        protected _inner: Collection<T>,
+        protected _mode: { value: TxMode | null },
+    ) {
+        this.name = _inner.name
+    }
+
+    protected _assertWritable(): void {
+        if (this._mode.value === "r") throw new Error("write is not allowed in a read-only transact")
+    }
+
+    get(key: string): Promise<T | null> {
+        return this._inner.get(key)
+    }
+
+    getMany(keys: readonly string[]): Promise<Array<T | null>> {
+        return this._inner.getMany(keys)
+    }
+
+    async put(row: T, opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.put(row, opts)
+    }
+
+    async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.putMany(rows, opts)
+    }
+
+    async delete(keys: readonly string[]): Promise<void> {
+        this._assertWritable()
+        await this._inner.delete(keys)
+    }
+
+    async clear(): Promise<void> {
+        this._assertWritable()
+        await this._inner.clear()
+    }
+
+    count(): Promise<number> {
+        return this._inner.count()
+    }
+
+    getAll(): Promise<T[]> {
+        return this._inner.getAll()
+    }
+
+    scan(index: string, bound?: ScanBound): Promise<Array<ScanHit<T>>> {
+        return this._inner.scan(index, bound)
+    }
+}
+
 class NestedTxDb implements Db {
     constructor(
         protected _inner: Db,
         protected _unlocked: (name: string) => Collection<Row>,
         protected _flushUnlocked: () => void,
+        protected _mode: { value: TxMode | null },
     ) {}
 
     get schema(): DbSchema {
@@ -316,7 +372,7 @@ class NestedTxDb implements Db {
     }
 
     collection<T extends Row>(name: string): Collection<T> {
-        return this._unlocked(name) as Collection<T>
+        return new WriteGuardCollection(this._unlocked(name), this._mode) as Collection<T>
     }
 
     transact<R>(_names: readonly string[], _mode: TxMode, _fn: (db: Db) => Promise<R>): Promise<R> {
@@ -324,6 +380,7 @@ class NestedTxDb implements Db {
     }
 
     flush(): Promise<void> {
+        if (this._mode.value === "r") return Promise.resolve()
         this._flushUnlocked()
         return Promise.resolve()
     }
@@ -388,18 +445,11 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     protected _handle: SqliteHandle
     protected _pending: Pending
     protected _inSqlTx: { value: boolean }
-    protected _txMode: { value: TxMode | null }
     protected _table: string
     protected _blobTable: string
     protected _indexColIds: string[]
 
-    constructor(
-        def: CollectionDef,
-        handle: SqliteHandle,
-        pending: Pending,
-        inSqlTx: { value: boolean },
-        txMode: { value: TxMode | null },
-    ) {
+    constructor(def: CollectionDef, handle: SqliteHandle, pending: Pending, inSqlTx: { value: boolean }) {
         this.name = def.name
         this._def = def
         this._keyPath = def.keyPath
@@ -408,14 +458,9 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         this._handle = handle
         this._pending = pending
         this._inSqlTx = inSqlTx
-        this._txMode = txMode
         this._table = quoteIdent(def.name)
         this._blobTable = quoteIdent(`${def.name}__blobs`)
         this._indexColIds = allIndexColIds(def)
-    }
-
-    protected _assertWritable(): void {
-        if (this._txMode.value === "r") throw new Error("write is not allowed in a read-only transact")
     }
 
     protected _colPending(): Map<string, PendingWrite> | undefined {
@@ -519,7 +564,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async put(row: T, opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         let write = await this._prepareWrite(row)
         if ((opts?.flush ?? "now") === "batch") {
             this._ensurePending().set(write.pk, write)
@@ -530,7 +574,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         if (rows.length === 0) return
         let writes: PendingWrite[] = []
         for (let row of rows) writes.push(await this._prepareWrite(row))
@@ -549,7 +592,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async delete(keys: readonly string[]): Promise<void> {
-        this._assertWritable()
         let pending = this._colPending()
         if (pending) {
             for (let key of keys) pending.delete(key)
@@ -563,7 +605,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async clear(): Promise<void> {
-        this._assertWritable()
         this._pending.delete(this.name)
         this._writeTx(() => {
             this._handle.exec(`DELETE FROM ${this._table}`)
@@ -718,9 +759,10 @@ class SqliteDb implements Db {
                 return col
             },
             () => this._flushPending(),
+            this._txMode,
         )
         for (let def of schema.collections) {
-            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx, this._txMode)
+            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx)
             this._collections.set(def.name, col)
             this._gated.set(def.name, new GatedCollection(col, this._lock))
         }

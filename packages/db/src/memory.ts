@@ -43,20 +43,14 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     protected _keyPath: string
     protected _indexes: Map<string, IndexDef>
     protected _rows: Map<string, T> = new Map()
-    protected _txMode: { value: TxMode | null }
 
-    constructor(def: CollectionDef, txMode: { value: TxMode | null }) {
+    constructor(def: CollectionDef) {
         this.name = def.name
         this._keyPath = def.keyPath
         this._indexes = new Map()
-        this._txMode = txMode
         for (let index of def.indexes ?? []) {
             this._indexes.set(index.name, index)
         }
-    }
-
-    protected _assertWritable(): void {
-        if (this._txMode.value === "r") throw new Error("write is not allowed in a read-only transact")
     }
 
     async get(key: string): Promise<T | null> {
@@ -72,13 +66,11 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     }
 
     async put(row: T, _opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         let pk = primaryKeyOf(row, this._keyPath)
         this._rows.set(pk, row)
     }
 
     async putMany(rows: readonly T[], _opts?: PutOpts): Promise<void> {
-        this._assertWritable()
         for (let row of rows) {
             let pk = primaryKeyOf(row, this._keyPath)
             this._rows.set(pk, row)
@@ -86,14 +78,12 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     }
 
     async delete(keys: readonly string[]): Promise<void> {
-        this._assertWritable()
         for (let key of keys) {
             this._rows.delete(key)
         }
     }
 
     async clear(): Promise<void> {
-        this._assertWritable()
         this._rows.clear()
     }
 
@@ -140,15 +130,73 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     }
 }
 
+class WriteGuardCollection<T extends Record<string, unknown>> implements Collection<T> {
+    readonly name: string
+
+    constructor(
+        protected _inner: Collection<T>,
+        protected _mode: { value: TxMode | null },
+    ) {
+        this.name = _inner.name
+    }
+
+    protected _assertWritable(): void {
+        if (this._mode.value === "r") throw new Error("write is not allowed in a read-only transact")
+    }
+
+    get(key: string): Promise<T | null> {
+        return this._inner.get(key)
+    }
+
+    getMany(keys: readonly string[]): Promise<Array<T | null>> {
+        return this._inner.getMany(keys)
+    }
+
+    async put(row: T, opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.put(row, opts)
+    }
+
+    async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        this._assertWritable()
+        await this._inner.putMany(rows, opts)
+    }
+
+    async delete(keys: readonly string[]): Promise<void> {
+        this._assertWritable()
+        await this._inner.delete(keys)
+    }
+
+    async clear(): Promise<void> {
+        this._assertWritable()
+        await this._inner.clear()
+    }
+
+    count(): Promise<number> {
+        return this._inner.count()
+    }
+
+    getAll(): Promise<T[]> {
+        return this._inner.getAll()
+    }
+
+    scan(index: string, bound?: ScanBound): Promise<Array<ScanHit<T>>> {
+        return this._inner.scan(index, bound)
+    }
+}
+
 class NestedTxDb implements Db {
-    constructor(protected _inner: Db) {}
+    constructor(
+        protected _inner: Db,
+        protected _mode: { value: TxMode | null },
+    ) {}
 
     get schema(): DbSchema {
         return this._inner.schema
     }
 
     collection<T extends Record<string, unknown>>(name: string): Collection<T> {
-        return this._inner.collection(name)
+        return new WriteGuardCollection(this._inner.collection(name), this._mode)
     }
 
     transact<R>(_names: readonly string[], _mode: TxMode, _fn: (db: Db) => Promise<R>): Promise<R> {
@@ -156,6 +204,7 @@ class NestedTxDb implements Db {
     }
 
     flush(): Promise<void> {
+        if (this._mode.value === "r") return Promise.resolve()
         return this._inner.flush()
     }
 
@@ -174,9 +223,9 @@ class MemoryDb implements Db {
     constructor(schema: DbSchema) {
         this.schema = schema
         this._collections = new Map()
-        this._txView = new NestedTxDb(this)
+        this._txView = new NestedTxDb(this, this._txMode)
         for (let def of schema.collections) {
-            this._collections.set(def.name, new MemoryCollection(def, this._txMode))
+            this._collections.set(def.name, new MemoryCollection(def))
         }
     }
 
