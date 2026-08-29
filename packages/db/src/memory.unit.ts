@@ -224,4 +224,26 @@ describe("openMemoryDb", () => {
         expect(await col.get("a")).toEqual(row({ key: "a" }))
         await expect(db.close()).resolves.toBeUndefined()
     })
+
+    it("coerces a non-string primary key field to string", async () => {
+        let db = await openMemoryDb(schema)
+        let col = db.collection<ResourceRow>("files")
+        await col.put({key: 1, storedAt: 0, bytes: 0, meta: {}} as unknown as ResourceRow)
+        expect(await col.get("1")).toEqual({key: "1", storedAt: 0, bytes: 0, meta: {}})
+    })
+
+    it("does not alias put/get row objects", async () => {
+        let db = await openMemoryDb(schema)
+        let col = db.collection<ResourceRow>("files")
+        let rec = row({key: "a", storedAt: 1})
+        await col.put(rec)
+        rec.storedAt = 99
+        let got = await col.get("a")
+        expect(got).toEqual(row({key: "a", storedAt: 1}))
+        got!.storedAt = 42
+        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        let many = await col.getMany(["a"])
+        many[0]!.storedAt = 7
+        expect(await col.get("a")).toMatchObject({storedAt: 1})
+    })
 })

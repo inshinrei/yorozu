@@ -39,6 +39,15 @@ function primaryKeyOf(row: Record<string, unknown>, keyPath: string): string {
     return String(raw)
 }
 
+function withStringPk<T extends Record<string, unknown>>(row: T, keyPath: string, pk: string): T {
+    if (row[keyPath] === pk) return row
+    return {...row, [keyPath]: pk}
+}
+
+function cloneRow<T extends Record<string, unknown>>(row: T): T {
+    return {...row}
+}
+
 class MemoryCollection<T extends Record<string, unknown>> implements Collection<T> {
     readonly name: string
     protected _keyPath: string
@@ -55,26 +64,30 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     }
 
     async get(key: string): Promise<T | null> {
-        return this._rows.get(key) ?? null
+        let row = this._rows.get(key)
+        return row ? cloneRow(row) : null
     }
 
     async getMany(keys: readonly string[]): Promise<Array<T | null>> {
         let out: Array<T | null> = []
         for (let key of keys) {
-            out.push(this._rows.get(key) ?? null)
+            let row = this._rows.get(key)
+            out.push(row ? cloneRow(row) : null)
         }
         return out
     }
 
     async put(row: T, _opts?: PutOpts): Promise<void> {
         let pk = primaryKeyOf(row, this._keyPath)
-        this._rows.set(pk, row)
+        let stored = cloneRow(withStringPk(row, this._keyPath, pk))
+        this._rows.set(pk, stored)
     }
 
     async putMany(rows: readonly T[], _opts?: PutOpts): Promise<void> {
         for (let row of rows) {
             let pk = primaryKeyOf(row, this._keyPath)
-            this._rows.set(pk, row)
+            let stored = cloneRow(withStringPk(row, this._keyPath, pk))
+            this._rows.set(pk, stored)
         }
     }
 
@@ -96,7 +109,7 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
         let entries = [...this._rows.entries()]
         entries.sort((a, b) => compareIndexKey(a[0], b[0]))
         let out: T[] = []
-        for (let [, row] of entries) out.push(row)
+        for (let [, row] of entries) out.push(cloneRow(row))
         return out
     }
 
@@ -106,7 +119,9 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
             for (let [pk, row] of this._rows) {
                 if (!inRange(pk, bound)) continue
                 hits.push(
-                    bound.keysOnly ? { primaryKey: pk, indexKey: pk } : { primaryKey: pk, indexKey: pk, value: row },
+                    bound.keysOnly
+                        ? { primaryKey: pk, indexKey: pk }
+                        : { primaryKey: pk, indexKey: pk, value: cloneRow(row) },
                 )
             }
         } else {
@@ -116,7 +131,11 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
                 let indexKey = projectIndexKey(row, def.keyPath)
                 if (indexKey === undefined) continue
                 if (!inRange(indexKey, bound)) continue
-                hits.push(bound.keysOnly ? { primaryKey: pk, indexKey } : { primaryKey: pk, indexKey, value: row })
+                hits.push(
+                    bound.keysOnly
+                        ? { primaryKey: pk, indexKey }
+                        : { primaryKey: pk, indexKey, value: cloneRow(row) },
+                )
             }
         }
         hits.sort((a, b) => {
