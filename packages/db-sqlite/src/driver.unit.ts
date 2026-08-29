@@ -361,6 +361,26 @@ describe("createSqliteDriver", () => {
         await db.close()
     })
 
+    it("pre-obtained collection put inside read transact is allowed", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let result = await Promise.race([
+            db
+                .transact(["files"], "r", async () => {
+                    await col.put({ key: "a", storedAt: 1, bytes: 0, meta: {} })
+                })
+                .then(
+                    () => "ok" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBe("ok")
+        expect(await col.get("a")).toMatchObject({ key: "a" })
+        await db.close()
+    })
+
     it("callback collection rejects writes in read transact", async () => {
         let driver = createSqliteDriver({ filename: ":memory:" })
         let db = await driver.open(schema)
