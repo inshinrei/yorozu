@@ -24,4 +24,5 @@
     --yorozu-menu-destructive: #e53935;
     --yorozu-menu-divider: #0000001a;
     --yorozu-menu-disabled-opacity: 0.5;
+    --yorozu-menu-divider-margin: 0.25rem 0.5rem;
 }

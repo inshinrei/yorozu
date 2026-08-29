@@ -31,6 +31,7 @@ let tokenNames = [
     "--yorozu-menu-destructive",
     "--yorozu-menu-divider",
     "--yorozu-menu-disabled-opacity",
+    "--yorozu-menu-divider-margin",
 ]
 
 describe("default compact menu styles", () => {
@@ -58,5 +59,13 @@ describe("default compact menu styles", () => {
         }
         expect(pkg.exports["./tokens.css"]).toBe("./src/tokens.css")
         expect(pkg.exports["./default.css"]).toBe("./src/default.css")
+    })
+
+    it("disabled items do not keep the focus wash", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toMatch(/\[aria-disabled="true"\]:focus/)
+        expect(css).toMatch(/\.disabled:focus/)
+        expect(css).toContain("--yorozu-menu-divider-margin")
+        expect(css).toMatch(/:active:not\(\.disabled\):not\(\[aria-disabled="true"\]\)/)
     })
 })

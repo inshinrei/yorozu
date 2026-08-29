@@ -58,6 +58,13 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
         rafId = null
     }
 
+    function resetClosing(): void {
+        if (!closing) return
+        currentPlayback?.cancel()
+        currentPlayback = null
+        closing = false
+    }
+
     function finishClose(): void {
         historyLayer?.release()
         historyLayer = null
@@ -143,6 +150,7 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
     }
 
     function placePointer(anchor: { x: number; y: number }, placeOpts?: PlacePointerOpts): void {
+        resetClosing()
         cancelRaf()
         if (el == null) return
         if (el.offsetWidth === 0 || el.offsetHeight === 0) {
@@ -156,9 +164,11 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
     }
 
     function placeAbove(placed: AboveAnchorPlacement): void {
+        resetClosing()
         cancelRaf()
         if (el == null) return
         el.style.bottom = `${placed.bottom}px`
+        el.style.top = "unset"
         if (placed.left != null) {
             el.style.left = `${placed.left}px`
             el.style.right = "unset"
@@ -177,6 +187,8 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
         document.removeEventListener("keydown", onKeyDown)
         historyLayer?.release()
         historyLayer = null
+        el = null
+        closing = false
     }
 
     return { attach, placePointer, placeAbove, close, destroy }

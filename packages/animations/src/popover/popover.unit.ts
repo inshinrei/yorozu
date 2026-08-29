@@ -167,4 +167,18 @@ describe("createPopover", () => {
         expect(el.style.getPropertyValue("transform")).toBe("scale(0.85)")
         expect(animate).not.toHaveBeenCalled()
     })
+
+    it("createPopover config seeds origin duration and easing", () => {
+        let el = createFakeEl()
+        let popover = createPopover({
+            origin: "bottom left",
+            durationMs: 40,
+            easing: "linear",
+        })
+        popover.playOpen(el as unknown as HTMLElement)
+        expect(el.style.getPropertyValue("transform-origin")).toBe("bottom left")
+        let opts = animate.mock.calls[0]![1]!
+        expect(opts.duration).toBe(40)
+        expect(opts.easing).toBe("linear")
+    })
 })

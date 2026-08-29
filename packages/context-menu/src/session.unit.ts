@@ -162,4 +162,36 @@ describe("createMenuSession", () => {
         expect(el.style.maxHeight).toBe("")
         expect(el.style.overflow).toBe("")
     })
+
+    it("placeAbove writes bottom/left and unsets top", () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 })
+        session.placeAbove({ bottom: 108, left: 40, right: undefined, origin: "bottom left" })
+        expect(el.style.bottom).toBe("108px")
+        expect(el.style.left).toBe("40px")
+        expect(el.style.right).toBe("unset")
+        expect(el.style.top).toBe("unset")
+    })
+
+    it("destroy does not call onClose", () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 })
+        session.destroy()
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it("placePointer after close cancels close and opens again", async () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 })
+        session.close()
+        session.placePointer({ x: 200, y: 90 })
+        expect(el.style.left).toBe("203px")
+        expect(el.style.top).toBe("90px")
+        document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+        await flush()
+        expect(onClose).toHaveBeenCalled()
+    })
 })

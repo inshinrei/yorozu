@@ -35,6 +35,7 @@ function dispatchTouch(node: HTMLElement, type: string, clientX: number, clientY
 
 describe("bindLongPress", () => {
     let node: HTMLElement
+    let action: ReturnType<typeof bindLongPress>
 
     beforeEach(() => {
         vi.useFakeTimers()
@@ -95,5 +96,25 @@ describe("bindLongPress", () => {
         node.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
         expect(sawClick).toHaveBeenCalledTimes(1)
         document.body.removeEventListener("click", sawClick)
+    })
+
+    it("mouse pointerdown cancels a pending press", () => {
+        let onContextMenu = vi.fn()
+        node.addEventListener("contextmenu", onContextMenu)
+        action = bindLongPress(node)
+        dispatchTouch(node, "touchstart", 10, 12)
+        node.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }))
+        vi.advanceTimersByTime(MENU_LONG_PRESS_MS)
+        expect(onContextMenu).not.toHaveBeenCalled()
+    })
+
+    it("update enabled false detaches and cancels a pending press", () => {
+        let onContextMenu = vi.fn()
+        node.addEventListener("contextmenu", onContextMenu)
+        action = bindLongPress(node)
+        dispatchTouch(node, "touchstart", 1, 2)
+        action.update({ enabled: false })
+        vi.advanceTimersByTime(MENU_LONG_PRESS_MS)
+        expect(onContextMenu).not.toHaveBeenCalled()
     })
 })

@@ -39,6 +39,17 @@ describe("createSubmenuHover", () => {
         expect(open).toBeNull()
     })
 
+    it("open is a no-op when getRect is undefined", () => {
+        let setOpen = vi.fn()
+        let hover = createSubmenuHover({
+            getRect: () => undefined,
+            isOpen: () => false,
+            setOpen,
+        })
+        hover.open()
+        expect(setOpen).not.toHaveBeenCalled()
+    })
+
     it("openFromClick ignores scheduleClose until cancelClose", () => {
         let open: SubmenuAnchor | null = null
         let hover = createSubmenuHover({
