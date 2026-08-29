@@ -1,5 +1,5 @@
-import { NoneToVoidFunction } from "../types"
-import { Deque } from "../structures"
+import {NoneToVoidFunction} from "../types"
+import {Deque} from "../structures"
 
 type LockInfo = [Promise<void>, NoneToVoidFunction]
 
@@ -7,23 +7,19 @@ export class AsyncLock {
     protected _queue: Deque<LockInfo> = new Deque<LockInfo>()
 
     async acquire(): Promise<void> {
-        let info
-        while ((info = this._queue.peekFront())) {
-            await info[0]
-        }
-
         let unlock!: NoneToVoidFunction
-        const promise = new Promise<void>((resolve) => {
+        let promise = new Promise<void>((resolve) => {
             unlock = resolve
         })
-
+        let prev = this._queue.peekBack()
         this._queue.pushBack([promise, unlock])
+        if (prev) await prev[0]
     }
 
     release(): void {
-        const front = this._queue.popFront()
+        let front = this._queue.popFront()
         if (!front) {
-            throw new Error("Nothing to release.", { cause: this._queue })
+            throw new Error("Nothing to release.", {cause: this._queue})
         }
         front[1]()
     }

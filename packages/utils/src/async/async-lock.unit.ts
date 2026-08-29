@@ -76,4 +76,34 @@ describe("AsyncLock", () => {
 
         expect(results).toEqual(["first", "second"])
     })
+
+    it("serializes many concurrent with() calls (max in-section is 1)", async () => {
+        let concurrent = 0
+        let max = 0
+        await Promise.all(
+            Array.from({length: 200}, () =>
+                lock.with(async () => {
+                    concurrent++
+                    max = Math.max(max, concurrent)
+                    await Promise.resolve()
+                    concurrent--
+                }),
+            ),
+        )
+        expect(max).toBe(1)
+    })
+
+    it("contending with() scales near-linear, not quadratic", async () => {
+        let timeN = async (n: number): Promise<number> => {
+            let l = new AsyncLock()
+            let t0 = performance.now()
+            await Promise.all(Array.from({length: n}, () => l.with(async () => {})))
+            return performance.now() - t0
+        }
+        let t2 = await timeN(2000)
+        let t8 = await timeN(8000)
+        // Quadratic wakeups: 4× N → ~16× time (measured ~121ms @2k, ~1.9s @8k).
+        // Predecessor chain: ~4× time. Ratio < 8 separates the two.
+        expect(t8 / Math.max(t2, 0.1)).toBeLessThan(8)
+    })
 })
