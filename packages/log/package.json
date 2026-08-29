@@ -1,0 +1,15 @@
+{
+    "name": "@yorozu/log",
+    "version": "0.3.1",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "halua logger helpers (makeLog, silent, test)",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "halua": "5.0.0"
+    }
+}
