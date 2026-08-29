@@ -1,0 +1,17 @@
+{
+    "name": "@yorozu/resource-cache",
+    "version": "0.3.1",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "blob TTL / bytes / count engine (Collection in)",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/db": "workspace:^",
+        "@yorozu/log": "workspace:^",
+        "@yorozu/utils": "workspace:^"
+    }
+}
