@@ -79,6 +79,7 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-ou
 
 ## Musts
 
+- Collection `claim` is `keysOnly` + one `get` (FIFO by `createdAt` among due keys); payloads are `structuredClone`d on enqueue / get / claim / listFailed.
 - Claim/lease is a queue. Host injects `OutboxStore` + `Clock` + logger + handlers.
 - Success deletes. Non-retryable or max attempts exhaust. Offline `releaseUncounted` (does not count toward the cap) then skip. Else exponential backoff on `reservedTo`: `min(base * 2^(attempts-1), cap)` minus 0–20% jitter.
 - Unknown type: `warn("never-happen")` then delete.
