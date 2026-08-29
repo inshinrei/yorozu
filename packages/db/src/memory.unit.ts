@@ -136,6 +136,26 @@ describe("openMemoryDb", () => {
         expect(order).toEqual(["start-1", "end-1", "start-2", "end-2"])
     })
 
+    it("transact r rejects writes and allows reads", async () => {
+        let db = await openMemoryDb(schema)
+        let col = db.collection<ResourceRow>("files")
+        await col.put(row({ key: "a" }))
+        await db.transact(["files"], "r", async (tx) => {
+            let inner = tx.collection<ResourceRow>("files")
+            expect(await inner.get("a")).toEqual(row({ key: "a" }))
+            await expect(inner.put(row({ key: "b" }))).rejects.toThrow(/read-only transact/)
+            await expect(inner.putMany([row({ key: "c" })])).rejects.toThrow(/read-only transact/)
+            await expect(inner.delete(["a"])).rejects.toThrow(/read-only transact/)
+            await expect(inner.clear()).rejects.toThrow(/read-only transact/)
+        })
+        expect(await col.get("a")).toEqual(row({ key: "a" }))
+        expect(await col.get("b")).toBeNull()
+        await db.transact(["files"], "rw", async (tx) => {
+            await tx.collection<ResourceRow>("files").put(row({ key: "b" }))
+        })
+        expect(await col.get("b")).toEqual(row({ key: "b" }))
+    })
+
     it("unknown collection / unknown index throws", async () => {
         let db = await openMemoryDb(schema)
         expect(() => db.collection("nope")).toThrow()

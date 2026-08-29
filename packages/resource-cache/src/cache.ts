@@ -146,7 +146,7 @@ export function createResourceCache<Meta = unknown>(opts: {
             return items.getBytesTotal()
         },
         peekL1(key: string): ResourceRow<Meta> | undefined {
-            return l1?.get(key)
+            return l1?.peek(key)
         },
     }
 }

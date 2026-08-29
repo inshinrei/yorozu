@@ -130,6 +130,20 @@ describe("BytesLruMap", () => {
         expect(map.has("c")).toBe(true)
     })
 
+    it("peek does not promote or change eviction order", () => {
+        let map = new BytesLruMap<string, number>({ maxBytes: 4, sizeOf })
+        map.set("a", 2)
+        map.set("b", 2)
+        expect(map.peek("a")).toBe(2)
+        expect(map.peek("missing")).toBeUndefined()
+        expect([...map].map(([key]) => key)).toEqual(["a", "b"])
+        map.set("c", 2)
+        expect(map.has("a")).toBe(false)
+        expect(map.has("b")).toBe(true)
+        expect(map.has("c")).toBe(true)
+        expect([...map].map(([key]) => key)).toEqual(["b", "c"])
+    })
+
     it("accepts a value equal to maxBytes", () => {
         let map = new BytesLruMap<string, number>({ maxBytes: 10, sizeOf })
         expect(map.set("a", 10)).toBe(true)

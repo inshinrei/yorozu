@@ -156,8 +156,6 @@ export class OutboxWorker {
 
                 try {
                     await flow.span("process " + entry.type, () => h.process(entry))
-                    await this.store.delete(entry.id)
-                    flow.info("done", { id: entry.id, type: entry.type })
                 } catch (err) {
                     let errMsg = err instanceof Error ? err.message : String(err)
                     let attempts = entry.attempts
@@ -193,7 +191,14 @@ export class OutboxWorker {
                             },
                         )
                     }
+                    continue
                 }
+                try {
+                    await this.store.delete(entry.id)
+                } catch (err) {
+                    this._report(err)
+                }
+                flow.info("done", { id: entry.id, type: entry.type })
             }
             await this._prune()
             this.log.trace("outbox: tick end")

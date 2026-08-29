@@ -267,6 +267,28 @@ describe("createSqliteDriver", () => {
         await db.close()
     })
 
+    it("pre-obtained collection inside transact joins the SQL tx and rolls back", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let result = await Promise.race([
+            db
+                .transact(["files"], "rw", async () => {
+                    await col.put(fileRow({ key: "a", storedAt: 1 }))
+                    throw new Error("boom")
+                })
+                .then(
+                    () => "committed" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBeInstanceOf(Error)
+        expect((result as Error).message).toBe("boom")
+        expect(await col.get("a")).toBeNull()
+        await db.close()
+    })
+
     it("string-key scan with limit follows compareIndexKey not SQL UTF-8 order", async () => {
         let driver = createSqliteDriver({ filename: ":memory:" })
         let db = await driver.open(schema)
@@ -279,6 +301,43 @@ describe("createSqliteDriver", () => {
         expect(compareIndexKey("\u{10000}", "\uFFFF")).toBe(-1)
         let hits = await col.scan("__pk", { gte: "a", limit: 2, keysOnly: true })
         expect(hits.map((h) => h.primaryKey)).toEqual(["a", "\u{10000}"])
+        await db.close()
+    })
+
+    it("lte BMP string bound includes UTF-16 astral even though SQLite UTF-8 would exclude it", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<ContactRow>("contacts")
+        let ascii = { id: "a", name: "ascii" }
+        let bmp = { id: "\uFFFF", name: "bmp" }
+        let astral = { id: "\u{10000}", name: "astral" }
+        await col.putMany([bmp, astral, ascii])
+        expect(compareIndexKey("\u{10000}", "\uFFFF")).toBe(-1)
+        let hits = await col.scan("__pk", { lte: "\uFFFF", keysOnly: true })
+        expect(hits.map((h) => h.primaryKey)).toEqual(["a", "\u{10000}", "\uFFFF"])
+        await db.close()
+    })
+
+    it("transact r rejects writes and allows reads", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let a = fileRow({ key: "a", storedAt: 1 })
+        await col.put(a)
+        await db.transact(["files"], "r", async (tx) => {
+            let inner = tx.collection<FileRow>("files")
+            expect(await inner.get("a")).toEqual(a)
+            await expect(inner.put(fileRow({ key: "b" }))).rejects.toThrow(/read-only transact/)
+            await expect(inner.putMany([fileRow({ key: "c" })])).rejects.toThrow(/read-only transact/)
+            await expect(inner.delete(["a"])).rejects.toThrow(/read-only transact/)
+            await expect(inner.clear()).rejects.toThrow(/read-only transact/)
+        })
+        expect(await col.get("a")).toEqual(a)
+        expect(await col.get("b")).toBeNull()
+        await db.transact(["files"], "rw", async (tx) => {
+            await tx.collection<FileRow>("files").put(fileRow({ key: "b" }))
+        })
+        expect(await col.get("b")).toEqual(fileRow({ key: "b" }))
         await db.close()
     })
 

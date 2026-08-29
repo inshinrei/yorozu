@@ -30,7 +30,8 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `scan(..., { keysOnly: true })` is `SELECT pk, index columns` only. Never `payload`, never join `__blobs`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` (`[cutoff] < [cutoff, 0]`).
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `transact` commit. `flush()` coalesces by `(collection, pk)`. Sync put batches use better-sqlite3 `db.transaction`.
-- Async `transact`: mutex + `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`. Not `db.transaction(fn)` (that API is sync-only). Nested `transact` throws via a facade. Concurrent `transact` serializes. Outer `db.collection()` ops queue on the same mutex; only the callback's `db.collection()` joins the SQL tx.
-- Scan `limit` is applied after `inRange` + `compareIndexKey` sort (no SQL `LIMIT`).
+- Async `transact`: mutex + `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`. Not `db.transaction(fn)` (that API is sync-only). Nested `transact` throws via a facade. Concurrent `transact` serializes. Prefer the callback's `db.collection()`. A collection obtained before `transact` is reentrant while the SQL tx is open and joins that tx (rolls back with it). Concurrent ops from another task still queue on the mutex.
+- Scan `limit` is applied after `inRange` + `compareIndexKey` sort (no SQL `LIMIT`). String / mixed index keys are not filtered by SQL `WHERE` (SQLite TEXT is UTF-8; `IndexKey` strings compare as UTF-16). Select covering columns, then `inRange` / `compareIndexKey`.
+- Call `await db.flush()` before `close()`. Do not leave `{ flush: "batch" }` puts outstanding if another process may take the file.
 - Collection / index names must match `/^[A-Za-z0-9_-]+$/` and are quoted as `"name"`. Illegal names throw.
 - `drop(schema)` closes tracked connections and `fs.unlink`s the file unless `filename === ":memory:"`.

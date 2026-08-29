@@ -184,6 +184,29 @@ describe("createIdbDriver", () => {
         await db.close()
     })
 
+    it("transact r rejects writes and allows reads", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let a = fileRow({ key: "a" })
+        await col.put(a)
+        await db.transact(["files"], "r", async (tx) => {
+            let inner = tx.collection<FileRow>("files")
+            expect(await inner.get("a")).toEqual(a)
+            await expect(inner.put(fileRow({ key: "b" }))).rejects.toThrow(/read-only transact/)
+            await expect(inner.putMany([fileRow({ key: "c" })])).rejects.toThrow(/read-only transact/)
+            await expect(inner.delete(["a"])).rejects.toThrow(/read-only transact/)
+            await expect(inner.clear()).rejects.toThrow(/read-only transact/)
+        })
+        expect(await col.get("a")).toEqual(a)
+        expect(await col.get("b")).toBeNull()
+        await db.transact(["files"], "rw", async (tx) => {
+            await tx.collection<FileRow>("files").put(fileRow({ key: "b" }))
+        })
+        expect(await col.get("b")).toEqual(fileRow({ key: "b" }))
+        await db.close()
+    })
+
     it("nested transact throws", async () => {
         let driver = createIdbDriver({ dbName: nextName() })
         let db = await driver.open(schema)

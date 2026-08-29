@@ -176,6 +176,20 @@ describe("OutboxWorker", () => {
         expectFlowStory(log.collect(), "outbox-process", ["start", "done"])
     })
 
+    it("logs delete failure after successful process and does not backoff or exhaust", async () => {
+        let { store, deleteSpy, updateAfterFailureSpy, markFailedSpy } = makeRepo([makeEntry()])
+        deleteSpy.mockRejectedValueOnce(new Error("delete failed"))
+        let log = createTestLog()
+        let w = track(new OutboxWorker(store, handlers, { log, pollIntervalMs: 10, maxAttempts: 5 }))
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        expect(updateAfterFailureSpy).not.toHaveBeenCalled()
+        expect(markFailedSpy).not.toHaveBeenCalled()
+        expect(rollbackSpy).not.toHaveBeenCalled()
+        expect(log.collect().some((r) => r.errorMeta?.issueKey === "yorozu-outbox")).toBe(true)
+        expectFlowStory(log.collect(), "outbox-process", ["start", "done"])
+    })
+
     it("backs off (not release) on failure below maxAttempts", async () => {
         let clock: Clock = { now: () => Date.now() }
         let { store, releaseSpy, updateAfterFailureSpy } = makeRepo([makeEntry({ attempts: 1 })], clock)

@@ -228,6 +228,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     protected _pending: Pending
     protected _seq: SeqBox
     protected _deferPut: (collectionName: string) => boolean
+    protected _txMode: { value: TxMode | null }
 
     constructor(
         def: CollectionDef,
@@ -235,6 +236,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         pending: Pending,
         seq: SeqBox,
         deferPut: (collectionName: string) => boolean,
+        txMode: { value: TxMode | null },
     ) {
         this.name = def.name
         this._def = def
@@ -245,6 +247,11 @@ class IdbCollection<T extends Row> implements Collection<T> {
         this._pending = pending
         this._seq = seq
         this._deferPut = deferPut
+        this._txMode = txMode
+    }
+
+    protected _assertWritable(): void {
+        if (this._txMode.value === "r") throw new Error("write is not allowed in a read-only transact")
     }
 
     protected _colPending(): Map<string, PendingEntry> | undefined {
@@ -290,6 +297,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async put(row: T, opts?: PutOpts): Promise<void> {
+        this._assertWritable()
         let pk = primaryKeyOf(row, this._keyPath)
         let stored = withStringPk(row, this._keyPath, pk)
         if ((opts?.flush ?? "now") === "batch" && this._batchEnabled()) {
@@ -304,6 +312,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        this._assertWritable()
         if (rows.length === 0) return
         let batch = (opts?.flush ?? "now") === "batch" && this._batchEnabled()
         if (batch) {
@@ -327,6 +336,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async delete(keys: readonly string[]): Promise<void> {
+        this._assertWritable()
         let pending = this._colPending()
         if (pending) {
             for (let key of keys) pending.delete(key)
@@ -340,6 +350,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     }
 
     async clear(): Promise<void> {
+        this._assertWritable()
         this._pending.delete(this.name)
         nextSeq(this._seq)
         await runTx(this._idb(), [this.name], "readwrite", (tx) => {
@@ -454,6 +465,7 @@ class IdbDb implements Db {
     protected _pending: Pending = new Map()
     protected _seq: SeqBox = { n: 0 }
     protected _lock: SerialQueue = new SerialQueue()
+    protected _txMode: { value: TxMode | null } = { value: null }
     protected _txView: Db
     protected _onClose: () => void
     protected _closed = false
@@ -475,7 +487,10 @@ class IdbDb implements Db {
             this._onClose()
         }
         for (let def of schema.collections) {
-            this._collections.set(def.name, new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut))
+            this._collections.set(
+                def.name,
+                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut, this._txMode),
+            )
         }
     }
 
@@ -485,14 +500,19 @@ class IdbDb implements Db {
         return col as Collection<T>
     }
 
-    transact<R>(names: readonly string[], _mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R> {
+    transact<R>(names: readonly string[], mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R> {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
         return this._lock.with(async () => {
-            let result = await fn(this._txView)
-            await this._flushPending()
-            return result
+            this._txMode.value = mode
+            try {
+                let result = await fn(this._txView)
+                if (mode !== "r") await this._flushPending()
+                return result
+            } finally {
+                this._txMode.value = null
+            }
         })
     }
 

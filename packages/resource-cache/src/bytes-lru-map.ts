@@ -47,6 +47,10 @@ export class BytesLruMap<K, V> {
         return value
     }
 
+    peek(key: K): V | undefined {
+        return this._map.get(key)
+    }
+
     has(key: K): boolean {
         return this._map.has(key)
     }

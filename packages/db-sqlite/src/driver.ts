@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import { unlink } from "node:fs/promises"
 import Database from "better-sqlite3"
 import {
@@ -223,6 +224,21 @@ function edgeSql(
     return lexSql(cols, parts, wantLess, inclusive)
 }
 
+function keyHasString(key: IndexKey): boolean {
+    if (typeof key === "string") return true
+    return Array.isArray(key) && key.some((part) => typeof part === "string")
+}
+
+/** SQLite TEXT is UTF-8; IndexKey strings compare as UTF-16. Do not use SQL WHERE as truth. */
+function trustSqlBounds(index: string, bound: ScanBound): boolean {
+    if (index === "__pk") return false
+    if (bound.lt !== undefined && keyHasString(bound.lt)) return false
+    if (bound.lte !== undefined && keyHasString(bound.lte)) return false
+    if (bound.gt !== undefined && keyHasString(bound.gt)) return false
+    if (bound.gte !== undefined && keyHasString(bound.gte)) return false
+    return true
+}
+
 function boundSql(cols: string[], storedIsArray: boolean, bound: ScanBound): { sql: string; params: unknown[] } {
     let parts: string[] = []
     let params: unknown[] = []
@@ -272,11 +288,14 @@ async function unlinkIfExists(path: string): Promise<void> {
     }
 }
 
+/** Reentrant in the owning async context so a pre-obtained collection used inside transact joins the SQL tx. */
 class SerialQueue {
     protected _tail: Promise<void> = Promise.resolve()
+    protected _held: AsyncLocalStorage<true> = new AsyncLocalStorage<true>()
 
     with<R>(fn: () => Promise<R>): Promise<R> {
-        let run = this._tail.then(() => fn())
+        if (this._held.getStore()) return fn()
+        let run = this._tail.then(() => this._held.run(true, fn))
         this._tail = run.then(
             () => undefined,
             () => undefined,
@@ -369,11 +388,18 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     protected _handle: SqliteHandle
     protected _pending: Pending
     protected _inSqlTx: { value: boolean }
+    protected _txMode: { value: TxMode | null }
     protected _table: string
     protected _blobTable: string
     protected _indexColIds: string[]
 
-    constructor(def: CollectionDef, handle: SqliteHandle, pending: Pending, inSqlTx: { value: boolean }) {
+    constructor(
+        def: CollectionDef,
+        handle: SqliteHandle,
+        pending: Pending,
+        inSqlTx: { value: boolean },
+        txMode: { value: TxMode | null },
+    ) {
         this.name = def.name
         this._def = def
         this._keyPath = def.keyPath
@@ -382,9 +408,14 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         this._handle = handle
         this._pending = pending
         this._inSqlTx = inSqlTx
+        this._txMode = txMode
         this._table = quoteIdent(def.name)
         this._blobTable = quoteIdent(`${def.name}__blobs`)
         this._indexColIds = allIndexColIds(def)
+    }
+
+    protected _assertWritable(): void {
+        if (this._txMode.value === "r") throw new Error("write is not allowed in a read-only transact")
     }
 
     protected _colPending(): Map<string, PendingWrite> | undefined {
@@ -488,6 +519,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async put(row: T, opts?: PutOpts): Promise<void> {
+        this._assertWritable()
         let write = await this._prepareWrite(row)
         if ((opts?.flush ?? "now") === "batch") {
             this._ensurePending().set(write.pk, write)
@@ -498,6 +530,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        this._assertWritable()
         if (rows.length === 0) return
         let writes: PendingWrite[] = []
         for (let row of rows) writes.push(await this._prepareWrite(row))
@@ -516,6 +549,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async delete(keys: readonly string[]): Promise<void> {
+        this._assertWritable()
         let pending = this._colPending()
         if (pending) {
             for (let key of keys) pending.delete(key)
@@ -529,6 +563,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     }
 
     async clear(): Promise<void> {
+        this._assertWritable()
         this._pending.delete(this.name)
         this._writeTx(() => {
             this._handle.exec(`DELETE FROM ${this._table}`)
@@ -583,7 +618,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
 
         let pending = this._colPending()
         let hits: Array<ScanHit<T>> = []
-        let frag = boundSql(cols, storedIsArray, bound)
+        let frag = trustSqlBounds(index, bound) ? boundSql(cols, storedIsArray, bound) : { sql: "1", params: [] }
         if (frag.sql !== "0") {
             let selectList =
                 index === "__pk"
@@ -664,6 +699,7 @@ class SqliteDb implements Db {
     protected _pending: Pending = new Map()
     protected _lock: SerialQueue = new SerialQueue()
     protected _inSqlTx = { value: false }
+    protected _txMode: { value: TxMode | null } = { value: null }
     protected _txView: Db
     protected _onClose: () => void
     protected _closed = false
@@ -684,7 +720,7 @@ class SqliteDb implements Db {
             () => this._flushPending(),
         )
         for (let def of schema.collections) {
-            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx)
+            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx, this._txMode)
             this._collections.set(def.name, col)
             this._gated.set(def.name, new GatedCollection(col, this._lock))
         }
@@ -696,16 +732,17 @@ class SqliteDb implements Db {
         return col as Collection<T>
     }
 
-    transact<R>(names: readonly string[], _mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R> {
+    transact<R>(names: readonly string[], mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R> {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
         return this._lock.with(async () => {
             this._handle.exec("BEGIN IMMEDIATE")
             this._inSqlTx.value = true
+            this._txMode.value = mode
             try {
                 let result = await fn(this._txView)
-                this._flushPending()
+                if (mode !== "r") this._flushPending()
                 this._handle.exec("COMMIT")
                 return result
             } catch (err) {
@@ -717,6 +754,7 @@ class SqliteDb implements Db {
                 throw err
             } finally {
                 this._inSqlTx.value = false
+                this._txMode.value = null
             }
         })
     }

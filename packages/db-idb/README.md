@@ -31,4 +31,5 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `getMany` / `putMany` / `delete` share one IDB transaction.
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `transact` commit. `flush()` coalesces by `(collection, pk)` in one multi-store `readwrite` tx.
 - Nested `transact` throws. Concurrent `transact` serializes on a mutex (tx facade; nested `transact` rejects without taking the lock).
+- Call `await db.flush()` before `close()`. Do not leave `{ flush: "batch" }` puts outstanding across multi-tab upgrades (`onversionchange` closes the connection without flushing).
 - `drop(schema)` closes tracked connections and `indexedDB.deleteDatabase`.

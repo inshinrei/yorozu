@@ -224,4 +224,25 @@ describe("createResourceCache", () => {
         expect(cache.peekL1("b")).toBeUndefined()
         expect(await cache.getBytesTotal()).toBe(0)
     })
+
+    it("peekL1 does not promote L1 eviction order", async () => {
+        let col = await filesCol()
+        let l1 = new BytesLruMap<string, ResourceRow>({
+            maxBytes: 100,
+            maxEntries: 2,
+            sizeOf: (r) => r.bytes || 1,
+        })
+        let cache = createResourceCache({
+            collection: col,
+            drop: dropDelete,
+            l1,
+        })
+        await cache.put({ key: "a", storedAt: 1, blob: blobOf(1), meta: {} })
+        await cache.put({ key: "b", storedAt: 2, blob: blobOf(1), meta: {} })
+        expect(cache.peekL1("a")?.key).toBe("a")
+        await cache.put({ key: "c", storedAt: 3, blob: blobOf(1), meta: {} })
+        expect(cache.peekL1("a")).toBeUndefined()
+        expect(cache.peekL1("b")?.key).toBe("b")
+        expect(cache.peekL1("c")?.key).toBe("c")
+    })
 })
