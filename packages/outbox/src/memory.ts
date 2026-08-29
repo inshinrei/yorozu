@@ -35,7 +35,7 @@ class MemoryOutboxStore implements OutboxStore {
 
     async get(id: string): Promise<OutboxEntry | null> {
         let found = this._items.find((e) => e.id === id)
-        return found ? { ...found } : null
+        return found ? structuredClone(found) : null
     }
 
     async claim(leaseDurationMs: number): Promise<OutboxEntry | null> {
@@ -50,7 +50,7 @@ class MemoryOutboxStore implements OutboxStore {
             attempts: chosen.attempts + 1,
         }
         this._items[idx] = updated
-        return { ...updated }
+        return structuredClone(updated)
     }
 
     async delete(id: string): Promise<void> {
@@ -91,7 +91,7 @@ class MemoryOutboxStore implements OutboxStore {
     async listFailed(): Promise<OutboxEntry[]> {
         let out: OutboxEntry[] = []
         for (let entry of this._items) {
-            if (entry.failedAt != null) out.push({ ...entry })
+            if (entry.failedAt != null) out.push(structuredClone(entry))
         }
         return out
     }

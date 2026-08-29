@@ -73,7 +73,47 @@ describe("createOutboxStore", () => {
         await store.enqueue({ type: "t", payload: {} })
         await store.claim(5000)
         expect(transact).toHaveBeenCalledWith(["outbox"], "rw", expect.any(Function))
-        expect(scan).toHaveBeenCalledWith("by-claim", { lte: [1000, Number.MAX_SAFE_INTEGER] })
+        expect(scan).toHaveBeenCalledWith("by-claim", {
+            lte: [1000, Number.MAX_SAFE_INTEGER],
+            keysOnly: true,
+        })
+        await db.close()
+    })
+
+    it("claim loads one row among many due keysOnly hits", async () => {
+        let clock = mutableClock(1000)
+        let {store, db} = await openCollectionOutbox(clock)
+        let col = db.collection<OutboxRow>("outbox")
+        for (let i = 0; i < 40; i++) {
+            clock.nowMs = 1000 + i
+            await store.enqueue({type: "t", payload: {i, blob: "x".repeat(200)}})
+        }
+        clock.nowMs = 50_000
+        let get = vi.spyOn(col, "get")
+        let scan = vi.spyOn(col, "scan")
+        let claimed = await store.claim(5000)
+        expect(claimed?.attempts).toBe(1)
+        expect(scan).toHaveBeenCalledWith(
+            "by-claim",
+            expect.objectContaining({keysOnly: true, lte: [50_000, Number.MAX_SAFE_INTEGER]}),
+        )
+        expect(get.mock.calls.length).toBeLessThan(5)
+        await db.close()
+    })
+
+    it("nextDueAt scans by-claim keysOnly with limit 1", async () => {
+        let clock = mutableClock(1000)
+        let {store, db} = await openCollectionOutbox(clock)
+        for (let i = 0; i < 20; i++) {
+            let id = await store.enqueue({type: "f", payload: i})
+            await store.claim(1)
+            await store.markFailed(id)
+        }
+        await store.enqueue({type: "live", payload: 1})
+        let col = db.collection<OutboxRow>("outbox")
+        let scan = vi.spyOn(col, "scan")
+        expect(await store.nextDueAt()).toBe(0)
+        expect(scan).toHaveBeenCalledWith("by-claim", expect.objectContaining({keysOnly: true, limit: 1}))
         await db.close()
     })
 

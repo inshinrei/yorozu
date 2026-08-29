@@ -1,5 +1,9 @@
 import type { Clock, OutboxEntry } from "./types"
 
+function cloneJson<T>(value: T): T {
+    return structuredClone(value)
+}
+
 export function newOutboxId(now: number): string {
     return now.toString(36) + "-" + Math.random().toString(36).slice(2, 10)
 }
@@ -22,10 +26,10 @@ export function newOutboxEntry(
         createdAt: now,
         reservedTo: 0,
         type: params.type,
-        payload: params.payload,
+        payload: cloneJson(params.payload),
         attempts: 0,
     }
     if (params.rollbackType !== undefined) entry.rollbackType = params.rollbackType
-    if (params.rollbackPayload !== undefined) entry.rollbackPayload = params.rollbackPayload
+    if (params.rollbackPayload !== undefined) entry.rollbackPayload = cloneJson(params.rollbackPayload)
     return entry
 }

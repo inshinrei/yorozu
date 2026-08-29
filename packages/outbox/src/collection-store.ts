@@ -20,11 +20,11 @@ function fromRow(row: OutboxRow): OutboxEntry {
         createdAt: row.createdAt,
         reservedTo: row.reservedTo,
         type: row.type,
-        payload: row.payload,
+        payload: structuredClone(row.payload),
         attempts: row.attempts,
     }
     if (row.rollbackType !== undefined) entry.rollbackType = row.rollbackType
-    if (row.rollbackPayload !== undefined) entry.rollbackPayload = row.rollbackPayload
+    if (row.rollbackPayload !== undefined) entry.rollbackPayload = structuredClone(row.rollbackPayload)
     if (row.lastError !== undefined) entry.lastError = row.lastError
     if (row.failedAt !== undefined) entry.failedAt = row.failedAt
     return entry
@@ -71,20 +71,26 @@ class CollectionOutboxStore implements OutboxStore {
     async claim(leaseDurationMs: number): Promise<OutboxEntry | null> {
         return this._transact(async (col) => {
             let now = this._clock.now()
-            let hits = await col.scan(BY_CLAIM, { lte: [now, Number.MAX_SAFE_INTEGER] })
-            let best: OutboxEntry | null = null
+            let hits = await col.scan(BY_CLAIM, { lte: [now, Number.MAX_SAFE_INTEGER], keysOnly: true })
+            let bestPk: string | null = null
+            let bestCreated = Infinity
             for (let hit of hits) {
-                let row = hit.value ?? (await col.get(String(hit.primaryKey)))
-                if (!row) {
-                    this._log.warn("never-happen", { reason: "claim-missing-row", primaryKey: hit.primaryKey })
-                    continue
+                let indexKey = hit.indexKey
+                let reservedTo = Array.isArray(indexKey) ? Number(indexKey[0]) : Number.NaN
+                let createdAt = Array.isArray(indexKey) ? Number(indexKey[1]) : Number.NaN
+                if (!(reservedTo <= now)) continue
+                if (createdAt < bestCreated || (createdAt === bestCreated && String(hit.primaryKey) < (bestPk ?? ""))) {
+                    bestCreated = createdAt
+                    bestPk = String(hit.primaryKey)
                 }
-                let entry = fromRow(row)
-                if (entry.failedAt != null) continue
-                if (entry.reservedTo > now) continue
-                if (!best || entry.createdAt < best.createdAt) best = entry
             }
-            if (!best) return null
+            if (bestPk == null) return null
+            let row = await col.get(bestPk)
+            if (!row) {
+                this._log.warn("never-happen", { reason: "claim-missing-row", primaryKey: bestPk })
+                return null
+            }
+            let best = fromRow(row)
             let updated: OutboxEntry = {
                 ...best,
                 reservedTo: now + leaseDurationMs,
@@ -199,18 +205,14 @@ class CollectionOutboxStore implements OutboxStore {
     }
 
     async nextDueAt(): Promise<number | null> {
-        let hits = await this._col.scan(BY_CLAIM)
-        for (let hit of hits) {
-            let row = hit.value ?? (await this._col.get(String(hit.primaryKey)))
-            if (!row) {
-                this._log.warn("never-happen", { reason: "next-due-missing-row", primaryKey: hit.primaryKey })
-                continue
-            }
-            let entry = fromRow(row)
-            if (entry.failedAt != null) continue
-            return entry.reservedTo
-        }
-        return null
+        let hits = await this._col.scan(BY_CLAIM, { keysOnly: true, limit: 1 })
+        let hit = hits[0]
+        if (!hit) return null
+        let indexKey = hit.indexKey
+        let reservedTo = Array.isArray(indexKey) ? Number(indexKey[0]) : null
+        if (reservedTo == null) return null
+        if (reservedTo >= Number.MAX_SAFE_INTEGER) return null
+        return reservedTo
     }
 }
 

@@ -213,6 +213,19 @@ export function testOutboxStore(factory: () => Promise<{ store: OutboxStore; clo
             expect(again!.payload).toBe(1)
         })
 
+        it("nested payload mutation after enqueue/claim does not alias storage", async () => {
+            let payload = {n: 1, nested: {k: "v"}}
+            let id = await store.enqueue({type: "t", payload})
+            payload.n = 2
+            payload.nested.k = "mutated"
+            expect((await store.get(id))!.payload).toEqual({n: 1, nested: {k: "v"}})
+
+            let claimed = await store.claim(1000)
+            ;(claimed!.payload as {n: number}).n = 999
+            ;(claimed!.payload as {nested: {k: string}}).nested.k = "x"
+            expect((await store.get(id))!.payload).toEqual({n: 1, nested: {k: "v"}})
+        })
+
         it("retry clears lastError", async () => {
             let id = await store.enqueue({ type: "t", payload: 1 })
             await store.claim(1)
