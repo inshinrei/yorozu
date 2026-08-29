@@ -309,6 +309,15 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
                 tryRunPending()
             },
             destroy: (): void => {
+                if (
+                    (pair && (pair.from === key || pair.to === key)) ||
+                    (pending && (pending.from === key || pending.to === key))
+                ) {
+                    slideGen++
+                    abortInFlight()
+                    animating = false
+                    leavingKey = undefined
+                }
                 if (panelEls.get(key) === el) panelEls.delete(key)
             },
         }

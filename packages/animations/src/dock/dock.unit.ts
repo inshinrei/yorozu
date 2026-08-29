@@ -184,7 +184,8 @@ describe("createDock", () => {
             cancel,
         }))
         let dock = makeDock({ mode: "slide" })
-        dock.attach(createFakeEl() as unknown as HTMLElement)
+        let panel = createFakeEl()
+        dock.attach(panel as unknown as HTMLElement)
         let playback = dock.setOpen(true)
         await flushFrames()
         expect(dock.animating).toBe(true)
@@ -192,6 +193,8 @@ describe("createDock", () => {
         expect(cancel).toHaveBeenCalled()
         expect(await playback.done).toBe(false)
         expect(dock.animating).toBe(false)
+        expect(dock.mounted).toBe(false)
+        expect(panel.style.transform).toBe("")
     })
 
     it("a newer setOpen cancels the previous generation", async () => {

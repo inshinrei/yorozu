@@ -42,4 +42,15 @@ describe("playScrollTween", () => {
         expect(el.scrollLeft).toBe(100)
         expect(await playback.done).toBe(true)
     })
+
+    it("a second playScrollTween on the same element cancels the first", async () => {
+        let el = { scrollLeft: 0, scrollTop: 0 }
+        let a = playScrollTween(el as unknown as HTMLElement, { left: 100, durationMs: 200 })
+        await vi.advanceTimersByTimeAsync(50)
+        let b = playScrollTween(el as unknown as HTMLElement, { left: 0, durationMs: 200 })
+        expect(await a.done).toBe(false)
+        await vi.advanceTimersByTimeAsync(250)
+        expect(el.scrollLeft).toBe(0)
+        expect(await b.done).toBe(true)
+    })
 })

@@ -9,14 +9,18 @@ export type ScrollTweenOptions = {
     durationMs?: number
 }
 
+let activeByEl = new WeakMap<HTMLElement, Playback>()
+
 export function playScrollTween(el: HTMLElement, options: ScrollTweenOptions): Playback {
+    activeByEl.get(el)?.cancel()
+
     let fromLeft = el.scrollLeft
     let fromTop = el.scrollTop
     let toLeft = options.left ?? fromLeft
     let toTop = options.top ?? fromTop
     let durationMs = options.durationMs ?? SCROLL_TWEEN_MS
 
-    return tween({
+    let playback = tween({
         from: 0,
         to: 1,
         durationMs,
@@ -25,4 +29,9 @@ export function playScrollTween(el: HTMLElement, options: ScrollTweenOptions): P
             if (options.top != null) el.scrollTop = lerp(fromTop, toTop, t)
         },
     })
+    activeByEl.set(el, playback)
+    void playback.done.finally(() => {
+        if (activeByEl.get(el) === playback) activeByEl.delete(el)
+    })
+    return playback
 }

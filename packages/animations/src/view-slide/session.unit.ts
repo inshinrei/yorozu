@@ -264,6 +264,28 @@ describe("createViewSlide", () => {
         expect(slide.animating).toBe(false)
     })
 
+    it("attach().destroy cancels an in-flight anim tied to the key", async () => {
+        let cancel = vi.fn()
+        animate = createFakeAnimate(() => ({
+            finished: new Promise<void>(() => undefined),
+            cancel,
+        }))
+        let slide = makeSlide()
+        let fromEl = createFakeEl()
+        let toEl = createFakeEl()
+        slide.setActive("a")
+        let fromHandle = slide.attach(fromEl as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(toEl as unknown as HTMLElement, "b")
+        await flushFrames()
+        expect(slide.animating).toBe(true)
+        fromHandle.destroy()
+        expect(cancel).toHaveBeenCalled()
+        expect(slide.animating).toBe(false)
+        expect(slide.leavingKey).toBeUndefined()
+        expect(fromEl.style.transform).toBe("")
+    })
+
     it("settle fallback uses durationMs + slack", async () => {
         animate = createFakeAnimate(() => ({
             finished: new Promise<void>(() => undefined),
