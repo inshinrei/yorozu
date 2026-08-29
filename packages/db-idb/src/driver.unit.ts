@@ -292,6 +292,40 @@ describe("createIdbDriver", () => {
         expect(order).toEqual(["tx-start", "tx-end", "closed"])
     })
 
+    it("tx.close from inside transact does not hang", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let result = await Promise.race([
+            db
+                .transact(["files"], "rw", async (tx) => {
+                    await tx.close()
+                })
+                .then(
+                    () => "ok" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBe("ok")
+    })
+
+    it("outer db.close from inside transact does not hang", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let result = await Promise.race([
+            db
+                .transact(["files"], "rw", async () => {
+                    await db.close()
+                })
+                .then(
+                    () => "ok" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBe("ok")
+    })
+
     it("scan uses injected IDBKeyRange", async () => {
         let bound = vi.fn((...args: Parameters<typeof IDBKeyRange.bound>) => IDBKeyRange.bound(...args))
         let KeyRange = {

@@ -586,16 +586,21 @@ class IdbDb implements Db {
     }
 
     close(): Promise<void> {
-        return this._lock.with(async () => {
-            if (this._closed) return
-            this._closed = true
-            try {
-                await this._flushPending()
-            } finally {
-                this._idb.close()
-                this._onClose()
-            }
+        return this._inTransact.enter((als) => {
+            if (als.getStore()) return this._closeUnlocked()
+            return this._lock.with(() => this._closeUnlocked())
         })
+    }
+
+    protected async _closeUnlocked(): Promise<void> {
+        if (this._closed) return
+        this._closed = true
+        try {
+            await this._flushPending()
+        } finally {
+            this._idb.close()
+            this._onClose()
+        }
     }
 
     protected async _flushPending(): Promise<void> {
