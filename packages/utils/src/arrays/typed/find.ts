@@ -39,9 +39,14 @@ export function lastIndexOf(haystack: TypedArray, needle: number | bigint, start
 }
 
 export function indexOfArray<T extends TypedArray>(haystack: T, needle: T, start = 0): number {
+    let length = haystack.length
+    if (start < 0) {
+        start += length
+        if (start < 0) start = 0
+    }
     if (needle.length === 0) return start
     if (needle.length === 1) return indexOf(haystack as Uint8Array, needle[0] as number, start)
-    let max = haystack.length - needle.length
+    let max = length - needle.length
     for (let i = start; i <= max; i++) {
         if (haystack[i] === needle[0]) {
             let j = 1
@@ -61,10 +66,17 @@ export function lastIndexOfArray<T extends TypedArray>(
     needle: T,
     start: number = haystack.length - 1,
 ): number {
+    let length = haystack.length
+    if (start < 0) {
+        start += length
+        if (start < 0) return -1
+    } else if (start >= length) {
+        start = length - 1
+    }
     if (needle.length === 0) return start
     if (needle.length === 1) return lastIndexOf(haystack as BigInt64Array, needle[0] as bigint, start)
 
-    let maxStart = haystack.length - needle.length
+    let maxStart = length - needle.length
     let effectiveStart = start > maxStart ? maxStart : start
 
     for (let i = effectiveStart; i >= 0; i--) {

@@ -96,6 +96,15 @@ describe("indexOfArray", () => {
         let needle = new BigInt64Array([BigInt(2), BigInt(3)])
         expect(indexOfArray(haystack, needle)).toBe(1)
     })
+
+    it("applies native-style negative start", () => {
+        let haystack = new Uint8Array([1, 2, 3, 4, 2, 3])
+        let needle = new Uint8Array([2, 3])
+        expect(indexOfArray(haystack, needle, -5)).toBe(1)
+        expect(indexOfArray(haystack, needle, -2)).toBe(4)
+        expect(lastIndexOfArray(haystack, needle, -1)).toBe(4)
+        expect(lastIndexOfArray(haystack, needle, -3)).toBe(1)
+    })
 })
 
 describe("lastIndexOfArray", () => {
@@ -128,6 +137,15 @@ describe("lastIndexOfArray", () => {
         let haystack = new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(2), BigInt(3)])
         let needle = new BigUint64Array([BigInt(2), BigInt(3)])
         expect(lastIndexOfArray(haystack, needle)).toBe(3)
+    })
+
+    it("applies native-style negative start", () => {
+        let haystack = new Uint8Array([1, 2, 3, 4, 2, 3])
+        let needle = new Uint8Array([2, 3])
+        expect(indexOfArray(haystack, needle, -5)).toBe(1)
+        expect(indexOfArray(haystack, needle, -2)).toBe(4)
+        expect(lastIndexOfArray(haystack, needle, -1)).toBe(4)
+        expect(lastIndexOfArray(haystack, needle, -3)).toBe(1)
     })
 })
 

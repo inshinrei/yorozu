@@ -112,7 +112,7 @@ Namespaces only: `base64`, `hex`, `utf8`.
 
 - `sleep(ms, signal?)` — optional `AbortSignal`.
 - `AsyncLock` — `acquire` / `release` / `with`.
-- `AsyncQueue<T>` — bounded optional `maxSize`; `enqueue` / `tryEnqueue` / `next` / `nextOrWait` / `peek` / `end` / async iterator.
+- `AsyncQueue<T>` — bounded optional `maxSize`; `enqueue` / `tryEnqueue` / `next` / `nextOrWait` / `peek` / `end` / async iterator. Iterator yields `undefined` items; `nextOrWait` still uses `undefined` as the end sentinel.
 - `AsyncResource<T>` — **SWR-style cache** (`fetcher` + `expiresIn`), not acquire/release pooling. Options: `autoReload`, `autoReloadAfter`, `swr`, `swrValidator`, `fetcher`, `onError`. Methods: `setData`, `update`, `get`, `getCached`, `destroy`, `isStale`; `onUpdated` emitter. Types: `AsyncResourceContext`, `AsyncResourceOptions`.
 - Concurrency “pool”: `asyncPool(iterable, executor, options?)`, `parallelMap(iterable, executor, options?)`, `AsyncPoolOptions`, `AggregateError`.
 - `ConditionVariable` — `wait()`, `notify()` **broadcasts** all waiters (no `notifyOne`).

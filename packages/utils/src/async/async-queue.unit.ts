@@ -104,6 +104,30 @@ describe("AsyncQueue", () => {
         expect(items).toEqual([])
     })
 
+    it("async iterator yields undefined values and continues", async () => {
+        let q = new AsyncQueue<number | undefined>()
+        await q.enqueue(1)
+        await q.enqueue(undefined)
+        await q.enqueue(2)
+        q.end()
+        let items: Array<number | undefined> = []
+        for await (let val of q) items.push(val)
+        expect(items).toEqual([1, undefined, 2])
+    })
+
+    it("async iterator waiter path yields undefined without ending", async () => {
+        let q = new AsyncQueue<number | undefined>()
+        let items: Array<number | undefined> = []
+        let consumed = (async () => {
+            for await (let val of q) items.push(val)
+        })()
+        await q.enqueue(undefined)
+        await q.enqueue(1)
+        q.end()
+        await consumed
+        expect(items).toEqual([undefined, 1])
+    })
+
     it("peek and next still work safely after partial consumption", () => {
         queue.enqueue(55)
         expect(queue.peek()).toBe(55)
