@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestLog, expectFlowStory } from "@yorozu/log"
+import { timers } from "@yorozu/utils"
 import { mutableClock } from "./_contract"
 import { openMemoryOutbox } from "./memory"
 import { OUTBOX_MAX_FAILED_AGE_MS } from "./prune"
@@ -36,6 +37,7 @@ type RepoHarness = {
 
 function makeRepo(initial: OutboxEntry[] = [], clock: Clock = { now: () => Date.now() }): RepoHarness {
     let state = { items: initial.map((e) => ({ ...e })) }
+    let listeners = new Set<() => void>()
     let claimSpy = vi.fn()
     let deleteSpy = vi.fn()
     let releaseSpy = vi.fn()
@@ -62,8 +64,20 @@ function makeRepo(initial: OutboxEntry[] = [], clock: Clock = { now: () => Date.
             state.items = []
         }),
         count: vi.fn(async () => state.items.length),
-        subscribe: vi.fn((_fn: () => void): (() => void) => () => {}),
-        nextDueAt: vi.fn(async (): Promise<number | null> => null),
+        subscribe: vi.fn((fn: () => void): (() => void) => {
+            listeners.add(fn)
+            return (): void => {
+                listeners.delete(fn)
+            }
+        }),
+        nextDueAt: vi.fn(async (): Promise<number | null> => {
+            let best: number | null = null
+            for (let entry of state.items) {
+                if (entry.failedAt != null) continue
+                if (best == null || entry.reservedTo < best) best = entry.reservedTo
+            }
+            return best
+        }),
     }
 
     claimSpy.mockImplementation(async (lease: number) => {
@@ -438,5 +452,207 @@ describe("OutboxWorker", () => {
         let w = track(new OutboxWorker(store, {}, { clock, log: createTestLog(), pollIntervalMs: 10, prune: false }))
         await startUntilIdle(w)
         expect(await store.get(id)).not.toBeNull()
+    })
+
+    it("drains on store enqueue without waiting for the watchdog", async () => {
+        let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 30_000 }))
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(0)
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        expect(await store.count()).toBe(0)
+    })
+
+    it("does not claim again for 2s when the watchdog is 30s", async () => {
+        let { store, claimSpy } = makeRepo([])
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 30_000 }))
+        await startUntilIdle(w)
+        let n = claimSpy.mock.calls.length
+        await vi.advanceTimersByTimeAsync(2000)
+        await flushMicrotasks()
+        expect(claimSpy.mock.calls.length).toBe(n)
+        await vi.advanceTimersByTimeAsync(30_000)
+        await flushMicrotasks()
+        expect(claimSpy.mock.calls.length).toBeGreaterThan(n)
+    })
+
+    it("retries when reservedTo is due, not at the watchdog", async () => {
+        vi.spyOn(Math, "random").mockReturnValue(0)
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        processSpy.mockRejectedValueOnce(new Error("temp"))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog(),
+                pollIntervalMs: 60_000,
+                retryBaseMs: 1000,
+                retryCapMs: 30_000,
+                clock,
+            }),
+        )
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(999)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it("wake drains without waiting for the watchdog", async () => {
+        let { store, state, deleteSpy } = makeRepo([])
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        await startUntilIdle(w)
+        state.items.push(makeEntry())
+        w.wake()
+        await flushMicrotasks()
+        expect(deleteSpy).toHaveBeenCalledWith("e1")
+    })
+
+    it("arms a due timer for a leased entry and reclaims when reservedTo is due", async () => {
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await store.claim(5000)
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog(),
+                pollIntervalMs: 60_000,
+                leaseDurationMs: 5000,
+                clock,
+            }),
+        )
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(0)
+        await vi.advanceTimersByTimeAsync(4999)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(0)
+        await vi.advanceTimersByTimeAsync(1)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not tight-loop claim while offline", async () => {
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        processSpy.mockRejectedValue(new Error("network down"))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog(),
+                pollIntervalMs: 60_000,
+                isOnline: () => false,
+                isRetryableError: () => true,
+                clock,
+            }),
+        )
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it("drains when subscribeOnline fires after offline", async () => {
+        let online = false
+        let onlineListeners = new Set<() => void>()
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        processSpy.mockRejectedValueOnce(new Error("network down"))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog(),
+                pollIntervalMs: 60_000,
+                isOnline: () => online,
+                isRetryableError: () => true,
+                subscribeOnline: (cb: () => void): (() => void) => {
+                    onlineListeners.add(cb)
+                    return (): void => {
+                        onlineListeners.delete(cb)
+                    }
+                },
+                clock,
+            }),
+        )
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        processSpy.mockResolvedValue(undefined)
+        online = true
+        for (let cb of onlineListeners) cb()
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it("coalesces a wake that arrives while processing", async () => {
+        let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
+        let release!: () => void
+        processSpy.mockImplementationOnce(async (): Promise<void> => {
+            await new Promise<void>((r) => {
+                release = r
+            })
+        })
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        await store.enqueue({ type: "test/msg", payload: { n: 1 } })
+        w.start()
+        await flushMicrotasks()
+        await store.enqueue({ type: "test/msg", payload: { n: 2 } })
+        release()
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it("drains an enqueue that arrives while arming the due timer", async () => {
+        let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
+        let origNextDueAt = store.nextDueAt.bind(store)
+        let releaseDue!: () => void
+        store.nextDueAt = async (): Promise<number | null> => {
+            await new Promise<void>((r) => {
+                releaseDue = r
+            })
+            return origNextDueAt()
+        }
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        w.start()
+        await flushMicrotasks()
+        await store.enqueue({ type: "test/msg", payload: {} })
+        expect(processSpy).toHaveBeenCalledTimes(0)
+        releaseDue()
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it("ignores store notify while paused and drains on resume", async () => {
+        let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        await startUntilIdle(w)
+        w.pause()
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(0)
+        w.resume()
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it("stop unsubscribes so later enqueue does not process", async () => {
+        let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        await startUntilIdle(w)
+        w.stop()
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(0)
+    })
+
+    it("start uses a 30s watchdog by default", async () => {
+        let { store } = makeRepo([])
+        let spy = vi.spyOn(timers, "setInterval")
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog() }))
+        await startUntilIdle(w)
+        expect(spy).toHaveBeenCalledWith(expect.any(Function), 30_000)
     })
 })

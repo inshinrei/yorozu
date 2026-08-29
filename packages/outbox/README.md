@@ -67,6 +67,14 @@ let worker = new OutboxWorker(store, handlers, {
 worker.start()
 ```
 
+Worker drains on `start` / `resume` / `wake()` / store `subscribe` (enqueue, retry, release, releaseUncounted, updateAfterFailure) / `subscribeOnline`.
+
+`pollIntervalMs` is a watchdog fuse, default 30s — not a 2s claim loop. After an empty drain, one timeout is armed for `nextDueAt` (backoff and lease reclaim).
+
+Cross-tab: this package does not open `BroadcastChannel`. Host should `bc.onmessage → worker.wake()` and post on local enqueue. Without that, other-tab enqueue waits up to the watchdog. Lease steal on **this** tab is the due timer (not worse than the old 2s poll).
+
+Offline: pass `subscribeOnline` (e.g. `window` `online`) or call `wake()` when connectivity returns; otherwise the watchdog is the fuse.
+
 Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-outbox")`. Process flow is `outbox-process` (`start` / `done` / `retry` / `skip` / `error`).
 
 ## Musts

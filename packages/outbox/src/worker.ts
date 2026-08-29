@@ -34,6 +34,8 @@ export type OutboxWorkerOptions = {
      * not advance the terminal attempt cap (they're not real failures). Defaults to always-online.
      */
     isOnline?: () => boolean
+    /** Host-level online signal (e.g. `window` `online`). If omitted, offline→online waits for `wake()` or the watchdog. */
+    subscribeOnline?: (onOnline: () => void) => () => void
     /**
      * Classifies an error as retryable (transient: network/5xx/429 → keep retrying) vs.
      * non-retryable (terminal: 4xx → fail now). Defaults to treating every error as retryable.
@@ -50,7 +52,11 @@ export type OutboxWorkerOptions = {
 }
 
 export class OutboxWorker {
-    protected _timer: timers.Interval | null = null
+    protected _watchdog: timers.Interval | null = null
+    protected _dueTimer: timers.Timer | null = null
+    protected _wakePending: boolean = false
+    protected _unsubStore: (() => void) | null = null
+    protected _unsubOnline: (() => void) | null = null
     protected _running: boolean = false
     protected _paused: boolean = false
     protected _processing: boolean = false
@@ -66,46 +72,100 @@ export class OutboxWorker {
         this._clock = resolveClock(options.clock)
     }
 
+    wake(): void {
+        if (!this._running || this._paused) return
+        if (this._processing) {
+            this._wakePending = true
+            return
+        }
+        this._runTick()
+    }
+
     start(): void {
         if (this._running) return
         this._running = true
         this._paused = false
-        let interval = this.options.pollIntervalMs ?? 2000
-        this.log.trace("outbox: starting", { intervalMs: interval })
-        this._runTick()
-        this._timer = timers.setInterval(() => {
-            this._runTick()
-        }, interval)
+        this._unsubStore = this.store.subscribe(() => {
+            this.wake()
+        })
+        this._unsubOnline = this.options.subscribeOnline
+            ? this.options.subscribeOnline(() => {
+                  this.wake()
+              })
+            : null
+        this._armWatchdog()
+        this.wake()
     }
 
     stop(): void {
         this._running = false
         this._paused = false
-        this._clearTimer()
+        this._wakePending = false
+        this._unsubscribe()
+        this._clearWatchdog()
+        this._clearDueTimer()
     }
 
     pause(): void {
         if (!this._running || this._paused) return
         this._paused = true
-        this._clearTimer()
+        this._clearWatchdog()
+        this._clearDueTimer()
     }
 
     resume(): void {
         if (!this._running || !this._paused) return
         this._paused = false
-        let interval = this.options.pollIntervalMs ?? 2000
-        this.log.trace("outbox: resuming", { intervalMs: interval })
-        this._runTick()
-        this._timer = timers.setInterval(() => {
-            this._runTick()
+        this._armWatchdog()
+        this.wake()
+    }
+
+    protected _unsubscribe(): void {
+        this._unsubStore?.()
+        this._unsubStore = null
+        this._unsubOnline?.()
+        this._unsubOnline = null
+    }
+
+    protected _armWatchdog(): void {
+        this._clearWatchdog()
+        let interval = this.options.pollIntervalMs ?? 30_000
+        this.log.trace("outbox: watchdog", { intervalMs: interval })
+        this._watchdog = timers.setInterval(() => {
+            this.wake()
         }, interval)
     }
 
-    protected _clearTimer(): void {
-        if (this._timer) {
-            timers.clearInterval(this._timer)
-            this._timer = null
+    protected _clearWatchdog(): void {
+        if (this._watchdog) {
+            timers.clearInterval(this._watchdog)
+            this._watchdog = null
         }
+    }
+
+    protected _clearDueTimer(): void {
+        if (this._dueTimer) {
+            timers.clearTimeout(this._dueTimer)
+            this._dueTimer = null
+        }
+    }
+
+    protected async _armDueTimer(): Promise<void> {
+        this._clearDueTimer()
+        if (!this._running || this._paused) return
+        let due: number | null
+        try {
+            due = await this.store.nextDueAt()
+        } catch (err) {
+            this._report(err)
+            return
+        }
+        if (due == null || !this._running || this._paused) return
+        let delay = due - this._clock.now()
+        if (delay <= 0) return
+        this._dueTimer = timers.setTimeout(() => {
+            this.wake()
+        }, delay)
     }
 
     protected _runTick(): void {
@@ -210,7 +270,17 @@ export class OutboxWorker {
                 }
             }
         } finally {
+            if (this._running && !this._paused) {
+                await this._armDueTimer()
+            } else {
+                this._clearDueTimer()
+            }
             this._processing = false
+            if (this._wakePending) {
+                this._wakePending = false
+                let online = this.options.isOnline ? this.options.isOnline() : true
+                if (online) this.wake()
+            }
         }
     }
 
