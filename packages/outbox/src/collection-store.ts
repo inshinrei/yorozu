@@ -1,6 +1,7 @@
 import type { Collection, Db } from "@yorozu/db"
 import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
 import { newOutboxEntry, resolveClock } from "./ids"
+import { createListenerSet } from "./notify"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
 
 const ISSUE_KEY: string = "yorozu-outbox"
@@ -34,6 +35,7 @@ class CollectionOutboxStore implements OutboxStore {
     protected _db: Db
     protected _clock: Clock
     protected _log: Logger
+    protected _listeners = createListenerSet()
 
     constructor(opts: { collection: Collection<OutboxRow>; db: Db; clock?: Clock; log?: Logger }) {
         this._col = opts.collection
@@ -52,11 +54,13 @@ class CollectionOutboxStore implements OutboxStore {
         rollbackType?: string
         rollbackPayload?: unknown
     }): Promise<string> {
-        return this._transact(async (col) => {
+        let id = await this._transact(async (col) => {
             let entry = newOutboxEntry(this._clock.now(), params)
             await col.put(asRow(entry))
             return entry.id
         })
+        this._listeners.notify()
+        return id
     }
 
     async get(id: string): Promise<OutboxEntry | null> {
@@ -103,6 +107,7 @@ class CollectionOutboxStore implements OutboxStore {
             if (!row) return
             await col.put(asRow({ ...fromRow(row), reservedTo: 0 }))
         })
+        this._listeners.notify()
     }
 
     async updateAfterFailure(id: string, error: string, nextReservedTo?: number): Promise<void> {
@@ -118,6 +123,7 @@ class CollectionOutboxStore implements OutboxStore {
                 }),
             )
         })
+        this._listeners.notify()
     }
 
     async markFailed(id: string, error?: string): Promise<void> {
@@ -158,6 +164,7 @@ class CollectionOutboxStore implements OutboxStore {
             let { failedAt: _failedAt, lastError: _lastError, ...rest } = fromRow(row)
             await col.put(asRow({ ...rest, attempts: 0, reservedTo: 0 }))
         })
+        this._listeners.notify()
     }
 
     async releaseUncounted(id: string, error?: string, nextReservedTo?: number): Promise<void> {
@@ -174,6 +181,7 @@ class CollectionOutboxStore implements OutboxStore {
                 }),
             )
         })
+        this._listeners.notify()
     }
 
     async deleteAll(): Promise<void> {
@@ -184,6 +192,25 @@ class CollectionOutboxStore implements OutboxStore {
 
     async count(): Promise<number> {
         return this._col.count()
+    }
+
+    subscribe(listener: () => void): () => void {
+        return this._listeners.subscribe(listener)
+    }
+
+    async nextDueAt(): Promise<number | null> {
+        let hits = await this._col.scan(BY_CLAIM)
+        for (let hit of hits) {
+            let row = hit.value ?? (await this._col.get(String(hit.primaryKey)))
+            if (!row) {
+                this._log.warn("never-happen", { reason: "next-due-missing-row", primaryKey: hit.primaryKey })
+                continue
+            }
+            let entry = fromRow(row)
+            if (entry.failedAt != null) continue
+            return entry.reservedTo
+        }
+        return null
     }
 }
 

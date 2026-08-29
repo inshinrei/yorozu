@@ -1,4 +1,5 @@
 import { newOutboxEntry, resolveClock } from "./ids"
+import { createListenerSet } from "./notify"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
 
 function pickClaimable(items: OutboxEntry[], now: number): OutboxEntry | null {
@@ -14,6 +15,7 @@ function pickClaimable(items: OutboxEntry[], now: number): OutboxEntry | null {
 class MemoryOutboxStore implements OutboxStore {
     protected _items: OutboxEntry[] = []
     protected _clock: Clock
+    protected _listeners = createListenerSet()
 
     constructor(clock: Clock) {
         this._clock = clock
@@ -27,6 +29,7 @@ class MemoryOutboxStore implements OutboxStore {
     }): Promise<string> {
         let entry = newOutboxEntry(this._clock.now(), params)
         this._items.push(entry)
+        this._listeners.notify()
         return entry.id
     }
 
@@ -58,6 +61,7 @@ class MemoryOutboxStore implements OutboxStore {
         let idx = this._items.findIndex((e) => e.id === id)
         if (idx === -1) return
         this._items[idx] = { ...this._items[idx]!, reservedTo: 0 }
+        this._listeners.notify()
     }
 
     async updateAfterFailure(id: string, error: string, nextReservedTo?: number): Promise<void> {
@@ -69,6 +73,7 @@ class MemoryOutboxStore implements OutboxStore {
             lastError: error,
             reservedTo: nextReservedTo ?? entry.reservedTo,
         }
+        this._listeners.notify()
     }
 
     async markFailed(id: string, error?: string): Promise<void> {
@@ -96,6 +101,7 @@ class MemoryOutboxStore implements OutboxStore {
         if (idx === -1) return
         let { failedAt: _failedAt, lastError: _lastError, ...rest } = this._items[idx]!
         this._items[idx] = { ...rest, attempts: 0, reservedTo: 0 }
+        this._listeners.notify()
     }
 
     async releaseUncounted(id: string, error?: string, nextReservedTo?: number): Promise<void> {
@@ -108,6 +114,7 @@ class MemoryOutboxStore implements OutboxStore {
             lastError: error ?? entry.lastError,
             reservedTo: nextReservedTo ?? 0,
         }
+        this._listeners.notify()
     }
 
     async deleteAll(): Promise<void> {
@@ -116,6 +123,19 @@ class MemoryOutboxStore implements OutboxStore {
 
     async count(): Promise<number> {
         return this._items.length
+    }
+
+    subscribe(listener: () => void): () => void {
+        return this._listeners.subscribe(listener)
+    }
+
+    async nextDueAt(): Promise<number | null> {
+        let best: number | null = null
+        for (let entry of this._items) {
+            if (entry.failedAt != null) continue
+            if (best == null || entry.reservedTo < best) best = entry.reservedTo
+        }
+        return best
     }
 }
 

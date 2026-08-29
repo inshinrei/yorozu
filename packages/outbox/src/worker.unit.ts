@@ -62,6 +62,8 @@ function makeRepo(initial: OutboxEntry[] = [], clock: Clock = { now: () => Date.
             state.items = []
         }),
         count: vi.fn(async () => state.items.length),
+        subscribe: vi.fn((_fn: () => void): (() => void) => () => {}),
+        nextDueAt: vi.fn(async (): Promise<number | null> => null),
     }
 
     claimSpy.mockImplementation(async (lease: number) => {

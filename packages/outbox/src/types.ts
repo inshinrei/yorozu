@@ -31,4 +31,6 @@ export interface OutboxStore {
     releaseUncounted(id: string, error?: string, nextReservedTo?: number): Promise<void>
     deleteAll(): Promise<void>
     count(): Promise<number>
+    subscribe(listener: () => void): () => void
+    nextDueAt(): Promise<number | null>
 }

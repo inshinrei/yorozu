@@ -253,5 +253,64 @@ export function testOutboxStore(factory: () => Promise<{ store: OutboxStore; clo
             expect(claimed).toHaveLength(1)
             expect(claimed[0]!.attempts).toBe(1)
         })
+
+        it("nextDueAt is null when empty or only failed", async () => {
+            expect(await store.nextDueAt()).toBeNull()
+            let id = await store.enqueue({ type: "f", payload: {} })
+            await store.claim(1000)
+            await store.markFailed(id)
+            expect(await store.nextDueAt()).toBeNull()
+        })
+
+        it("nextDueAt is 0 after enqueue and the lease instant after claim", async () => {
+            clock.nowMs = 1000
+            let id = await store.enqueue({ type: "t", payload: {} })
+            expect(await store.nextDueAt()).toBe(0)
+            await store.claim(5000)
+            expect(await store.nextDueAt()).toBe(6000)
+            await store.release(id)
+            expect(await store.nextDueAt()).toBe(0)
+        })
+
+        it("nextDueAt is the min reservedTo among non-failed rows", async () => {
+            clock.nowMs = 1000
+            let a = await store.enqueue({ type: "a", payload: 1 })
+            let b = await store.enqueue({ type: "b", payload: 2 })
+            await store.claim(8000)
+            await store.updateAfterFailure(a, "x", 4000)
+            await store.claim(1000)
+            await store.updateAfterFailure(b, "y", 9000)
+            expect(await store.nextDueAt()).toBe(4000)
+        })
+
+        it("subscribe fires after enqueue/retry/release/releaseUncounted/updateAfterFailure, not after get", async () => {
+            let n = 0
+            let unsub = store.subscribe(() => {
+                n++
+            })
+            clock.nowMs = 1000
+            let id = await store.enqueue({ type: "t", payload: {} })
+            expect(n).toBe(1)
+            expect(await store.get(id)).not.toBeNull()
+            await store.get(id)
+            expect(n).toBe(1)
+            await store.claim(1000)
+            expect(n).toBe(1)
+            await store.updateAfterFailure(id, "e", 5000)
+            expect(n).toBe(2)
+            await store.release(id)
+            expect(n).toBe(3)
+            await store.claim(1000)
+            await store.releaseUncounted(id, "off")
+            expect(n).toBe(4)
+            await store.claim(1000)
+            await store.markFailed(id)
+            expect(n).toBe(4)
+            await store.retry(id)
+            expect(n).toBe(5)
+            unsub()
+            await store.enqueue({ type: "u", payload: {} })
+            expect(n).toBe(5)
+        })
     })
 }
