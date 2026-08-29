@@ -1,0 +1,20 @@
+{
+    "name": "@yorozu/db-sqlite",
+    "version": "0.3.1",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "better-sqlite3 thin wrapper + driver for @yorozu/db",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/db": "workspace:^",
+        "@yorozu/log": "workspace:^",
+        "better-sqlite3": "12.11.1"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "9.6.0"
+    }
+}
