@@ -70,9 +70,10 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
         this._rows.set(pk, row)
     }
 
-    async putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+    async putMany(rows: readonly T[], _opts?: PutOpts): Promise<void> {
         for (let row of rows) {
-            await this.put(row, opts)
+            let pk = primaryKeyOf(row, this._keyPath)
+            this._rows.set(pk, row)
         }
     }
 
@@ -129,15 +130,40 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
     }
 }
 
+class NestedTxDb implements Db {
+    constructor(protected _inner: Db) {}
+
+    get schema(): DbSchema {
+        return this._inner.schema
+    }
+
+    collection<T extends Record<string, unknown>>(name: string): Collection<T> {
+        return this._inner.collection(name)
+    }
+
+    transact<R>(_names: readonly string[], _mode: TxMode, _fn: (db: Db) => Promise<R>): Promise<R> {
+        return Promise.reject(new Error("nested transact is not supported"))
+    }
+
+    flush(): Promise<void> {
+        return this._inner.flush()
+    }
+
+    close(): Promise<void> {
+        return this._inner.close()
+    }
+}
+
 class MemoryDb implements Db {
     readonly schema: DbSchema
     protected _collections: Map<string, MemoryCollection<Record<string, unknown>>>
     protected _lock: AsyncLock = new AsyncLock()
-    protected _inTx = false
+    protected _txView: Db
 
     constructor(schema: DbSchema) {
         this.schema = schema
         this._collections = new Map()
+        this._txView = new NestedTxDb(this)
         for (let def of schema.collections) {
             this._collections.set(def.name, new MemoryCollection(def))
         }
@@ -150,19 +176,10 @@ class MemoryDb implements Db {
     }
 
     transact<R>(names: readonly string[], _mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R> {
-        if (this._inTx) throw new Error("nested transact is not supported")
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
-        return this._lock.with(async () => {
-            if (this._inTx) throw new Error("nested transact is not supported")
-            this._inTx = true
-            try {
-                return await fn(this)
-            } finally {
-                this._inTx = false
-            }
-        })
+        return this._lock.with(() => fn(this._txView))
     }
 
     flush(): Promise<void> {

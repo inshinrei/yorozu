@@ -10,7 +10,7 @@ type ResourceRow = {
     meta: Record<string, unknown>
 }
 
-let schema: DbSchema = {
+const schema: DbSchema = {
     name: "t",
     version: 1,
     collections: [
@@ -115,12 +115,18 @@ describe("openMemoryDb", () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")
         let order: string[] = []
+        let started!: () => void
+        let startedP = new Promise<void>((resolve) => {
+            started = resolve
+        })
         let p1 = db.transact(["files"], "rw", async () => {
             order.push("start-1")
+            started()
             await new Promise((r) => setTimeout(r, 20))
             await col.put(row({ key: "a" }))
             order.push("end-1")
         })
+        await startedP
         let p2 = db.transact(["files"], "rw", async () => {
             order.push("start-2")
             await col.put(row({ key: "b" }))
