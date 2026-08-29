@@ -11,6 +11,7 @@ import type { Logger } from "@yorozu/log"
 let driver = createIdbDriver({
     dbName: "app", // default: schema.name
     indexedDB, // default: globalThis.indexedDB
+    IDBKeyRange, // default: globalThis.IDBKeyRange
     log, // optional Logger; silent default
     deferPut: (name) => name !== "meta",
 })
@@ -29,7 +30,7 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `scan(..., { keysOnly: true })` uses `openKeyCursor`. Never reads `cursor.value`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` via IDB array keys (`[cutoff] < [cutoff, 0]`).
 - `getMany` / `putMany` / `delete` share one IDB transaction.
-- Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `transact` commit. `flush()` coalesces by `(collection, pk)` in one multi-store `readwrite` tx.
+- Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `"rw"` transact commit, not `"r"`. `flush()` coalesces by `(collection, pk)` in one multi-store `readwrite` tx.
 - Nested `transact` throws. Concurrent `transact` serializes on a mutex (tx facade; nested `transact` rejects without taking the lock).
 - Call `await db.flush()` before `close()`. Do not leave `{ flush: "batch" }` puts outstanding across multi-tab upgrades (`onversionchange` closes the connection without flushing).
 - `drop(schema)` closes tracked connections and `indexedDB.deleteDatabase`.

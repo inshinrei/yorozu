@@ -42,4 +42,9 @@ describe("createTxAls", () => {
         ])
         expect(seen).toEqual([undefined, undefined])
     })
+
+    it("is not exported from the public Collection barrel", async () => {
+        let mod = await import("./index")
+        expect(mod).not.toHaveProperty("createTxAls")
+    })
 })

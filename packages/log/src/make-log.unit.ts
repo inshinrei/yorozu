@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { makeLog, reportFlowFailure } from "./make-log"
+import { makeSilentLog } from "./silent"
 import { createTestLog } from "./test-log"
 import type { Logger } from "./types"
 
@@ -44,6 +45,11 @@ describe("makeLog", () => {
         let rec = raw.collect().find((r) => r.errorMeta)
         expect(rec?.errorMeta?.issueKey).toBe("yorozu-test")
         expect(rec?.errorMeta?.op).toBe("check")
+    })
+
+    it("span still runs when wrapping makeSilentLog", async () => {
+        let log = makeLog(makeSilentLog(), "k")
+        expect(await log.span("x", async () => 1)).toBe(1)
     })
 })
 

@@ -1,6 +1,5 @@
 import {
     compareIndexKey,
-    createTxAls,
     inRange,
     type Collection,
     type CollectionDef,
@@ -12,11 +11,19 @@ import {
     type PutOpts,
     type ScanBound,
     type ScanHit,
-    type TxAlsGate,
     type TxMode,
 } from "@yorozu/db"
+import { createTxAls, type TxAlsGate } from "@yorozu/db/tx-als"
 import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
 import { toIdbKeyRange } from "./range"
+
+type IdbDriverOpts = {
+    dbName?: string
+    indexedDB?: IDBFactory
+    IDBKeyRange?: typeof IDBKeyRange
+    log?: Logger
+    deferPut?: (collectionName: string) => boolean
+}
 
 type Row = Record<string, unknown>
 type PendingEntry = { row: Row; seq: number }
@@ -287,6 +294,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     protected _pending: Pending
     protected _seq: SeqBox
     protected _deferPut: (collectionName: string) => boolean
+    protected _keyRange: typeof IDBKeyRange
 
     constructor(
         def: CollectionDef,
@@ -294,6 +302,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         pending: Pending,
         seq: SeqBox,
         deferPut: (collectionName: string) => boolean,
+        keyRange: typeof IDBKeyRange,
     ) {
         this.name = def.name
         this._def = def
@@ -304,6 +313,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         this._pending = pending
         this._seq = seq
         this._deferPut = deferPut
+        this._keyRange = keyRange
     }
 
     protected _colPending(): Map<string, PendingEntry> | undefined {
@@ -444,7 +454,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
     async scan(index: string, bound: ScanBound = {}): Promise<Array<ScanHit<T>>> {
         if (index !== "__pk" && !this._indexes.has(index)) throw new Error(`unknown index: ${index}`)
-        let range = toIdbKeyRange(bound)
+        let range = toIdbKeyRange(bound, this._keyRange)
         let pending = this._colPending()
         let hasPending = pending !== undefined && pending.size > 0
         let hits: Array<ScanHit<T>> = []
@@ -524,6 +534,7 @@ class IdbDb implements Db {
         idb: IDBDatabase,
         deferPut: (collectionName: string) => boolean,
         onClose: () => void,
+        keyRange: typeof IDBKeyRange,
     ) {
         this.schema = schema
         this._idb = idb
@@ -538,7 +549,7 @@ class IdbDb implements Db {
         for (let def of schema.collections) {
             this._collections.set(
                 def.name,
-                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut),
+                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut, keyRange),
             )
         }
     }
@@ -574,15 +585,17 @@ class IdbDb implements Db {
         return this._lock.with(() => this._flushPending())
     }
 
-    async close(): Promise<void> {
-        if (this._closed) return
-        this._closed = true
-        try {
-            await this._flushPending()
-        } finally {
-            this._idb.close()
-            this._onClose()
-        }
+    close(): Promise<void> {
+        return this._lock.with(async () => {
+            if (this._closed) return
+            this._closed = true
+            try {
+                await this._flushPending()
+            } finally {
+                this._idb.close()
+                this._onClose()
+            }
+        })
     }
 
     protected async _flushPending(): Promise<void> {
@@ -619,18 +632,15 @@ class IdbDb implements Db {
 class IdbDriver implements DbDriver {
     protected log: Logger
     protected _factory: IDBFactory
+    protected _keyRange: typeof IDBKeyRange
     protected _dbName: string | undefined
     protected _deferPut: (collectionName: string) => boolean
     protected _conns: Set<IDBDatabase> = new Set()
 
-    constructor(opts: {
-        dbName?: string
-        indexedDB?: IDBFactory
-        log?: Logger
-        deferPut?: (collectionName: string) => boolean
-    }) {
+    constructor(opts: IdbDriverOpts) {
         this.log = makeLog(opts.log ?? makeSilentLog(), "yorozu-db-idb")
         this._factory = opts.indexedDB ?? globalThis.indexedDB
+        this._keyRange = opts.IDBKeyRange ?? globalThis.IDBKeyRange
         this._dbName = opts.dbName
         this._deferPut = opts.deferPut ?? (() => true)
     }
@@ -644,9 +654,15 @@ class IdbDriver implements DbDriver {
         let name = this._dbName ?? schema.name
         let idb = await openIdb(this._factory, name, schema, this.log)
         this._conns.add(idb)
-        return new IdbDb(schema, idb, this._deferPut, () => {
-            this._conns.delete(idb)
-        })
+        return new IdbDb(
+            schema,
+            idb,
+            this._deferPut,
+            () => {
+                this._conns.delete(idb)
+            },
+            this._keyRange,
+        )
     }
 
     async drop(schema: DbSchema): Promise<void> {
@@ -675,6 +691,7 @@ export function createIdbDriver(
     opts: {
         dbName?: string
         indexedDB?: IDBFactory
+        IDBKeyRange?: typeof IDBKeyRange
         log?: Logger
         deferPut?: (collectionName: string) => boolean
     } = {},

@@ -263,6 +263,52 @@ describe("createIdbDriver", () => {
         expect(src).not.toMatch(/node:module/)
     })
 
+    it("close waits for in-flight transact", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let order: string[] = []
+        let started!: () => void
+        let startedP = new Promise<void>((resolve) => {
+            started = resolve
+        })
+        let release!: () => void
+        let gate = new Promise<void>((resolve) => {
+            release = resolve
+        })
+        let txP = db.transact(["files"], "rw", async () => {
+            order.push("tx-start")
+            started()
+            await gate
+            order.push("tx-end")
+        })
+        await startedP
+        let closeP = db.close().then(() => {
+            order.push("closed")
+        })
+        await new Promise((r) => setTimeout(r, 20))
+        expect(order).toEqual(["tx-start"])
+        release()
+        await Promise.all([txP, closeP])
+        expect(order).toEqual(["tx-start", "tx-end", "closed"])
+    })
+
+    it("scan uses injected IDBKeyRange", async () => {
+        let bound = vi.fn((...args: Parameters<typeof IDBKeyRange.bound>) => IDBKeyRange.bound(...args))
+        let KeyRange = {
+            bound,
+            lowerBound: IDBKeyRange.lowerBound.bind(IDBKeyRange),
+            upperBound: IDBKeyRange.upperBound.bind(IDBKeyRange),
+            only: IDBKeyRange.only.bind(IDBKeyRange),
+        } as unknown as typeof IDBKeyRange
+        let driver = createIdbDriver({ dbName: nextName(), IDBKeyRange: KeyRange })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put(fileRow({ key: "a", storedAt: 1, bytes: 1 }))
+        await col.scan("by-evict", { gte: [0, 0], lte: [10, 10], keysOnly: true })
+        expect(bound).toHaveBeenCalled()
+        await db.close()
+    })
+
     it("nested transact throws", async () => {
         let driver = createIdbDriver({ dbName: nextName() })
         let db = await driver.open(schema)

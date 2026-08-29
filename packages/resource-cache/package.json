@@ -11,7 +11,6 @@
     },
     "dependencies": {
         "@yorozu/db": "workspace:^",
-        "@yorozu/log": "workspace:^",
-        "@yorozu/utils": "workspace:^"
+        "@yorozu/log": "workspace:^"
     }
 }

@@ -30,10 +30,7 @@ function isDataError(err: unknown): boolean {
  * IDBKeyRange for ScanBound using IDB array-key order.
  * `undefined` = unbounded; `null` = empty (no matches).
  */
-export function toIdbKeyRange(
-    bound: ScanBound = {},
-    KeyRange: typeof IDBKeyRange = globalThis.IDBKeyRange,
-): IDBKeyRange | null | undefined {
+export function toIdbKeyRange(bound: ScanBound, KeyRange: typeof IDBKeyRange): IDBKeyRange | null | undefined {
     let lower = pickLower(bound)
     let upper = pickUpper(bound)
     if (!lower && !upper) return undefined

@@ -232,9 +232,6 @@ importers:
       '@yorozu/log':
         specifier: workspace:^
         version: link:../log
-      '@yorozu/utils':
-        specifier: workspace:^
-        version: link:../utils
 
   packages/utils: {}
 
