@@ -5,10 +5,11 @@ import { BY_EVICT_INDEX, type ResourceRow } from "./row"
 
 export async function listEvictItems<Meta = unknown>(
     col: Collection<ResourceRow<Meta>>,
-    opts?: { beforeStoredAt?: number },
+    opts?: { beforeStoredAt?: number; limit?: number },
 ): Promise<BytesCapItem[]> {
     let bound: ScanBound = { keysOnly: true }
     if (opts?.beforeStoredAt != null) bound.lt = [opts.beforeStoredAt]
+    if (opts?.limit != null) bound.limit = opts.limit
     let hits = await col.scan(BY_EVICT_INDEX, bound)
     let out: BytesCapItem[] = []
     for (let hit of hits) {

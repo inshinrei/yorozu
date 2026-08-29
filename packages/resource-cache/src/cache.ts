@@ -67,9 +67,9 @@ export function createResourceCache<Meta = unknown>(opts: {
                 let n = await items.count()
                 if (n > caps.maxEntries) {
                     let extra = n - caps.maxEntries
-                    let oldest = await listEvictItems(items)
+                    let oldest = await listEvictItems(items, { limit: extra })
                     await applyDrop(
-                        oldest.slice(0, extra).map((i) => i.key),
+                        oldest.map((i) => i.key),
                         "count",
                     )
                 }
@@ -110,7 +110,9 @@ export function createResourceCache<Meta = unknown>(opts: {
         async get(key: string): Promise<ResourceRow<Meta> | null> {
             let hit = l1?.get(key)
             if (hit) return hit
-            return items.get(key)
+            let row = await items.get(key)
+            if (row) l1?.set(key, row)
+            return row
         },
         async put(record: Omit<ResourceRow<Meta>, "bytes"> & { bytes?: number }): Promise<void> {
             let bytes = record.blob?.size ?? record.bytes ?? 0

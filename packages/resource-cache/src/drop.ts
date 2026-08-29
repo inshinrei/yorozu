@@ -19,12 +19,16 @@ export function dropStripBlob<Meta = unknown>(): DropHandler<Meta> {
     return {
         async apply(col: Collection<ResourceRow<Meta>>, plan: DropPlan): Promise<void> {
             if (plan.keys.length === 0) return
-            for (let key of plan.keys) {
-                let rec = await col.get(key)
+            let rows = await col.getMany(plan.keys)
+            let next: Array<ResourceRow<Meta>> = []
+            for (let rec of rows) {
                 if (!rec) continue
+                if (rec.bytes === 0 && rec.blob == null) continue
                 let { blob: _blob, ...rest } = rec
-                await col.put({ ...rest, bytes: 0, storedAt: rec.storedAt })
+                next.push({ ...rest, bytes: 0, storedAt: rec.storedAt })
             }
+            if (next.length === 0) return
+            await col.putMany(next)
         },
     }
 }

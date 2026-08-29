@@ -18,9 +18,15 @@ let caps = {
     maxEntries: 2000,
 }
 
+let strip = dropStripBlob()
 let blobs = createResourceCache({
     collection: db.collection("blobs"),
-    drop: dropStripBlob(),
+    drop: {
+        apply(col, plan) {
+            if (plan.reason === "bytes") return strip.apply(col, plan)
+            return dropDelete.apply(col, plan)
+        },
+    },
     caps,
     evictMetaEveryNPuts: 50,
     log, // optional; silent default

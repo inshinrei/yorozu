@@ -60,6 +60,17 @@ describe("listEvictItems", () => {
             { key: "new", storedAt: 30, bytes: 2 },
         ])
     })
+
+    it("forwards ScanBound.limit when opts.limit is set", async () => {
+        let col = await filesCol()
+        await col.put(rec({ key: "a", storedAt: 1, bytes: 1 }))
+        await col.put(rec({ key: "b", storedAt: 2, bytes: 1 }))
+        await col.put(rec({ key: "c", storedAt: 3, bytes: 1 }))
+        let scan = vi.spyOn(col, "scan")
+        let items = await listEvictItems(col, { limit: 1 })
+        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: true, limit: 1 })
+        expect(items).toEqual([{ key: "a", storedAt: 1, bytes: 1 }])
+    })
 })
 
 describe("attachBytesLedger", () => {

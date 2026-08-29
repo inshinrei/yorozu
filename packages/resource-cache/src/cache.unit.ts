@@ -104,6 +104,38 @@ describe("createResourceCache", () => {
         expect(await col.count()).toBe(2)
     })
 
+    it("count eviction scans by-evict keysOnly with limit extra", async () => {
+        let col = await filesCol()
+        let scan = vi.spyOn(col, "scan")
+        let cache = createResourceCache({
+            collection: col,
+            drop: dropDelete,
+            caps: { maxEntries: 2 },
+        })
+        await cache.put({ key: "a", storedAt: 1, blob: blobOf(1), meta: {} })
+        await cache.put({ key: "b", storedAt: 2, blob: blobOf(1), meta: {} })
+        await cache.put({ key: "c", storedAt: 3, blob: blobOf(1), meta: {} })
+        scan.mockClear()
+        await cache.evict("meta")
+        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: true, limit: 1 })
+        expect(await col.count()).toBe(2)
+        expect(await col.get("a")).toBeNull()
+    })
+
+    it("get miss populates L1 so the second get does not hit the collection", async () => {
+        let col = await filesCol()
+        let l1 = new BytesLruMap<string, ResourceRow>({ maxBytes: 1000, sizeOf: (r) => r.bytes })
+        let cache = createResourceCache({ collection: col, drop: dropDelete, l1 })
+        await col.put({ key: "a", storedAt: 1, bytes: 4, blob: blobOf(4), meta: {} })
+        let get = vi.spyOn(col, "get")
+        expect((await cache.get("a"))?.key).toBe("a")
+        expect(get).toHaveBeenCalledTimes(1)
+        get.mockClear()
+        expect((await cache.get("a"))?.key).toBe("a")
+        expect(get).not.toHaveBeenCalled()
+        expect(cache.peekL1("a")?.bytes).toBe(4)
+    })
+
     it("put of a blob larger than maxBytes does not call collection.put", async () => {
         let col = await filesCol()
         let put = vi.spyOn(col, "put")
