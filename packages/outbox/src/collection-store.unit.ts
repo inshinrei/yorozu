@@ -101,6 +101,25 @@ describe("createOutboxStore", () => {
         await db.close()
     })
 
+    it("claim picks min createdAt among due rows, not min reservedTo", async () => {
+        let clock = mutableClock(1000)
+        let {store, db} = await openCollectionOutbox(clock)
+        clock.nowMs = 1000
+        let older = await store.enqueue({type: "old", payload: 1})
+        clock.nowMs = 1100
+        let newer = await store.enqueue({type: "new", payload: 2})
+        await store.claim(1) // older attempts=1, reservedTo=1001
+        await store.updateAfterFailure(older, "temp", 4000) // older due at 4000
+        clock.nowMs = 1100
+        await store.claim(1) // newer reservedTo=1101
+        await store.updateAfterFailure(newer, "temp", 2000) // newer due at 2000
+        clock.nowMs = 5000
+        // both due; index order is newer (2000) then older (4000); FIFO wants older (createdAt 1000)
+        let claimed = await store.claim(1000)
+        expect(claimed?.id).toBe(older)
+        await db.close()
+    })
+
     it("nextDueAt scans by-claim keysOnly with limit 1", async () => {
         let clock = mutableClock(1000)
         let {store, db} = await openCollectionOutbox(clock)

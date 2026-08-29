@@ -65,4 +65,12 @@ describe("dropStripBlob", () => {
         expect(putMany).toHaveBeenCalledTimes(1)
         expect(putMany.mock.calls[0]![0].map((r: { key: string }) => r.key)).toEqual(["a"])
     })
+
+    it("already-stripped keys do not call putMany", async () => {
+        let col = await filesCol()
+        await col.put({ key: "z", storedAt: 2, bytes: 0, meta: {} })
+        let putMany = vi.spyOn(col, "putMany")
+        await dropStripBlob().apply(col, { keys: ["z"], reason: "bytes" })
+        expect(putMany).not.toHaveBeenCalled()
+    })
 })
