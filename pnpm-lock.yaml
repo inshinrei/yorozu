@@ -133,6 +133,12 @@ importers:
         specifier: 7.7.1
         version: 7.7.1
 
+  packages/context-menu:
+    dependencies:
+      '@yorozu/animations':
+        specifier: workspace:^
+        version: link:../animations
+
   packages/db:
     dependencies:
       '@yorozu/utils':
