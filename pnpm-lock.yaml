@@ -212,6 +212,18 @@ importers:
         specifier: 8.20.1
         version: 8.20.1
 
+  packages/outbox:
+    dependencies:
+      '@yorozu/db':
+        specifier: workspace:^
+        version: link:../db
+      '@yorozu/log':
+        specifier: workspace:^
+        version: link:../log
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../utils
+
   packages/resource-cache:
     dependencies:
       '@yorozu/db':

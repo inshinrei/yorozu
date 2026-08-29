@@ -1,0 +1,17 @@
+{
+    "name": "@yorozu/outbox",
+    "version": "0.3.1",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "durable job queue + worker",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/db": "workspace:^",
+        "@yorozu/log": "workspace:^",
+        "@yorozu/utils": "workspace:^"
+    }
+}

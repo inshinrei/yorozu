@@ -1,0 +1,85 @@
+import { describe, expect, it, vi } from "vitest"
+import { openMemoryDb, type Db } from "@yorozu/db"
+import { mutableClock, testOutboxStore } from "./_contract"
+import { createOutboxStore } from "./collection-store"
+import { outboxCollectionDef } from "./schema"
+import type { Clock, OutboxEntry, OutboxStore } from "./types"
+
+type OutboxRow = OutboxEntry & Record<string, unknown>
+
+async function openCollectionOutbox(clock?: Clock): Promise<{ store: OutboxStore; db: Db }> {
+    let db = await openMemoryDb({
+        name: "outbox-test",
+        version: 1,
+        collections: [outboxCollectionDef("outbox")],
+    })
+    let collection = db.collection<OutboxRow>("outbox")
+    let store = createOutboxStore({ collection, db, clock })
+    return { store, db }
+}
+
+describe("outboxCollectionDef", () => {
+    it("defaults name outbox with by-claim and by-failed indexes", () => {
+        expect(outboxCollectionDef()).toEqual({
+            name: "outbox",
+            keyPath: "id",
+            indexes: [
+                { name: "by-claim", keyPath: ["reservedTo", "createdAt"] },
+                { name: "by-failed", keyPath: ["failedAt", "createdAt"] },
+            ],
+        })
+        expect(outboxCollectionDef("jobs").name).toBe("jobs")
+    })
+})
+
+describe("createOutboxStore", () => {
+    testOutboxStore(async () => {
+        let clock = mutableClock()
+        let { store } = await openCollectionOutbox(clock)
+        return { store, clock }
+    })
+
+    it("claim scans by-claim with lte [now, MAX_SAFE_INTEGER] inside transact", async () => {
+        let clock = mutableClock(1000)
+        let { store, db } = await openCollectionOutbox(clock)
+        let col = db.collection<OutboxRow>("outbox")
+        let scan = vi.spyOn(col, "scan")
+        let transact = vi.spyOn(db, "transact")
+        await store.enqueue({ type: "t", payload: {} })
+        await store.claim(5000)
+        expect(transact).toHaveBeenCalledWith(["outbox"], "rw", expect.any(Function))
+        expect(scan).toHaveBeenCalledWith("by-claim", { lte: [1000, Number.MAX_SAFE_INTEGER] })
+        await db.close()
+    })
+
+    it("markFailed sets reservedTo MAX so a by-claim due scan does not return it", async () => {
+        let clock = mutableClock(1000)
+        let { store, db } = await openCollectionOutbox(clock)
+        let col = db.collection<OutboxRow>("outbox")
+        let id = await store.enqueue({ type: "f", payload: {} })
+        await store.claim(1000)
+        await store.markFailed(id, "fatal 400")
+
+        let row = await store.get(id)
+        expect(row).not.toBeNull()
+        expect(row!.failedAt).toBe(1000)
+        expect(row!.reservedTo).toBe(Number.MAX_SAFE_INTEGER)
+        expect(await store.claim(1000)).toBeNull()
+        expect(await store.get(id)).not.toBeNull()
+
+        let due = await col.scan("by-claim", { lte: [clock.now(), Number.MAX_SAFE_INTEGER] })
+        expect(due.map((h) => h.primaryKey)).not.toContain(id)
+
+        let failedHits = await col.scan("by-failed")
+        expect(failedHits.map((h) => h.primaryKey)).toContain(id)
+        await db.close()
+    })
+
+    it("omitted log and clock still enqueue and claim", async () => {
+        let { store, db } = await openCollectionOutbox()
+        let id = await store.enqueue({ type: "t", payload: 1 })
+        let claimed = await store.claim(1000)
+        expect(claimed).toMatchObject({ id, attempts: 1 })
+        await db.close()
+    })
+})
