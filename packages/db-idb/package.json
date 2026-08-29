@@ -1,0 +1,19 @@
+{
+    "name": "@yorozu/db-idb",
+    "version": "0.3.1",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "IndexedDB driver for @yorozu/db",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/db": "workspace:^",
+        "@yorozu/log": "workspace:^"
+    },
+    "devDependencies": {
+        "fake-indexeddb": "6.2.5"
+    }
+}
