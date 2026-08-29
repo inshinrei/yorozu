@@ -8,3 +8,14 @@ export type { MenuPositionX, MenuPositionY, PlaceFixedMenuInput, PlaceFixedMenuR
 
 export { COMPOSER_MENU_GAP_PX, placeAboveAnchor } from "./place-above"
 export type { MenuAlign, AnchorBox, ViewportBox, AboveAnchorPlacement } from "./place-above"
+
+export { MENU_FOCUSABLE_SELECTOR, moveMenuFocus } from "./keyboard"
+
+export { MENU_SUBMENU_DELAY_MS, createSubmenuOpenRegistry, createSubmenuHover } from "./submenu"
+export type { SubmenuAnchor, SubmenuOpenRegistry, SubmenuHover } from "./submenu"
+
+export { MENU_LONG_PRESS_MS, MENU_LONG_PRESS_SWALLOW_MS, bindLongPress } from "./long-press"
+export type { LongPressBinding } from "./long-press"
+
+export { MENU_HISTORY_STATE, isMenuHistoryState, bindHistoryLayer } from "./history"
+export type { HistoryLayer } from "./history"
