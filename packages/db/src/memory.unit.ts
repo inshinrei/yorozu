@@ -111,6 +111,23 @@ describe("openMemoryDb", () => {
         ).rejects.toThrow()
     })
 
+    it("outer transact from inside a transact throws nested, does not hang", async () => {
+        let db = await openMemoryDb(schema)
+        let result = await Promise.race([
+            db
+                .transact(["files"], "rw", async () => {
+                    await db.transact(["files"], "rw", async () => undefined)
+                })
+                .then(
+                    () => "ok" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBeInstanceOf(Error)
+        expect((result as Error).message).toMatch(/nested transact/)
+    })
+
     it("serializes concurrent transact", async () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")

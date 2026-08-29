@@ -739,6 +739,7 @@ class SqliteDb implements Db {
     protected _gated: Map<string, GatedCollection<Row>>
     protected _pending: Pending = new Map()
     protected _lock: SerialQueue = new SerialQueue()
+    protected _inTransact: AsyncLocalStorage<true> = new AsyncLocalStorage<true>()
     protected _inSqlTx = { value: false }
     protected _txMode: { value: TxMode | null } = { value: null }
     protected _txView: Db
@@ -778,27 +779,30 @@ class SqliteDb implements Db {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
-        return this._lock.with(async () => {
-            this._handle.exec("BEGIN IMMEDIATE")
-            this._inSqlTx.value = true
-            this._txMode.value = mode
-            try {
-                let result = await fn(this._txView)
-                if (mode !== "r") this._flushPending()
-                this._handle.exec("COMMIT")
-                return result
-            } catch (err) {
+        if (this._inTransact.getStore()) return Promise.reject(new Error("nested transact is not supported"))
+        return this._lock.with(() =>
+            this._inTransact.run(true, async () => {
+                this._handle.exec("BEGIN IMMEDIATE")
+                this._inSqlTx.value = true
+                this._txMode.value = mode
                 try {
-                    this._handle.exec("ROLLBACK")
-                } catch {
-                    // not in a transaction
+                    let result = await fn(this._txView)
+                    if (mode !== "r") this._flushPending()
+                    this._handle.exec("COMMIT")
+                    return result
+                } catch (err) {
+                    try {
+                        this._handle.exec("ROLLBACK")
+                    } catch {
+                        // not in a transaction
+                    }
+                    throw err
+                } finally {
+                    this._inSqlTx.value = false
+                    this._txMode.value = null
                 }
-                throw err
-            } finally {
-                this._inSqlTx.value = false
-                this._txMode.value = null
-            }
-        })
+            }),
+        )
     }
 
     flush(): Promise<void> {

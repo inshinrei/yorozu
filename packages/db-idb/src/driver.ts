@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import {
     compareIndexKey,
     inRange,
@@ -511,6 +512,7 @@ class IdbDb implements Db {
     protected _pending: Pending = new Map()
     protected _seq: SeqBox = { n: 0 }
     protected _lock: SerialQueue = new SerialQueue()
+    protected _inTransact: AsyncLocalStorage<true> = new AsyncLocalStorage<true>()
     protected _txMode: { value: TxMode | null } = { value: null }
     protected _txView: Db
     protected _onClose: () => void
@@ -550,16 +552,19 @@ class IdbDb implements Db {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
-        return this._lock.with(async () => {
-            this._txMode.value = mode
-            try {
-                let result = await fn(this._txView)
-                if (mode !== "r") await this._flushPending()
-                return result
-            } finally {
-                this._txMode.value = null
-            }
-        })
+        if (this._inTransact.getStore()) return Promise.reject(new Error("nested transact is not supported"))
+        return this._lock.with(() =>
+            this._inTransact.run(true, async () => {
+                this._txMode.value = mode
+                try {
+                    let result = await fn(this._txView)
+                    if (mode !== "r") await this._flushPending()
+                    return result
+                } finally {
+                    this._txMode.value = null
+                }
+            }),
+        )
     }
 
     flush(): Promise<void> {

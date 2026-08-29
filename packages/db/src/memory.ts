@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import { AsyncLock } from "@yorozu/utils"
 import { compareIndexKey, inRange } from "./bounds"
 import type {
@@ -217,6 +218,7 @@ class MemoryDb implements Db {
     readonly schema: DbSchema
     protected _collections: Map<string, MemoryCollection<Record<string, unknown>>>
     protected _lock: AsyncLock = new AsyncLock()
+    protected _inTransact: AsyncLocalStorage<true> = new AsyncLocalStorage<true>()
     protected _txView: Db
     protected _txMode: { value: TxMode | null } = { value: null }
 
@@ -239,14 +241,17 @@ class MemoryDb implements Db {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
-        return this._lock.with(async () => {
-            this._txMode.value = mode
-            try {
-                return await fn(this._txView)
-            } finally {
-                this._txMode.value = null
-            }
-        })
+        if (this._inTransact.getStore()) return Promise.reject(new Error("nested transact is not supported"))
+        return this._lock.with(() =>
+            this._inTransact.run(true, async () => {
+                this._txMode.value = mode
+                try {
+                    return await fn(this._txView)
+                } finally {
+                    this._txMode.value = null
+                }
+            }),
+        )
     }
 
     flush(): Promise<void> {

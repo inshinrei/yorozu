@@ -143,6 +143,25 @@ describe("createSqliteDriver", () => {
         await db.close()
     })
 
+    it("outer transact from inside a transact throws nested, does not hang", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let result = await Promise.race([
+            db
+                .transact(["files"], "rw", async () => {
+                    await db.transact(["files"], "rw", async () => undefined)
+                })
+                .then(
+                    () => "ok" as const,
+                    (err: unknown) => err,
+                ),
+            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500)),
+        ])
+        expect(result).toBeInstanceOf(Error)
+        expect((result as Error).message).toMatch(/nested transact/)
+        await db.close()
+    })
+
     it("drop on :memory: is safe", async () => {
         let driver = createSqliteDriver({ filename: ":memory:" })
         let db = await driver.open(schema)
