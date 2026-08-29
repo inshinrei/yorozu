@@ -102,8 +102,12 @@ describe("indexOfArray", () => {
         let needle = new Uint8Array([2, 3])
         expect(indexOfArray(haystack, needle, -5)).toBe(1)
         expect(indexOfArray(haystack, needle, -2)).toBe(4)
-        expect(lastIndexOfArray(haystack, needle, -1)).toBe(4)
-        expect(lastIndexOfArray(haystack, needle, -3)).toBe(1)
+    })
+
+    it("empty needle uses normalized negative start", () => {
+        let haystack = new Uint8Array([1, 2, 3])
+        let empty = new Uint8Array([])
+        expect(indexOfArray(haystack, empty, -1)).toBe(2)
     })
 })
 
@@ -142,10 +146,15 @@ describe("lastIndexOfArray", () => {
     it("applies native-style negative start", () => {
         let haystack = new Uint8Array([1, 2, 3, 4, 2, 3])
         let needle = new Uint8Array([2, 3])
-        expect(indexOfArray(haystack, needle, -5)).toBe(1)
-        expect(indexOfArray(haystack, needle, -2)).toBe(4)
         expect(lastIndexOfArray(haystack, needle, -1)).toBe(4)
         expect(lastIndexOfArray(haystack, needle, -3)).toBe(1)
+    })
+
+    it("empty needle uses normalized negative start", () => {
+        let haystack = new Uint8Array([1, 2, 3])
+        let empty = new Uint8Array([])
+        expect(lastIndexOfArray(haystack, empty, -1)).toBe(2)
+        expect(lastIndexOfArray(haystack, empty, -100)).toBe(-1)
     })
 })
 

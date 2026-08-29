@@ -197,6 +197,27 @@ describe("createDock", () => {
         expect(panel.style.transform).toBe("")
     })
 
+    it("cancel mid-open does not remount on a later setOpen(false)", async () => {
+        let cancel = vi.fn()
+        animate = createFakeAnimate(() => ({
+            finished: new Promise<void>(() => undefined),
+            cancel,
+        }))
+        let dock = makeDock({mode: "slide"})
+        dock.attach(createFakeEl() as unknown as HTMLElement)
+        let playback = dock.setOpen(true)
+        await flushFrames()
+        playback.cancel()
+        expect(dock.mounted).toBe(false)
+        expect(dock.animating).toBe(false)
+        animate.mockClear()
+        let close = dock.setOpen(false)
+        expect(dock.mounted).toBe(false)
+        expect(dock.animating).toBe(false)
+        expect(animate).not.toHaveBeenCalled()
+        expect(await close.done).toBe(true)
+    })
+
     it("a newer setOpen cancels the previous generation", async () => {
         let cancel = vi.fn()
         animate = createFakeAnimate(() => ({

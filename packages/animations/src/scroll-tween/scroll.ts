@@ -9,7 +9,7 @@ export type ScrollTweenOptions = {
     durationMs?: number
 }
 
-let activeByEl = new WeakMap<HTMLElement, Playback>()
+const activeByEl = new WeakMap<HTMLElement, Playback>()
 
 export function playScrollTween(el: HTMLElement, options: ScrollTweenOptions): Playback {
     activeByEl.get(el)?.cancel()

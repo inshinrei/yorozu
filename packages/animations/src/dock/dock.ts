@@ -198,6 +198,7 @@ export function createDock(config: DockConfig): Dock {
                 animating = false
                 leaving = false
                 mounted = false
+                wantOpen = false
                 clearPanel()
                 clearBackdrop()
             }
