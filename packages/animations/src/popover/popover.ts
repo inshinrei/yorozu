@@ -5,15 +5,27 @@ import type { Playback } from "../core/types"
 export const POPOVER_MS: number = 120
 export const POPOVER_EASING: string = "ease-out"
 export const POPOVER_ORIGIN: string = "center top"
+export const POPOVER_SCALE: number = 0.92
 
-const CLOSED: { transform: string; opacity: string } = { transform: "scale(0.92)", opacity: "0" }
+function closedFrame(scale: number): { transform: string; opacity: string } {
+    return { transform: `scale(${scale})`, opacity: "0" }
+}
+
 const OPEN: { transform: string; opacity: string } = { transform: "scale(1)", opacity: "1" }
 const STYLE_KEYS: readonly string[] = ["will-change"]
+
+export type PopoverConfig = {
+    scale?: number
+    origin?: string
+    durationMs?: number
+    easing?: string
+}
 
 export type PopoverPlayOptions = {
     origin?: string
     durationMs?: number
     easing?: string
+    scale?: number
 }
 
 export type Popover = {
@@ -21,8 +33,11 @@ export type Popover = {
     playClose: (el: HTMLElement, options?: PopoverPlayOptions) => Playback
 }
 
-export function createPopover(): Popover {
-    let lastOrigin = POPOVER_ORIGIN
+export function createPopover(config?: PopoverConfig): Popover {
+    let lastOrigin = config?.origin ?? POPOVER_ORIGIN
+    let lastScale = config?.scale ?? POPOVER_SCALE
+    let defaultDuration = config?.durationMs ?? POPOVER_MS
+    let defaultEasing = config?.easing ?? POPOVER_EASING
     let current: {
         anim: Animation | null
         resolve: (ran: boolean) => void
@@ -38,14 +53,16 @@ export function createPopover(): Popover {
     let play = (el: HTMLElement, opening: boolean, options?: PopoverPlayOptions): Playback => {
         stopCurrent()
         let { playback, resolve, isCancelled } = createPlayback()
-        let durationMs = options?.durationMs ?? POPOVER_MS
-        let easing = options?.easing ?? POPOVER_EASING
+        let durationMs = options?.durationMs ?? defaultDuration
+        let easing = options?.easing ?? defaultEasing
         if (options?.origin != null) lastOrigin = options.origin
+        if (options?.scale != null) lastScale = options.scale
         let origin = options?.origin ?? lastOrigin
+        let closed = closedFrame(options?.scale ?? lastScale)
         applyStyles(el, { "transform-origin": origin })
 
-        let from = opening ? CLOSED : OPEN
-        let to = opening ? OPEN : CLOSED
+        let from = opening ? closed : OPEN
+        let to = opening ? OPEN : closed
 
         if (durationMs <= 0) {
             applyStyles(el, { transform: to.transform, opacity: to.opacity })

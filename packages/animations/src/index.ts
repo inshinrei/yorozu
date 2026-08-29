@@ -67,11 +67,7 @@ export type { ViewSlideConfig, ViewSlide } from "./view-slide/session"
 export { VIEW_SLIDE_SETTLE_SLACK_MS, createViewSlide } from "./view-slide/session"
 
 export type { SlidingIndicator, SlidingIndicatorOptions } from "./sliding-indicator/indicator"
-export {
-    INDICATOR_MS,
-    INDICATOR_EASING,
-    createSlidingIndicator,
-} from "./sliding-indicator/indicator"
+export { INDICATOR_MS, INDICATOR_EASING, createSlidingIndicator } from "./sliding-indicator/indicator"
 
 export type { ReorderAnimKind, OrderDiffByKey } from "./list-reorder/classify"
 export { buildOrderDiff, classifyReorderAnim } from "./list-reorder/classify"
@@ -86,19 +82,11 @@ export {
 export type { Fade, FadeOptions } from "./fade/fade"
 export { FADE_MS, FADE_EASING, createFade } from "./fade/fade"
 
-export type {
-    Dock,
-    DockConfig,
-    DockEdge,
-    DockHandle,
-    DockMode,
-    DockPanelState,
-    DockTransforms,
-} from "./dock/dock"
+export type { Dock, DockConfig, DockEdge, DockHandle, DockMode, DockPanelState, DockTransforms } from "./dock/dock"
 export { DOCK_EASING, DOCK_FADE_OFFSET, DOCK_MS, createDock, dockTransforms } from "./dock/dock"
 
-export type { Popover, PopoverPlayOptions } from "./popover/popover"
-export { POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN, createPopover } from "./popover/popover"
+export type { Popover, PopoverConfig, PopoverPlayOptions } from "./popover/popover"
+export { POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN, POPOVER_SCALE, createPopover } from "./popover/popover"
 
 export type { DigitSlot } from "./digit-flip/slots"
 export {

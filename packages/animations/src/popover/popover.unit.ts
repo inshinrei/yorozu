@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createFakeAnimate } from "../_test/fake-animate"
-import { createPopover, POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN } from "./popover"
+import { createPopover, POPOVER_EASING, POPOVER_MS, POPOVER_ORIGIN, POPOVER_SCALE } from "./popover"
 
 type FakeNode = {
     style: CSSStyleDeclaration
@@ -56,6 +56,7 @@ describe("createPopover", () => {
         expect(POPOVER_MS).toBe(120)
         expect(POPOVER_EASING).toBe("ease-out")
         expect(POPOVER_ORIGIN).toBe("center top")
+        expect(POPOVER_SCALE).toBe(0.92)
         let el = createFakeEl()
         let popover = createPopover()
         let playback = popover.playOpen(el as unknown as HTMLElement)
@@ -136,5 +137,34 @@ describe("createPopover", () => {
         expect(frames[1]).toMatchObject({ transform: "scale(0.92)", opacity: "0" })
         close.cancel()
         expect(await close.done).toBe(false)
+    })
+
+    it("createPopover config scale changes closed keyframes", () => {
+        let el = createFakeEl()
+        let popover = createPopover({ scale: 0.85 })
+        popover.playOpen(el as unknown as HTMLElement)
+        let frames = animate.mock.calls[0]![0]
+        expect(frames).toEqual([
+            { transform: "scale(0.85)", opacity: "0" },
+            { transform: "scale(1)", opacity: "1" },
+        ])
+    })
+
+    it("play options scale is remembered on a later playClose", () => {
+        let el = createFakeEl()
+        let popover = createPopover()
+        popover.playOpen(el as unknown as HTMLElement, { scale: 0.85 })
+        animate.mockClear()
+        popover.playClose(el as unknown as HTMLElement)
+        let frames = animate.mock.calls[0]![0]
+        expect(frames[1]).toMatchObject({ transform: "scale(0.85)", opacity: "0" })
+    })
+
+    it("duration 0 close snaps to the configured scale", async () => {
+        let el = createFakeEl()
+        let popover = createPopover({ scale: 0.85 })
+        expect(await popover.playClose(el as unknown as HTMLElement, { durationMs: 0 }).done).toBe(true)
+        expect(el.style.getPropertyValue("transform")).toBe("scale(0.85)")
+        expect(animate).not.toHaveBeenCalled()
     })
 })
