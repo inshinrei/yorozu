@@ -1,6 +1,6 @@
-import { AsyncLocalStorage } from "node:async_hooks"
 import {
     compareIndexKey,
+    createTxAls,
     inRange,
     type Collection,
     type CollectionDef,
@@ -12,6 +12,7 @@ import {
     type PutOpts,
     type ScanBound,
     type ScanHit,
+    type TxAlsGate,
     type TxMode,
 } from "@yorozu/db"
 import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
@@ -512,7 +513,7 @@ class IdbDb implements Db {
     protected _pending: Pending = new Map()
     protected _seq: SeqBox = { n: 0 }
     protected _lock: SerialQueue = new SerialQueue()
-    protected _inTransact: AsyncLocalStorage<true> = new AsyncLocalStorage<true>()
+    protected _inTransact: TxAlsGate = createTxAls()
     protected _txMode: { value: TxMode | null } = { value: null }
     protected _txView: Db
     protected _onClose: () => void
@@ -552,19 +553,21 @@ class IdbDb implements Db {
         for (let name of names) {
             if (!this._collections.has(name)) throw new Error(`unknown collection: ${name}`)
         }
-        if (this._inTransact.getStore()) return Promise.reject(new Error("nested transact is not supported"))
-        return this._lock.with(() =>
-            this._inTransact.run(true, async () => {
-                this._txMode.value = mode
-                try {
-                    let result = await fn(this._txView)
-                    if (mode !== "r") await this._flushPending()
-                    return result
-                } finally {
-                    this._txMode.value = null
-                }
-            }),
-        )
+        return this._inTransact.enter((als) => {
+            if (als.getStore()) return Promise.reject(new Error("nested transact is not supported"))
+            return this._lock.with(() =>
+                als.run(async () => {
+                    this._txMode.value = mode
+                    try {
+                        let result = await fn(this._txView)
+                        if (mode !== "r") await this._flushPending()
+                        return result
+                    } finally {
+                        this._txMode.value = null
+                    }
+                }),
+            )
+        })
     }
 
     flush(): Promise<void> {

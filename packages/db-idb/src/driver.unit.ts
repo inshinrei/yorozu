@@ -1,8 +1,13 @@
 import "fake-indexeddb/auto"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { DbSchema } from "@yorozu/db"
 import { makeSilentLog } from "@yorozu/log"
 import { createIdbDriver } from "./driver"
+
+let here = dirname(fileURLToPath(import.meta.url))
 
 let schema: DbSchema = {
     name: "t",
@@ -250,6 +255,12 @@ describe("createIdbDriver", () => {
         expect(putSpy).toHaveBeenCalledTimes(1)
         expect(await col.get("b")).toMatchObject({ key: "b" })
         await db.close()
+    })
+
+    it("does not statically import node:async_hooks or node:module", () => {
+        let src = readFileSync(join(here, "driver.ts"), "utf8")
+        expect(src).not.toMatch(/node:async_hooks/)
+        expect(src).not.toMatch(/node:module/)
     })
 
     it("nested transact throws", async () => {

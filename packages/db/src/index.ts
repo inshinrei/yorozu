@@ -13,3 +13,4 @@ export type {
 } from "./types"
 export { compareIndexKey, inRange } from "./bounds"
 export { openMemoryDb } from "./memory"
+export { createTxAls, type TxAls, type TxAlsGate } from "./tx-als"

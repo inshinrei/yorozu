@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import { openMemoryDb } from "./memory"
 import type { DbSchema } from "./types"
+
+let here = dirname(fileURLToPath(import.meta.url))
 
 type ResourceRow = {
     key: string
@@ -203,6 +208,12 @@ describe("openMemoryDb", () => {
         expect(() => db.collection("nope")).toThrow()
         let col = db.collection<ResourceRow>("files")
         await expect(col.scan("nope")).rejects.toThrow()
+    })
+
+    it("does not statically import node:async_hooks or node:module", () => {
+        let src = readFileSync(join(here, "memory.ts"), "utf8")
+        expect(src).not.toMatch(/node:async_hooks/)
+        expect(src).not.toMatch(/node:module/)
     })
 
     it("flush() resolves", async () => {
