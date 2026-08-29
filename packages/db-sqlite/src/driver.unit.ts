@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { existsSync } from "node:fs"
 import Database from "better-sqlite3"
 import { describe, expect, it } from "vitest"
-import type { DbSchema } from "@yorozu/db"
+import { compareIndexKey, type DbSchema } from "@yorozu/db"
 import { makeSilentLog } from "@yorozu/log"
 import { createSqliteDriver } from "./driver"
 
@@ -188,17 +188,17 @@ describe("createSqliteDriver", () => {
         let startedP = new Promise<void>((resolve) => {
             started = resolve
         })
-        let p1 = db.transact(["files"], "rw", async () => {
+        let p1 = db.transact(["files"], "rw", async (inner) => {
             order.push("start-1")
             started()
             await new Promise((r) => setTimeout(r, 20))
-            await col.put(fileRow({ key: "a" }))
+            await inner.collection<FileRow>("files").put(fileRow({ key: "a" }))
             order.push("end-1")
         })
         await startedP
-        let p2 = db.transact(["files"], "rw", async () => {
+        let p2 = db.transact(["files"], "rw", async (inner) => {
             order.push("start-2")
-            await col.put(fileRow({ key: "b" }))
+            await inner.collection<FileRow>("files").put(fileRow({ key: "b" }))
             order.push("end-2")
         })
         await Promise.all([p1, p2])
@@ -211,12 +211,74 @@ describe("createSqliteDriver", () => {
         let db = await driver.open(schema)
         let col = db.collection<FileRow>("files")
         await expect(
-            db.transact(["files"], "rw", async () => {
-                await col.put(fileRow({ key: "a", storedAt: 1 }))
+            db.transact(["files"], "rw", async (inner) => {
+                await inner.collection<FileRow>("files").put(fileRow({ key: "a", storedAt: 1 }))
                 throw new Error("boom")
             }),
         ).rejects.toThrow("boom")
         expect(await col.get("a")).toBeNull()
+        await db.close()
+    })
+
+    it("outside put during transact await is not rolled back with that tx", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        let started!: () => void
+        let startedP = new Promise<void>((resolve) => {
+            started = resolve
+        })
+        let txP = db.transact(["files"], "rw", async (inner) => {
+            await inner.collection<FileRow>("files").put(fileRow({ key: "tx", storedAt: 1 }))
+            started()
+            await new Promise((r) => setTimeout(r, 30))
+            throw new Error("boom")
+        })
+        await startedP
+        let outerP = col.put(fileRow({ key: "outer", storedAt: 2 }))
+        await expect(txP).rejects.toThrow("boom")
+        await outerP
+        expect(await col.get("tx")).toBeNull()
+        expect(await col.get("outer")).toEqual(fileRow({ key: "outer", storedAt: 2 }))
+        await db.close()
+    })
+
+    it("outside delete during transact await is not rolled back with that tx", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put(fileRow({ key: "keep", storedAt: 1 }))
+        let started!: () => void
+        let startedP = new Promise<void>((resolve) => {
+            started = resolve
+        })
+        let txP = db.transact(["files"], "rw", async (inner) => {
+            await inner.collection<FileRow>("files").put(fileRow({ key: "tx", storedAt: 1 }))
+            started()
+            await new Promise((r) => setTimeout(r, 30))
+            throw new Error("boom")
+        })
+        await startedP
+        let delP = col.delete(["keep"])
+        await expect(txP).rejects.toThrow("boom")
+        await delP
+        expect(await col.get("tx")).toBeNull()
+        expect(await col.get("keep")).toBeNull()
+        await db.close()
+    })
+
+    it("string-key scan with limit follows compareIndexKey not SQL UTF-8 order", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<ContactRow>("contacts")
+        let ascii = { id: "a", name: "ascii" }
+        let bmp = { id: "\uFFFF", name: "bmp" }
+        let astral = { id: "\u{10000}", name: "astral" }
+        await col.putMany([bmp, astral, ascii])
+        expect(compareIndexKey("a", "\u{10000}")).toBe(-1)
+        expect(compareIndexKey("\u{10000}", "\uFFFF")).toBe(-1)
+        let hits = await col.scan("__pk", { gte: "a", limit: 2, keysOnly: true })
+        expect(hits.map((h) => h.primaryKey)).toEqual(["a", "\u{10000}"])
         await db.close()
     })
 

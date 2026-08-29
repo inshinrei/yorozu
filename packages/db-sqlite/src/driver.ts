@@ -288,6 +288,7 @@ class SerialQueue {
 class NestedTxDb implements Db {
     constructor(
         protected _inner: Db,
+        protected _unlocked: (name: string) => Collection<Row>,
         protected _flushUnlocked: () => void,
     ) {}
 
@@ -296,7 +297,7 @@ class NestedTxDb implements Db {
     }
 
     collection<T extends Row>(name: string): Collection<T> {
-        return this._inner.collection(name)
+        return this._unlocked(name) as Collection<T>
     }
 
     transact<R>(_names: readonly string[], _mode: TxMode, _fn: (db: Db) => Promise<R>): Promise<R> {
@@ -310,6 +311,53 @@ class NestedTxDb implements Db {
 
     close(): Promise<void> {
         return this._inner.close()
+    }
+}
+
+class GatedCollection<T extends Row> implements Collection<T> {
+    readonly name: string
+
+    constructor(
+        protected _inner: SqliteCollection<T>,
+        protected _lock: SerialQueue,
+    ) {
+        this.name = _inner.name
+    }
+
+    get(key: string): Promise<T | null> {
+        return this._lock.with(() => this._inner.get(key))
+    }
+
+    getMany(keys: readonly string[]): Promise<Array<T | null>> {
+        return this._lock.with(() => this._inner.getMany(keys))
+    }
+
+    put(row: T, opts?: PutOpts): Promise<void> {
+        return this._lock.with(() => this._inner.put(row, opts))
+    }
+
+    putMany(rows: readonly T[], opts?: PutOpts): Promise<void> {
+        return this._lock.with(() => this._inner.putMany(rows, opts))
+    }
+
+    delete(keys: readonly string[]): Promise<void> {
+        return this._lock.with(() => this._inner.delete(keys))
+    }
+
+    clear(): Promise<void> {
+        return this._lock.with(() => this._inner.clear())
+    }
+
+    count(): Promise<number> {
+        return this._lock.with(() => this._inner.count())
+    }
+
+    getAll(): Promise<T[]> {
+        return this._lock.with(() => this._inner.getAll())
+    }
+
+    scan(index: string, bound?: ScanBound): Promise<Array<ScanHit<T>>> {
+        return this._lock.with(() => this._inner.scan(index, bound))
     }
 }
 
@@ -534,7 +582,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         }
 
         let pending = this._colPending()
-        let hasPending = pending !== undefined && pending.size > 0
         let hits: Array<ScanHit<T>> = []
         let frag = boundSql(cols, storedIsArray, bound)
         if (frag.sql !== "0") {
@@ -554,12 +601,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
             if (frag.sql !== "1") whereParts.push(frag.sql)
             let where = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : ""
             let order = `ORDER BY ${cols.join(", ")}${index === "__pk" ? "" : ", pk"}`
-            let limitSql = ""
-            if (!hasPending && bound.limit !== undefined) {
-                limitSql = " LIMIT ?"
-                params.push(Math.max(0, bound.limit))
-            }
-            let sql = `SELECT ${selectList.join(", ")} FROM ${this._table} ${where} ${order}${limitSql}`
+            let sql = `SELECT ${selectList.join(", ")} FROM ${this._table} ${where} ${order}`
             let rows = this._handle.prepare(sql).all(params)
             let valueByPk = new Map<string, Row>()
             for (let r of rows) {
@@ -580,6 +622,11 @@ class SqliteCollection<T extends Row> implements Collection<T> {
             if (!keysOnly && valueByPk.size > 0) this._attachBlobs(valueByPk, [...valueByPk.keys()])
         }
         if (pending && pending.size > 0) hits = this._mergePending(index, bound, hits, pending)
+        hits.sort((a, b) => {
+            let c = compareIndexKey(a.indexKey, b.indexKey)
+            if (c !== 0) return c
+            return compareIndexKey(a.primaryKey, b.primaryKey)
+        })
         if (bound.limit !== undefined) hits = hits.slice(0, Math.max(0, bound.limit))
         return hits
     }
@@ -613,6 +660,7 @@ class SqliteDb implements Db {
     readonly schema: DbSchema
     protected _handle: SqliteHandle
     protected _collections: Map<string, SqliteCollection<Row>>
+    protected _gated: Map<string, GatedCollection<Row>>
     protected _pending: Pending = new Map()
     protected _lock: SerialQueue = new SerialQueue()
     protected _inSqlTx = { value: false }
@@ -625,14 +673,25 @@ class SqliteDb implements Db {
         this._handle = handle
         this._onClose = onClose
         this._collections = new Map()
-        this._txView = new NestedTxDb(this, () => this._flushPending())
+        this._gated = new Map()
+        this._txView = new NestedTxDb(
+            this,
+            (name) => {
+                let col = this._collections.get(name)
+                if (!col) throw new Error(`unknown collection: ${name}`)
+                return col
+            },
+            () => this._flushPending(),
+        )
         for (let def of schema.collections) {
-            this._collections.set(def.name, new SqliteCollection(def, handle, this._pending, this._inSqlTx))
+            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx)
+            this._collections.set(def.name, col)
+            this._gated.set(def.name, new GatedCollection(col, this._lock))
         }
     }
 
     collection<T extends Row>(name: string): Collection<T> {
-        let col = this._collections.get(name)
+        let col = this._gated.get(name)
         if (!col) throw new Error(`unknown collection: ${name}`)
         return col as Collection<T>
     }

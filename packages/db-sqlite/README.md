@@ -30,6 +30,7 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `scan(..., { keysOnly: true })` is `SELECT pk, index columns` only. Never `payload`, never join `__blobs`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` (`[cutoff] < [cutoff, 0]`).
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `transact` commit. `flush()` coalesces by `(collection, pk)`. Sync put batches use better-sqlite3 `db.transaction`.
-- Async `transact`: mutex + `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`. Not `db.transaction(fn)` (that API is sync-only). Nested `transact` throws via a facade. Concurrent `transact` serializes.
+- Async `transact`: mutex + `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`. Not `db.transaction(fn)` (that API is sync-only). Nested `transact` throws via a facade. Concurrent `transact` serializes. Outer `db.collection()` ops queue on the same mutex; only the callback's `db.collection()` joins the SQL tx.
+- Scan `limit` is applied after `inRange` + `compareIndexKey` sort (no SQL `LIMIT`).
 - Collection / index names must match `/^[A-Za-z0-9_-]+$/` and are quoted as `"name"`. Illegal names throw.
 - `drop(schema)` closes tracked connections and `fs.unlink`s the file unless `filename === ":memory:"`.
