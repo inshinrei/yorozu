@@ -1,0 +1,27 @@
+/* Compact default tokens for [data-yorozu-menu]. Override via CSS custom properties. */
+[data-yorozu-menu] {
+    --yorozu-menu-min-width: 13.5rem;
+    --yorozu-menu-radius: 1rem;
+    --yorozu-menu-pad-block: 0.25rem;
+    --yorozu-menu-z: 1000;
+    --yorozu-menu-bg: #ffffffbb;
+    --yorozu-menu-shadow: 0 0.25rem 0.5rem 0.125rem #72727240;
+    --yorozu-menu-color: #000000;
+    --yorozu-menu-font-size: 0.875rem;
+    --yorozu-menu-font-weight: 500;
+    --yorozu-menu-font-family: system-ui, sans-serif;
+    --yorozu-menu-blur: 10px;
+    --yorozu-menu-item-margin: 0.125rem 0.25rem;
+    --yorozu-menu-item-padding: 0.25rem;
+    --yorozu-menu-item-padding-inline-end: 0.75rem;
+    --yorozu-menu-item-radius: 0.75rem;
+    --yorozu-menu-item-gap: 0.5rem;
+    --yorozu-menu-item-min-block: 2rem;
+    --yorozu-menu-item-hover: #000000b2;
+    --yorozu-menu-item-active-scale: 0.98;
+    --yorozu-menu-icon-size: 1.25rem;
+    --yorozu-menu-icon-color: #707579;
+    --yorozu-menu-destructive: #e53935;
+    --yorozu-menu-divider: #0000001a;
+    --yorozu-menu-disabled-opacity: 0.5;
+}

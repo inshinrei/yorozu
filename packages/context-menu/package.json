@@ -9,7 +9,9 @@
     "license": "MIT",
     "description": "framework-agnostic pointer-menu placement, motion, and session",
     "exports": {
-        ".": "./src/index.ts"
+        ".": "./src/index.ts",
+        "./tokens.css": "./src/tokens.css",
+        "./default.css": "./src/default.css"
     },
     "dependencies": {
         "@yorozu/animations": "workspace:^"

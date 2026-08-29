@@ -1,0 +1,78 @@
+@import "./tokens.css";
+
+/* Compact default layout for [data-yorozu-menu]. Host supplies item markup. */
+[data-yorozu-menu] {
+    position: fixed;
+    z-index: var(--yorozu-menu-z);
+    min-width: var(--yorozu-menu-min-width);
+    padding-block: var(--yorozu-menu-pad-block);
+    border-radius: var(--yorozu-menu-radius);
+    color: var(--yorozu-menu-color);
+    font-size: var(--yorozu-menu-font-size);
+    font-weight: var(--yorozu-menu-font-weight);
+    font-family: var(--yorozu-menu-font-family);
+    background: var(--yorozu-menu-bg);
+    box-shadow: var(--yorozu-menu-shadow);
+    backdrop-filter: blur(var(--yorozu-menu-blur));
+    opacity: 0;
+}
+
+[data-yorozu-menu] [role="menuitem"],
+[data-yorozu-menu] [role="menuitemcheckbox"] {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--yorozu-menu-item-gap);
+    margin: var(--yorozu-menu-item-margin);
+    padding: var(--yorozu-menu-item-padding);
+    padding-inline-end: var(--yorozu-menu-item-padding-inline-end);
+    border-radius: var(--yorozu-menu-item-radius);
+    min-block-size: var(--yorozu-menu-item-min-block);
+    outline: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+[data-yorozu-menu] [role="menuitem"]:hover,
+[data-yorozu-menu] [role="menuitem"]:focus,
+[data-yorozu-menu] [role="menuitem"]:focus-visible,
+[data-yorozu-menu] [role="menuitemcheckbox"]:hover,
+[data-yorozu-menu] [role="menuitemcheckbox"]:focus,
+[data-yorozu-menu] [role="menuitemcheckbox"]:focus-visible {
+    outline: none;
+    box-shadow: none;
+    background: var(--yorozu-menu-item-hover);
+}
+
+[data-yorozu-menu] [role="menuitem"]:active:not(.disabled),
+[data-yorozu-menu] [role="menuitemcheckbox"]:active:not(.disabled) {
+    transform: scale(var(--yorozu-menu-item-active-scale));
+}
+
+[data-yorozu-menu] [role="menuitem"].disabled,
+[data-yorozu-menu] [role="menuitem"][aria-disabled="true"],
+[data-yorozu-menu] [role="menuitemcheckbox"].disabled,
+[data-yorozu-menu] [role="menuitemcheckbox"][aria-disabled="true"] {
+    opacity: var(--yorozu-menu-disabled-opacity);
+    pointer-events: none;
+}
+
+[data-yorozu-menu] [role="menuitem"].disabled:hover,
+[data-yorozu-menu] [role="menuitem"][aria-disabled="true"]:hover,
+[data-yorozu-menu] [role="menuitemcheckbox"].disabled:hover,
+[data-yorozu-menu] [role="menuitemcheckbox"][aria-disabled="true"]:hover {
+    background: transparent;
+}
+
+[data-yorozu-menu] .destructive,
+[data-yorozu-menu] [role="menuitem"].destructive,
+[data-yorozu-menu] [role="menuitemcheckbox"].destructive {
+    color: var(--yorozu-menu-destructive);
+}
+
+[data-yorozu-menu] [role="separator"] {
+    height: 1px;
+    margin: 0.25rem 0.5rem;
+    background: var(--yorozu-menu-divider);
+    border: none;
+}
