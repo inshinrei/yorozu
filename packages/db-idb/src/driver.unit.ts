@@ -565,4 +565,31 @@ describe("createIdbDriver", () => {
         expect(continueSpy.mock.calls.length).toBeLessThan(4)
         await db.close()
     })
+
+    it("getMany dedupes repeated cold keys into one store.get", async () => {
+        let driver = createIdbDriver({dbName: nextName()})
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put(fileRow({key: "a"}))
+        let get = vi.spyOn(IDBObjectStore.prototype, "get")
+        expect((await col.getMany(["a", "a", "a"])).map((r) => r?.key)).toEqual(["a", "a", "a"])
+        expect(get.mock.calls.length).toBe(1)
+        await db.close()
+    })
+
+    it("scan limit skips a pending update that moved off the prefix", async () => {
+        let driver = createIdbDriver({dbName: nextName(), deferPut: () => true})
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.putMany([
+            fileRow({key: "a", storedAt: 1}),
+            fileRow({key: "b", storedAt: 2}),
+            fileRow({key: "c", storedAt: 3}),
+            fileRow({key: "d", storedAt: 4}),
+        ])
+        await col.put(fileRow({key: "a", storedAt: 99}), {flush: "batch"})
+        let hits = await col.scan("by-evict", {keysOnly: true, limit: 2})
+        expect(hits.map((h) => h.primaryKey)).toEqual(["b", "c"])
+        await db.close()
+    })
 })

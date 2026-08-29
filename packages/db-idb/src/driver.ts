@@ -347,8 +347,10 @@ class IdbCollection<T extends Row> implements Collection<T> {
         if (keys.length === 0) return []
         let pending = this._colPending()
         let need: string[] = []
+        let seen = new Set<string>()
         for (let key of keys) {
-            if (pending?.has(key)) continue
+            if (pending?.has(key) || seen.has(key)) continue
+            seen.add(key)
             need.push(key)
         }
         let fromStore = new Map<string, T | null>()
@@ -430,7 +432,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     async count(): Promise<number> {
         let pending = this._colPending()
         let countReq!: IDBRequest<number>
-        let probeReqs: Array<{ pk: string; req: IDBRequest }> = []
+        let probeReqs: IDBRequest[] = []
         await runTx(this._idb(), [this.name], "readonly", (tx) => {
             let store = tx.objectStore(this.name)
             countReq = store.count()
@@ -438,12 +440,12 @@ class IdbCollection<T extends Row> implements Collection<T> {
                 for (let pk of pending.keys()) {
                     let req =
                         typeof store.getKey === "function" ? store.getKey(pk) : store.get(pk)
-                    probeReqs.push({ pk, req })
+                    probeReqs.push(req)
                 }
             }
         })
         let extra = 0
-        for (let { req } of probeReqs) {
+        for (let req of probeReqs) {
             if (req.result === undefined) extra++
         }
         return countReq.result + extra

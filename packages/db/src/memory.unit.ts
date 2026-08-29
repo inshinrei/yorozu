@@ -246,4 +246,16 @@ describe("openMemoryDb", () => {
         many[0]!.storedAt = 7
         expect(await col.get("a")).toMatchObject({storedAt: 1})
     })
+
+    it("getAll and scan value hits do not alias stored rows", async () => {
+        let db = await openMemoryDb(schema)
+        let col = db.collection<ResourceRow>("files")
+        await col.put(row({key: "a", storedAt: 1}))
+        let all = await col.getAll()
+        all[0]!.storedAt = 99
+        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        let hits = await col.scan("by-evict")
+        hits[0]!.value!.storedAt = 7
+        expect(await col.get("a")).toMatchObject({storedAt: 1})
+    })
 })
