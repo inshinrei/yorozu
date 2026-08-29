@@ -345,16 +345,27 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
     async getMany(keys: readonly string[]): Promise<Array<T | null>> {
         if (keys.length === 0) return []
-        let reqs: IDBRequest[] = []
-        await runTx(this._idb(), [this.name], "readonly", (tx) => {
-            let store = tx.objectStore(this.name)
-            for (let key of keys) reqs.push(store.get(key))
-        })
         let pending = this._colPending()
-        return keys.map((key, i) => {
+        let need: string[] = []
+        for (let key of keys) {
+            if (pending?.has(key)) continue
+            need.push(key)
+        }
+        let fromStore = new Map<string, T | null>()
+        if (need.length > 0) {
+            let reqs: IDBRequest[] = []
+            await runTx(this._idb(), [this.name], "readonly", (tx) => {
+                let store = tx.objectStore(this.name)
+                for (let key of need) reqs.push(store.get(key))
+            })
+            for (let i = 0; i < need.length; i++) {
+                fromStore.set(need[i]!, (reqs[i]!.result as T | undefined) ?? null)
+            }
+        }
+        return keys.map((key) => {
             let hit = pending?.get(key)
             if (hit) return hit.row as T
-            return (reqs[i]!.result as T | undefined) ?? null
+            return fromStore.get(key) ?? null
         })
     }
 
@@ -418,20 +429,24 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
     async count(): Promise<number> {
         let pending = this._colPending()
-        if (!pending || pending.size === 0) {
-            let req!: IDBRequest<number>
-            await runTx(this._idb(), [this.name], "readonly", (tx) => {
-                req = tx.objectStore(this.name).count()
-            })
-            return req.result
-        }
-        let req!: IDBRequest<IDBValidKey[]>
+        let countReq!: IDBRequest<number>
+        let probeReqs: Array<{ pk: string; req: IDBRequest }> = []
         await runTx(this._idb(), [this.name], "readonly", (tx) => {
-            req = tx.objectStore(this.name).getAllKeys()
+            let store = tx.objectStore(this.name)
+            countReq = store.count()
+            if (pending && pending.size > 0) {
+                for (let pk of pending.keys()) {
+                    let req =
+                        typeof store.getKey === "function" ? store.getKey(pk) : store.get(pk)
+                    probeReqs.push({ pk, req })
+                }
+            }
         })
-        let keys = new Set((req.result ?? []).map((k) => String(k)))
-        for (let pk of pending.keys()) keys.add(pk)
-        return keys.size
+        let extra = 0
+        for (let { req } of probeReqs) {
+            if (req.result === undefined) extra++
+        }
+        return countReq.result + extra
     }
 
     async getAll(): Promise<T[]> {
@@ -456,20 +471,24 @@ class IdbCollection<T extends Row> implements Collection<T> {
         if (index !== "__pk" && !this._indexes.has(index)) throw new Error(`unknown index: ${index}`)
         let range = toIdbKeyRange(bound, this._keyRange)
         let pending = this._colPending()
-        let hasPending = pending !== undefined && pending.size > 0
         let hits: Array<ScanHit<T>> = []
         if (range !== null) {
             let keysOnly = bound.keysOnly === true
-            let limit = hasPending || bound.limit === undefined ? undefined : Math.max(0, bound.limit)
+            let limit = bound.limit === undefined ? undefined : Math.max(0, bound.limit)
             if (limit !== 0) {
                 await runTx(this._idb(), [this.name], "readonly", (tx) => {
                     let store = tx.objectStore(this.name)
                     let source: IDBObjectStore | IDBIndex = index === "__pk" ? store : store.index(index)
                     let req = keysOnly ? source.openKeyCursor(range) : source.openCursor(range)
+                    let live = 0
                     req.onsuccess = () => {
                         let cursor = req.result
                         if (!cursor) return
                         let primaryKey = String(cursor.primaryKey)
+                        if (pending?.has(primaryKey)) {
+                            cursor.continue()
+                            return
+                        }
                         let indexKey = cursor.key as IndexKey
                         if (keysOnly) {
                             hits.push({ primaryKey, indexKey })
@@ -480,7 +499,8 @@ class IdbCollection<T extends Row> implements Collection<T> {
                                 value: (cursor as IDBCursorWithValue).value as T,
                             })
                         }
-                        if (limit !== undefined && hits.length >= limit) return
+                        live++
+                        if (limit !== undefined && live >= limit) return
                         cursor.continue()
                     }
                 })
