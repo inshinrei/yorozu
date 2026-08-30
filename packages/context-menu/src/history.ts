@@ -2,7 +2,7 @@ export const MENU_HISTORY_STATE: { yorozuMenu: 1 } = { yorozuMenu: 1 }
 
 export function isMenuHistoryState(state: unknown, marker?: Record<string, unknown>): boolean {
     if (state == null || typeof state !== "object") return false
-    let expected = marker ?? MENU_HISTORY_STATE
+    let expected: Record<string, unknown> = marker ?? MENU_HISTORY_STATE
     let record = state as Record<string, unknown>
     for (let key of Object.keys(expected)) {
         if (record[key] !== expected[key]) return false
