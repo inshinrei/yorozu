@@ -96,15 +96,22 @@ export function createPriorityWorkQueue(opts?: PriorityWorkQueueOptions): Priori
         if (active.size > maxActive) maxActive = active.size
 
         void (async () => {
+            let reported: Error | undefined
             try {
                 await job.run({ signal: controller.signal })
             } catch (err) {
-                if (isAbortError(err)) return
-                opts?.onError?.(unknownToError(err), job.id)
+                if (!isAbortError(err)) reported = unknownToError(err)
             } finally {
                 active.delete(job.id)
-                pump()
             }
+            if (reported) {
+                try {
+                    opts?.onError?.(reported, job.id)
+                } catch {
+                    // host onError must not reject the worker
+                }
+            }
+            pump()
         })()
     }
 

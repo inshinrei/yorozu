@@ -378,4 +378,58 @@ describe("createPriorityWorkQueue", () => {
         expect(seen[0]).toBeInstanceOf(Error)
         expect(seen[0]!.message).toBe("bad")
     })
+
+    it("onError can re-enqueue the same id after the slot is freed", async () => {
+        let runs: string[] = []
+        let q = createPriorityWorkQueue({
+            concurrency: 1,
+            onError: (_error, id) => {
+                expect(q.isBusy(id)).toBe(false)
+                expect(
+                    q.enqueue({
+                        id,
+                        pri: "background",
+                        run: async () => {
+                            runs.push("retry")
+                        },
+                    }),
+                ).toBe(true)
+            },
+        })
+
+        expect(
+            q.enqueue({
+                id: "job",
+                pri: "background",
+                run: async () => {
+                    runs.push("first")
+                    throw new Error("fail")
+                },
+            }),
+        ).toBe(true)
+
+        await tick()
+        expect(runs).toEqual(["first", "retry"])
+        expect(q.stats.active).toBe(0)
+        expect(q.isBusy("job")).toBe(false)
+    })
+
+    it("onError throw does not reject the worker", async () => {
+        let q = createPriorityWorkQueue({
+            concurrency: 1,
+            onError: () => {
+                throw new Error("handler boom")
+            },
+        })
+        q.enqueue({
+            id: "boom",
+            pri: "background",
+            run: async () => {
+                throw new Error("job boom")
+            },
+        })
+        await tick()
+        expect(q.stats.active).toBe(0)
+        expect(q.isBusy("boom")).toBe(false)
+    })
 })
