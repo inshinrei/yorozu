@@ -8,5 +8,6 @@ export * from "./condition-variable"
 export * from "./deferred"
 export * from "./emitter"
 export * from "./pool"
+export * from "./priority-work-queue"
 export * from "./sleep"
 export { timers }
