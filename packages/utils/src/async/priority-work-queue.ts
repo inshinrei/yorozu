@@ -48,8 +48,15 @@ function emptyLanes(): Record<WorkPri, QueuedJob[]> {
     }
 }
 
+function resolveConcurrency(value: number | undefined): number {
+    if (value === undefined) return 3
+    let n = Math.floor(value)
+    if (!Number.isFinite(n) || n < 1) return 1
+    return n
+}
+
 export function createPriorityWorkQueue(opts?: PriorityWorkQueueOptions): PriorityWorkQueue {
-    let concurrency = Math.max(1, opts?.concurrency ?? 3)
+    let concurrency = resolveConcurrency(opts?.concurrency)
     let lanes = emptyLanes()
     let queuedPri = new Map<string, WorkPri>()
     let active = new Map<string, ActiveJob>()

@@ -432,4 +432,249 @@ describe("createPriorityWorkQueue", () => {
         expect(q.stats.active).toBe(0)
         expect(q.isBusy("boom")).toBe(false)
     })
+
+    it("same-lane re-enqueue moves the job to that lane's tail", async () => {
+        let started: string[] = []
+        let hold = gate()
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+
+        q.enqueue({
+            id: "hold",
+            pri: "visible",
+            run: async () => {
+                started.push("hold")
+                await hold.promise
+            },
+        })
+        await tick()
+
+        q.enqueue({
+            id: "a",
+            pri: "preload",
+            run: async () => {
+                started.push("a-first")
+            },
+        })
+        q.enqueue({
+            id: "b",
+            pri: "preload",
+            run: async () => {
+                started.push("b")
+            },
+        })
+        expect(
+            q.enqueue({
+                id: "a",
+                pri: "preload",
+                run: async () => {
+                    started.push("a-tail")
+                },
+            }),
+        ).toBe(true)
+
+        hold.resolve()
+        await tick()
+        expect(started).toEqual(["hold", "b", "a-tail"])
+    })
+
+    it("preload starts before queued background after a slot frees", async () => {
+        let started: string[] = []
+        let hold = gate()
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+
+        q.enqueue({
+            id: "hold",
+            pri: "visible",
+            run: async () => {
+                started.push("hold")
+                await hold.promise
+            },
+        })
+        await tick()
+        q.enqueue({
+            id: "bg",
+            pri: "background",
+            run: async () => {
+                started.push("bg")
+            },
+        })
+        q.enqueue({
+            id: "p",
+            pri: "preload",
+            run: async () => {
+                started.push("p")
+            },
+        })
+        hold.resolve()
+        await tick()
+        expect(started).toEqual(["hold", "p", "bg"])
+    })
+
+    it("throw with no onError does not reject the worker", async () => {
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+        q.enqueue({
+            id: "boom",
+            pri: "background",
+            run: async () => {
+                throw new Error("job boom")
+            },
+        })
+        await tick()
+        expect(q.stats.active).toBe(0)
+        expect(q.isBusy("boom")).toBe(false)
+    })
+
+    it("cancelAll with concurrency 2 aborts every runner and drops queued", async () => {
+        let started: string[] = []
+        let aborted: string[] = []
+        let q = createPriorityWorkQueue({ concurrency: 2 })
+
+        let runFor =
+            (id: string) =>
+            async ({ signal }: { signal: AbortSignal }) => {
+                started.push(id)
+                let wait = gate()
+                signal.addEventListener("abort", () => {
+                    aborted.push(id)
+                    wait.resolve()
+                })
+                await wait.promise
+            }
+
+        q.enqueue({ id: "a", pri: "preload", run: runFor("a") })
+        q.enqueue({ id: "b", pri: "preload", run: runFor("b") })
+        q.enqueue({
+            id: "c",
+            pri: "preload",
+            run: async () => {
+                started.push("c")
+            },
+        })
+        await tick()
+        expect(started).toEqual(["a", "b"])
+
+        q.cancelAll()
+        expect(aborted.sort()).toEqual(["a", "b"])
+        expect(q.stats.queued).toBe(0)
+        await tick()
+        expect(started).toEqual(["a", "b"])
+        expect(q.stats.active).toBe(0)
+        expect(q.isBusy("c")).toBe(false)
+    })
+
+    it("enqueue of a cancelled running id is ignored until settle", async () => {
+        let runs: string[] = []
+        let wait = gate()
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+
+        q.enqueue({
+            id: "x",
+            pri: "preload",
+            run: async ({ signal }) => {
+                runs.push("first")
+                let done = gate()
+                signal.addEventListener("abort", () => done.resolve())
+                await wait.promise
+                await done.promise
+            },
+        })
+        await tick()
+        expect(q.cancel("x")).toBe(true)
+        expect(q.isBusy("x")).toBe(true)
+        expect(
+            q.enqueue({
+                id: "x",
+                pri: "visible",
+                run: async () => {
+                    runs.push("second")
+                },
+            }),
+        ).toBe(false)
+
+        wait.resolve()
+        await tick()
+        expect(q.isBusy("x")).toBe(false)
+        expect(runs).toEqual(["first"])
+        expect(
+            q.enqueue({
+                id: "x",
+                pri: "visible",
+                run: async () => {
+                    runs.push("after")
+                },
+            }),
+        ).toBe(true)
+        await tick()
+        expect(runs).toEqual(["first", "after"])
+    })
+
+    it("non-finite and fractional concurrency floor to 1; omit still defaults to 3", async () => {
+        let startedNan = 0
+        let nanGates: Array<ReturnType<typeof gate>> = []
+        let nanQ = createPriorityWorkQueue({ concurrency: Number.NaN })
+        for (let i = 0; i < 2; i++) {
+            nanQ.enqueue({
+                id: `n${i}`,
+                pri: "preload",
+                run: async () => {
+                    startedNan++
+                    let g = gate()
+                    nanGates.push(g)
+                    await g.promise
+                },
+            })
+        }
+        await tick()
+        expect(startedNan).toBe(1)
+        expect(nanQ.stats.maxActive).toBe(1)
+        nanGates[0]!.resolve()
+        await tick()
+        nanGates[1]!.resolve()
+        await tick()
+
+        let startedFrac = 0
+        let fracGates: Array<ReturnType<typeof gate>> = []
+        let fracQ = createPriorityWorkQueue({ concurrency: 1.9 })
+        for (let i = 0; i < 3; i++) {
+            fracQ.enqueue({
+                id: `f${i}`,
+                pri: "preload",
+                run: async () => {
+                    startedFrac++
+                    let g = gate()
+                    fracGates.push(g)
+                    await g.promise
+                },
+            })
+        }
+        await tick()
+        expect(startedFrac).toBe(1)
+        expect(fracQ.stats.maxActive).toBe(1)
+        for (let g of fracGates) g.resolve()
+        await tick()
+
+        let infQ = createPriorityWorkQueue({ concurrency: Number.POSITIVE_INFINITY })
+        let infStarted = 0
+        let infGates: Array<ReturnType<typeof gate>> = []
+        for (let i = 0; i < 2; i++) {
+            infQ.enqueue({
+                id: `i${i}`,
+                pri: "preload",
+                run: async () => {
+                    infStarted++
+                    let g = gate()
+                    infGates.push(g)
+                    await g.promise
+                },
+            })
+        }
+        await tick()
+        expect(infStarted).toBe(1)
+        expect(infQ.stats.maxActive).toBe(1)
+        infGates[0]!.resolve()
+        await tick()
+        expect(infStarted).toBe(2)
+        infGates[1]!.resolve()
+        await tick()
+    })
 })
