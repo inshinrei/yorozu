@@ -117,12 +117,13 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
             finishClose()
             return
         }
-        currentPlayback = popover.playClose(el, {
+        let playback = popover.playClose(el, {
             durationMs: durationFor("close"),
             easing: MENU_POPOVER_CLOSE_EASING,
         })
-        void currentPlayback.done.then((ran) => {
-            if (!ran) return
+        currentPlayback = playback
+        void playback.done.then((ran) => {
+            if (!ran || !closing || currentPlayback !== playback) return
             finishClose()
             opts.onClose()
         })
