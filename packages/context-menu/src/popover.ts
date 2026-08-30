@@ -7,5 +7,19 @@ export const MENU_POPOVER_CLOSE_EASING: string = "ease-in"
 export const MENU_POPOVER_SCALE: number = 0.85
 
 export function createMenuPopover(): Popover {
-    return createPopover({ scale: MENU_POPOVER_SCALE })
+    let inner = createPopover({ scale: MENU_POPOVER_SCALE })
+    return {
+        playOpen: (el, options) =>
+            inner.playOpen(el, {
+                durationMs: MENU_POPOVER_OPEN_MS,
+                easing: MENU_POPOVER_OPEN_EASING,
+                ...options,
+            }),
+        playClose: (el, options) =>
+            inner.playClose(el, {
+                durationMs: MENU_POPOVER_CLOSE_MS,
+                easing: MENU_POPOVER_CLOSE_EASING,
+                ...options,
+            }),
+    }
 }

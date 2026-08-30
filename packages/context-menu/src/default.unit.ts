@@ -40,6 +40,7 @@ describe("default compact menu styles", () => {
         for (let name of tokenNames) {
             expect(css).toContain(name)
         }
+        expect(css).toContain("--yorozu-menu-divider-margin: 0.25rem 0.5rem")
     })
 
     it("default.css imports tokens and shares hover/focus wash without focus ring", () => {
@@ -51,6 +52,8 @@ describe("default compact menu styles", () => {
         )
         expect(css).not.toContain("outline: auto")
         expect(css).not.toContain("outline-offset")
+        let rootRule = css.match(/\[data-yorozu-menu\]\s*\{[^}]*\}/)
+        expect(rootRule?.[0]).toContain("outline: none")
     })
 
     it("package.json exports tokens.css and default.css", () => {

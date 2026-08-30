@@ -105,6 +105,10 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
                 el.style.maxHeight = `${placed.maxHeight}px`
                 el.style.overflow = "auto"
             }
+        } else {
+            el.style.removeProperty("--yorozu-menu-max-height")
+            el.style.maxHeight = ""
+            el.style.overflow = ""
         }
         playOpen(placed.origin)
     }
@@ -140,6 +144,13 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
     }
 
     function attach(node: HTMLElement): void {
+        if (el === node) return
+        if (el != null) {
+            document.removeEventListener("pointerdown", onPointerDown, false)
+            document.removeEventListener("keydown", onKeyDown)
+            historyLayer?.release()
+            historyLayer = null
+        }
         el = node
         if (!opts.nested) {
             historyLayer = bindHistoryLayer({ onBack: close, state: opts.historyState })
@@ -177,6 +188,9 @@ export function createMenuSession(opts: MenuSessionOpts): MenuSession {
             el.style.right = `${placed.right ?? 0}px`
             el.style.left = "unset"
         }
+        el.style.removeProperty("--yorozu-menu-max-height")
+        el.style.maxHeight = ""
+        el.style.overflow = ""
         playOpen(placed.origin)
     }
 

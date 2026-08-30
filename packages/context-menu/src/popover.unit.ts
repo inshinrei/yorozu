@@ -135,4 +135,18 @@ describe("createMenuPopover", () => {
         popover.playClose(el as unknown as HTMLElement)
         expect(el.style.getPropertyValue("transform-origin")).toBe("40px 10px")
     })
+
+    it("playOpen without options uses 150ms cubic-bezier; playClose uses 200ms ease-in", () => {
+        let el = createFakeEl()
+        let popover = createMenuPopover()
+        popover.playOpen(el as unknown as HTMLElement)
+        let openOpts = animate.mock.calls[0]![1]!
+        expect(openOpts.duration).toBe(150)
+        expect(openOpts.easing).toBe("cubic-bezier(0.2, 0, 0.2, 1)")
+        animate.mockClear()
+        popover.playClose(el as unknown as HTMLElement)
+        let closeOpts = animate.mock.calls[0]![1]!
+        expect(closeOpts.duration).toBe(200)
+        expect(closeOpts.easing).toBe("ease-in")
+    })
 })

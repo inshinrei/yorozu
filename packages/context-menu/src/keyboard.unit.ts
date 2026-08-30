@@ -35,7 +35,7 @@ describe("moveMenuFocus", () => {
 
     it("exposes the focusable selector verbatim", () => {
         expect(MENU_FOCUSABLE_SELECTOR).toBe(
-            '[role="menuitem"]:not(.disabled), [role="menuitemcheckbox"]:not(.disabled)',
+            '[role="menuitem"]:not(.disabled):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not(.disabled):not([aria-disabled="true"])',
         )
     })
 
@@ -47,6 +47,21 @@ describe("moveMenuFocus", () => {
         moveMenuFocus(root, 1)
         expect(document.activeElement).toBe(last)
 
+        moveMenuFocus(root, -1)
+        expect(document.activeElement).toBe(first)
+    })
+
+    it("skips aria-disabled middle items like .disabled", () => {
+        let ariaDisabled = document.createElement("div")
+        ariaDisabled.setAttribute("role", "menuitem")
+        ariaDisabled.setAttribute("aria-disabled", "true")
+        ariaDisabled.tabIndex = 0
+        root.replaceChildren(first, ariaDisabled, last)
+
+        moveMenuFocus(root, 1)
+        expect(document.activeElement).toBe(first)
+        moveMenuFocus(root, 1)
+        expect(document.activeElement).toBe(last)
         moveMenuFocus(root, -1)
         expect(document.activeElement).toBe(first)
     })

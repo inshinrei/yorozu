@@ -27,7 +27,7 @@ importers:
         specifier: 0.25.12
         version: 0.25.12
       jsdom:
-        specifier: ^30.0.1
+        specifier: 30.0.1
         version: 30.0.1
       prettier:
         specifier: 3.8.3

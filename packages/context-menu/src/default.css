@@ -15,6 +15,7 @@
     box-shadow: var(--yorozu-menu-shadow);
     backdrop-filter: blur(var(--yorozu-menu-blur));
     opacity: 0;
+    outline: none;
 }
 
 [data-yorozu-menu] [role="menuitem"],

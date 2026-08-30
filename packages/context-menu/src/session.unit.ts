@@ -190,9 +190,91 @@ describe("createMenuSession", () => {
         session.placePointer({ x: 200, y: 90 })
         expect(el.style.left).toBe("203px")
         expect(el.style.top).toBe("90px")
+        expect(onClose).not.toHaveBeenCalled()
         document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
         await flush()
-        expect(onClose).toHaveBeenCalled()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("close then placeAbove same turn skips onClose", async () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 })
+        session.close()
+        session.placeAbove({ bottom: 108, left: 40, right: undefined, origin: "bottom left" })
+        await flush()
+        expect(onClose).not.toHaveBeenCalled()
+        expect(el.style.bottom).toBe("108px")
+        expect(el.style.left).toBe("40px")
+        document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+        await flush()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("duration-0 close then placeAbove same turn skips onClose", async () => {
+        session = createMenuSession({ onClose, getDurationMs: () => 0 })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 })
+        session.close()
+        session.placeAbove({ bottom: 108, left: 40, right: undefined, origin: "bottom left" })
+        await flush()
+        expect(onClose).not.toHaveBeenCalled()
+        expect(el.style.bottom).toBe("108px")
+        expect(el.style.left).toBe("40px")
+        document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
+        await flush()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("placePointer without withMaxHeight clears leftover max-height", () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 }, { withMaxHeight: true })
+        let maxHeight = `${2000 - MENU_MAX_HEIGHT_BOTTOM_MARGIN_PX}px`
+        expect(el.style.getPropertyValue("--yorozu-menu-max-height")).toBe(maxHeight)
+        expect(el.style.maxHeight).toBe(maxHeight)
+        expect(el.style.overflow).toBe("auto")
+        session.placePointer({ x: 200, y: 90 })
+        expect(el.style.getPropertyValue("--yorozu-menu-max-height")).toBe("")
+        expect(el.style.maxHeight).toBe("")
+        expect(el.style.overflow).toBe("")
+    })
+
+    it("placeAbove clears leftover max-height", () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        session.placePointer({ x: 120, y: 80 }, { withMaxHeight: true })
+        session.placeAbove({ bottom: 108, left: 40, right: undefined, origin: "bottom left" })
+        expect(el.style.getPropertyValue("--yorozu-menu-max-height")).toBe("")
+        expect(el.style.maxHeight).toBe("")
+        expect(el.style.overflow).toBe("")
+    })
+
+    it("attach same node is idempotent; other node rebinds history", () => {
+        session = createMenuSession({ onClose })
+        session.attach(el)
+        expect(history.pushState).toHaveBeenCalledTimes(1)
+        session.attach(el)
+        expect(history.pushState).toHaveBeenCalledTimes(1)
+        expect(history.go).not.toHaveBeenCalled()
+
+        Object.defineProperty(history, "state", {
+            configurable: true,
+            get: () => MENU_HISTORY_STATE,
+        })
+        let other = document.createElement("div")
+        other.setAttribute("data-yorozu-menu", "")
+        other.tabIndex = -1
+        installSize(other, size)
+        document.body.append(other)
+        try {
+            session.attach(other)
+            expect(history.go).toHaveBeenCalledWith(-1)
+            expect(history.pushState).toHaveBeenCalledTimes(2)
+        } finally {
+            other.remove()
+            Reflect.deleteProperty(history, "state")
+        }
     })
 
     it("duration-0 close then placePointer same turn skips onClose", async () => {

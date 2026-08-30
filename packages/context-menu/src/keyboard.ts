@@ -1,5 +1,5 @@
 export const MENU_FOCUSABLE_SELECTOR: string =
-    '[role="menuitem"]:not(.disabled), [role="menuitemcheckbox"]:not(.disabled)'
+    '[role="menuitem"]:not(.disabled):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not(.disabled):not([aria-disabled="true"])'
 
 export function moveMenuFocus(root: HTMLElement, direction: 1 | -1): void {
     let items = Array.from(root.querySelectorAll(MENU_FOCUSABLE_SELECTOR)) as HTMLElement[]
