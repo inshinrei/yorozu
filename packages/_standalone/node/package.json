@@ -28,6 +28,7 @@
         "ws": "8.20.1"
     },
     "yorozu": {
-        "jsr": "skip"
+        "jsr": "skip",
+        "standalone": true
     }
 }

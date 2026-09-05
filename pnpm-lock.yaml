@@ -62,7 +62,7 @@ importers:
     devDependencies:
       '@yorozu/io':
         specifier: workspace:^
-        version: link:../../io
+        version: link:../io
       tough-cookie:
         specifier: 6.0.2
         version: 6.0.2
@@ -75,6 +75,44 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.3.6
+
+  packages/_standalone/io:
+    dependencies:
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../../utils
+
+  packages/_standalone/net:
+    dependencies:
+      '@yorozu/io':
+        specifier: workspace:^
+        version: link:../io
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../../utils
+    devDependencies:
+      ipaddr.js:
+        specifier: 2.3.0
+        version: 2.3.0
+
+  packages/_standalone/node:
+    dependencies:
+      '@yorozu/io':
+        specifier: workspace:^
+        version: link:../io
+      '@yorozu/net':
+        specifier: workspace:^
+        version: link:../net
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../../utils
+    devDependencies:
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+      ws:
+        specifier: 8.20.1
+        version: 8.20.1
 
   packages/animations: {}
 
@@ -183,49 +221,11 @@ importers:
         specifier: 9.6.0
         version: 9.6.0
 
-  packages/io:
-    dependencies:
-      '@yorozu/utils':
-        specifier: workspace:^
-        version: link:../utils
-
   packages/log:
     dependencies:
       halua:
         specifier: 5.0.0
         version: 5.0.0
-
-  packages/net:
-    dependencies:
-      '@yorozu/io':
-        specifier: workspace:^
-        version: link:../io
-      '@yorozu/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      ipaddr.js:
-        specifier: 2.3.0
-        version: 2.3.0
-
-  packages/node:
-    dependencies:
-      '@yorozu/io':
-        specifier: workspace:^
-        version: link:../io
-      '@yorozu/net':
-        specifier: workspace:^
-        version: link:../net
-      '@yorozu/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      '@types/ws':
-        specifier: 8.18.1
-        version: 8.18.1
-      ws:
-        specifier: 8.20.1
-        version: 8.20.1
 
   packages/outbox:
     dependencies:

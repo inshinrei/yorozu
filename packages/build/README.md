@@ -4,7 +4,7 @@ Build and release toolkit for the yorozu monorepo. It discovers workspace packag
 
 ## How this repo uses it
 
-The root `package.json` `version` is the source of truth for every managed package (`@yorozu/utils`, `@yorozu/io`, `@yorozu/net`, `@yorozu/node`, `@yorozu/build`).
+The root `package.json` `version` is the source of truth for every managed package (`@yorozu/utils`, `@yorozu/build`, and the other non-standalone workspace packages).
 
 ```sh
 pnpm build          # build every npm-publishable package (including standalone)
@@ -17,7 +17,7 @@ pnpm release        # bump, build, publish to npm, commit, and tag
 
 ### Standalone packages
 
-`@yorozu/fetch` sets `yorozu.standalone: true` and keeps its own version. It is still built and published by the same `release` command, but it is not rewritten to the shared root version.
+`@yorozu/fetch`, `@yorozu/io`, `@yorozu/net`, and `@yorozu/node` set `yorozu.standalone: true` and keep their own versions. They are still built and published by the same `release` command, but they are not rewritten to the shared root version.
 
 ## CLI
 
