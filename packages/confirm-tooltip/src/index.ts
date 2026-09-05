@@ -12,3 +12,9 @@ export {
     setLastConfirmAnchor,
     type ConfirmAnchor,
 } from "./anchor"
+export {
+    CONFIRM_TOOLTIP_HISTORY_STATE,
+    CONFIRM_TOOLTIP_PENDING_HISTORY_KEYS,
+    bindHistoryWhenIdle,
+    isPendingOverlayHistory,
+} from "./history"
