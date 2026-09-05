@@ -1,0 +1,12 @@
+{
+    "name": "@yorozu/sortable",
+    "version": "0.5.2",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic pointer drag session for reordering lists",
+    "exports": {
+        ".": "./src/index.ts"
+    }
+}
