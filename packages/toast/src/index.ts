@@ -1,3 +1,4 @@
+export { attachToastRoot } from "./attach"
 export { bindToastItem } from "./bind"
 export {
     TOAST_DURATION_MS,

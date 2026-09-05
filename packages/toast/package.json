@@ -9,6 +9,8 @@
     "license": "MIT",
     "description": "framework-agnostic toast session",
     "exports": {
-        ".": "./src/index.ts"
+        ".": "./src/index.ts",
+        "./tokens.css": "./src/tokens.css",
+        "./default.css": "./src/default.css"
     }
 }

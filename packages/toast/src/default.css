@@ -1,0 +1,78 @@
+@import "./tokens.css";
+
+/* Optional default layout for toast. Hosts with their own theme skip this file. */
+[data-yorozu-toast-root] {
+    position: fixed;
+    bottom: var(--yorozu-toast-inset);
+    left: var(--yorozu-toast-inset);
+    display: flex;
+    flex-direction: column;
+    gap: var(--yorozu-toast-gap);
+    z-index: var(--yorozu-toast-z);
+    max-inline-size: var(--yorozu-toast-max-inline);
+    pointer-events: none;
+}
+
+[data-yorozu-toast] {
+    pointer-events: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--yorozu-toast-item-gap);
+    min-block-size: var(--yorozu-toast-min-block);
+    padding: var(--yorozu-toast-padding);
+    border-radius: var(--yorozu-toast-radius);
+    color: var(--yorozu-toast-color);
+    font-family: var(--yorozu-toast-font-family);
+    font-size: var(--yorozu-toast-font-size);
+    line-height: var(--yorozu-toast-line);
+    background: var(--yorozu-toast-bg);
+    backdrop-filter: blur(var(--yorozu-toast-blur)) saturate(var(--yorozu-toast-saturate));
+    -webkit-backdrop-filter: blur(var(--yorozu-toast-blur)) saturate(var(--yorozu-toast-saturate));
+    border: var(--yorozu-toast-border);
+    box-shadow: var(--yorozu-toast-shadow);
+    outline: none;
+    animation: yorozu-toast-enter var(--yorozu-toast-enter-ms) cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    transition:
+        opacity var(--yorozu-toast-exit-ms) cubic-bezier(0.4, 0, 0.2, 1),
+        transform var(--yorozu-toast-exit-ms) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-yorozu-toast].exiting {
+    opacity: 0;
+    transform: translateY(1.25rem) scale(0.96);
+    pointer-events: none;
+}
+
+[data-yorozu-toast-content] {
+    flex: 1;
+    user-select: text;
+}
+
+[data-yorozu-toast-close] {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--yorozu-toast-close-color);
+    font-size: var(--yorozu-toast-close-size);
+    line-height: 1;
+    cursor: pointer;
+}
+
+[data-yorozu-toast-close]:hover {
+    color: var(--yorozu-toast-close-hover);
+}
+
+[data-yorozu-toast][data-permanent] [data-yorozu-toast-close] {
+    display: none;
+}
+
+@keyframes yorozu-toast-enter {
+    from {
+        opacity: 0;
+        transform: translateY(1.875rem) scale(0.95);
+    }
+}

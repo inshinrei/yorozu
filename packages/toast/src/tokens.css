@@ -1,0 +1,40 @@
+/* Optional iOS liquid-glass tokens for toast. Override via CSS custom properties. */
+[data-yorozu-toast-root],
+[data-yorozu-toast] {
+    --yorozu-toast-z: 1200;
+    --yorozu-toast-inset: 0.5rem;
+    --yorozu-toast-gap: 0.75rem;
+    --yorozu-toast-max-inline: 90vw;
+    --yorozu-toast-radius: 1rem;
+    --yorozu-toast-padding: 1rem 1.25rem;
+    --yorozu-toast-min-block: 3.25rem;
+    --yorozu-toast-item-gap: 0.75rem;
+    --yorozu-toast-color: #000000;
+    --yorozu-toast-font-family: system-ui, -apple-system, sans-serif;
+    --yorozu-toast-font-size: 0.9375rem;
+    --yorozu-toast-line: 1.4;
+    --yorozu-toast-bg: rgba(255, 255, 255, 0.72);
+    --yorozu-toast-blur: 20px;
+    --yorozu-toast-saturate: 180%;
+    --yorozu-toast-border: 1px solid rgba(0, 0, 0, 0.08);
+    --yorozu-toast-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.2), 0 8px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --yorozu-toast-close-color: #000000;
+    --yorozu-toast-close-hover: rgba(0, 0, 0, 0.55);
+    --yorozu-toast-close-size: 1.375rem;
+    --yorozu-toast-enter-ms: 400ms;
+    --yorozu-toast-exit-ms: 300ms;
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-yorozu-toast-root],
+    [data-yorozu-toast] {
+        --yorozu-toast-color: #ffffff;
+        --yorozu-toast-bg: rgba(30, 30, 30, 0.72);
+        --yorozu-toast-border: 1px solid rgba(255, 255, 255, 0.12);
+        --yorozu-toast-shadow:
+            0 4px 16px rgba(0, 0, 0, 0.4), 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        --yorozu-toast-close-color: #ffffff;
+        --yorozu-toast-close-hover: rgba(255, 255, 255, 0.65);
+    }
+}
