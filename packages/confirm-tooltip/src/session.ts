@@ -66,11 +66,17 @@ export function createConfirmTooltipSession(opts: ConfirmTooltipSessionOpts): Co
         rafId = null
     }
 
+    function setClosingClass(on: boolean): void {
+        if (el == null) return
+        el.classList.toggle("closing", on)
+    }
+
     function resetClosing(): void {
         if (!closing) return
         currentPlayback?.cancel()
         currentPlayback = null
         closing = false
+        setClosingClass(false)
     }
 
     function finishClose(): void {
@@ -125,6 +131,7 @@ export function createConfirmTooltipSession(opts: ConfirmTooltipSessionOpts): Co
         if (closing) return
         closing = true
         cancelRaf()
+        setClosingClass(true)
         if (el == null) {
             finishClose()
             opts.onClose()
@@ -163,7 +170,15 @@ export function createConfirmTooltipSession(opts: ConfirmTooltipSessionOpts): Co
 
     function attach(node: HTMLElement): void {
         if (el === node) return
+        currentPlayback?.cancel()
+        currentPlayback = null
+        cancelRaf()
         unbindDocument()
+        if (el != null) {
+            el.classList.remove("closing")
+            historyLayer?.release()
+            historyLayer = null
+        }
         el = node
         closing = false
         bindHistory()
@@ -177,6 +192,7 @@ export function createConfirmTooltipSession(opts: ConfirmTooltipSessionOpts): Co
         resetClosing()
         cancelRaf()
         if (el == null) return
+        if (historyLayer == null) bindHistory()
         if (el.offsetWidth === 0 || el.offsetHeight === 0) {
             rafId = requestAnimationFrame(() => {
                 rafId = null
@@ -191,6 +207,7 @@ export function createConfirmTooltipSession(opts: ConfirmTooltipSessionOpts): Co
         currentPlayback?.cancel()
         currentPlayback = null
         cancelRaf()
+        setClosingClass(false)
         unbindDocument()
         historyLayer?.release()
         historyLayer = null

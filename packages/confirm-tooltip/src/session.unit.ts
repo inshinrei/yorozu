@@ -238,4 +238,85 @@ describe("createConfirmTooltipSession", () => {
         session.attach(el)
         expect(history.pushState).toHaveBeenCalledWith({ hostConfirm: 1 }, "")
     })
+
+    it("canClose false ignores Escape when listenEsc is true", async () => {
+        let allow = false
+        session = createConfirmTooltipSession({
+            onClose,
+            listenEsc: true,
+            canClose: () => allow,
+        })
+        session.attach(el)
+        session.place({ x: 400, y: 100 })
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        await flush()
+        expect(onClose).not.toHaveBeenCalled()
+        allow = true
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        await flush()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("close adds closing class; resetClosing on place removes it", async () => {
+        session = createConfirmTooltipSession({ onClose })
+        session.attach(el)
+        session.place({ x: 400, y: 100 })
+        expect(el.classList.contains("closing")).toBe(false)
+        session.close()
+        expect(el.classList.contains("closing")).toBe(true)
+        session.place({ x: 500, y: 120 })
+        expect(el.classList.contains("closing")).toBe(false)
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it("destroy removes closing class and does not call onClose", () => {
+        session = createConfirmTooltipSession({ onClose })
+        session.attach(el)
+        session.place({ x: 400, y: 100 })
+        session.close()
+        expect(el.classList.contains("closing")).toBe(true)
+        session.destroy()
+        expect(el.classList.contains("closing")).toBe(false)
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it("attach other node cancels in-flight close and does not call onClose", async () => {
+        session = createConfirmTooltipSession({ onClose })
+        session.attach(el)
+        session.place({ x: 400, y: 100 })
+        session.close()
+        let other = document.createElement("div")
+        other.setAttribute("data-yorozu-confirm", "")
+        other.tabIndex = -1
+        installSize(other, size)
+        document.body.append(other)
+        try {
+            session.attach(other)
+            await flush()
+            expect(onClose).not.toHaveBeenCalled()
+            expect(el.classList.contains("closing")).toBe(false)
+            session.place({ x: 400, y: 100 })
+            expect(other.style.left).toBe("300px")
+            expect(other.style.top).toBe("100px")
+        } finally {
+            other.remove()
+        }
+    })
+
+    it("place after a completed close rebinds history", async () => {
+        Object.defineProperty(history, "state", { configurable: true, get: () => null })
+        let pushSpy = history.pushState as unknown as ReturnType<typeof vi.fn>
+        session = createConfirmTooltipSession({ onClose, getDurationMs: () => 0 })
+        session.attach(el)
+        session.place({ x: 400, y: 100 })
+        expect(pushSpy).toHaveBeenCalledTimes(1)
+        session.close()
+        await flush()
+        expect(onClose).toHaveBeenCalledTimes(1)
+        pushSpy.mockClear()
+        session.place({ x: 500, y: 120 })
+        expect(el.style.left).toBe("400px")
+        expect(el.style.top).toBe("120px")
+        expect(pushSpy).toHaveBeenCalledTimes(1)
+    })
 })
