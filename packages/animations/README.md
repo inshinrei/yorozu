@@ -12,14 +12,14 @@ Import from the package root:
 
 ```ts
 import {
-  createSharedElement,
-  playSharedElement,
-  createViewSlide,
-  createSlidingIndicator,
-  createListReorder,
-  prefersReducedMotion,
-  canAnimate,
-  resolveViewSlideMode,
+    createSharedElement,
+    playSharedElement,
+    createViewSlide,
+    createSlidingIndicator,
+    createListReorder,
+    prefersReducedMotion,
+    canAnimate,
+    resolveViewSlideMode,
 } from "@yorozu/animations"
 ```
 
@@ -41,11 +41,11 @@ const from: Rect = thumb.getBoundingClientRect()
 const to: Rect = stage.getBoundingClientRect()
 
 const playback = se.play({
-  host: document.body,
-  from,
-  to,
-  imageUrl: thumb.src,
-  hideTarget: stage,
+    host: document.body,
+    from,
+    to,
+    imageUrl: thumb.src,
+    hideTarget: stage,
 })
 // playback?.done is Promise<boolean> — true if finished, false if cancelled
 // se.cancel() aborts an in-flight clone
@@ -59,19 +59,14 @@ const playback = se.play({
 
 Three playback levels. The OS `prefers-reduced-motion` query is **seed only** — after the host stores a pick, that value owns playback.
 
-| Level | Meaning |
-| --- | --- |
-| `low` | no motion (instant switches) |
-| `med` | softer transitions |
-| `high` | full transitions |
+| Level  | Meaning                      |
+| ------ | ---------------------------- |
+| `low`  | no motion (instant switches) |
+| `med`  | softer transitions           |
+| `high` | full transitions             |
 
 ```ts
-import {
-  defaultAnimationLevel,
-  canAnimate,
-  resolveViewSlideMode,
-  prefersReducedMotion,
-} from "@yorozu/animations"
+import { defaultAnimationLevel, canAnimate, resolveViewSlideMode, prefersReducedMotion } from "@yorozu/animations"
 
 let level = stored ?? defaultAnimationLevel(prefersReducedMotion())
 // first-run seed: med when the OS asks for reduce, otherwise high
@@ -92,9 +87,9 @@ import { createViewSlide, slideDirectionByIndex, resolveViewSlideMode } from "@y
 
 const items = [{ id: "a" }, { id: "b" }, { id: "c" }]
 const slide = createViewSlide({
-  getMode: () => resolveViewSlideMode(level, "stack"),
-  getDirection: (from, to) => slideDirectionByIndex(from, to, items),
-  mountPolicy: "active-plus-leaving", // or "keep-visited"
+    getMode: () => resolveViewSlideMode(level, "stack"),
+    getDirection: (from, to) => slideDirectionByIndex(from, to, items),
+    mountPolicy: "active-plus-leaving", // or "keep-visited"
 })
 
 // Render only keys in slide.mountedKeys, then:
@@ -113,10 +108,10 @@ Track an underline (or similar) under the active control. Size snaps; only posit
 import { createSlidingIndicator } from "@yorozu/animations"
 
 const indicator = createSlidingIndicator({
-  getTrack: () => trackEl,
-  getIndicator: () => indicatorEl,
-  getActive: () => activeTabEl,
-  enabled: () => !prefersReducedMotion(),
+    getTrack: () => trackEl,
+    getIndicator: () => indicatorEl,
+    getActive: () => activeTabEl,
+    enabled: () => !prefersReducedMotion(),
 })
 
 // After the active item changes (and layout has updated):
@@ -133,49 +128,55 @@ Index-based FLIP for fixed-height lists. Geometry is `delta = -orderDiff * itemH
 import { createListReorder } from "@yorozu/animations"
 
 const reorder = createListReorder<Item>({
-  getItemHeight: () => 48,
-  getKey: (item) => item.id,
-  isEnabled: () => true,
-  isReduced: () => prefersReducedMotion(),
-  isSuppressed: () => isDragging,
+    getItemHeight: () => 48,
+    getKey: (item) => item.id,
+    isEnabled: () => true,
+    isReduced: () => prefersReducedMotion(),
+    isSuppressed: () => isDragging,
+    // Optional: FLIP a key from a host-supplied overlay translateY (skips classify).
+    getFromTranslateY: (key) => overlayByKey.get(key),
 })
 
 // Per mounted row:
 const handle = reorder.register(rowEl, item.id)
 // After the order changes:
 reorder.sync(items)
+// One-shot map wins for that sync over getFromTranslateY for keys it has:
+reorder.sync(items, { fromTranslateY: new Map([[droppedKey, px]]) })
 // handle.destroy() when the row leaves the window
 ```
+
+Host computes `px`; the package does not measure layout. `px` is CSS `translateY` — positive is down from the post-layout slot. Override plays only when `|px| > LIST_REORDER_EPSILON_PX`. Use `isSuppressed` during an active drag so baseline advances without FLIP.
 
 Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the host needs the same majority/minority rules outside the controller.
 
 ## Motion catalog
 
-| Name | API | Notes |
-| --- | --- | --- |
-| Intensity | `AnimationLevel` | `low` / `med` / `high`; OS seed-only |
-| Stack slide | `createViewSlide` `push` | Full-width 100% translate |
-| Soft slide | `createViewSlide` `crossfade` | ±1.5rem + opacity |
-| Cover slide | `createViewSlide` `cover` | Scale-out leave + 200% enter (list-layer open/close) |
-| Peek slide | `createViewSlide` `peek` | Incoming full-width; outgoing ~20% back + dim |
-| Lift | `createViewSlide` `lift` | Vertical `translateY` ±100% |
-| Zoom | `createViewSlide` `zoom` | Scale 1.1 / 0.95 + short opacity |
-| Reveal | `createViewSlide` `reveal` | `clip-path` inset wipe |
-| Shared element | `createSharedElement` | Thumb ↔ stage flight |
-| Sliding indicator | `createSlidingIndicator` | Size snap, position tween |
-| List reorder | `createListReorder` | Index FLIP, fixed height |
-| Dock | `createDock` | Edge open/close + backdrop fade |
-| Fade | `createFade` | Opacity-only show/hide |
-| Popover | `createPopover` | Scale + fade from an origin |
-| Digit flip | `buildDigitSlots` / `playDigitFlip` | Right-aligned slots + `rotateX` |
-| Presence pop | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N |
-| Send flight | `playSendFlight` | Clone from an origin to a list insert |
-| Swipe reveal | `createSwipeReveal` | Pointer rubber + release tween |
-| Scroll tween | `playScrollTween` | Animate `scrollLeft` / `scrollTop` |
-| Ripple | `playRipple` | Touch ink at pointer |
-| Pinch zoom | `createPinchZoom` | Clamp / origin zoom; pan when scale > 1 |
-| Waveform | `decodeWaveform` / `fitWaveform` | Packed 5-bit samples, resampled bars |
-| Spoiler | `createSpoiler` | Dot-field overlay; reveal fades it out |
+| Name              | API                                     | Notes                                                |
+| ----------------- | --------------------------------------- | ---------------------------------------------------- |
+| Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                 |
+| Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                            |
+| Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                    |
+| Cover slide       | `createViewSlide` `cover`               | Scale-out leave + 200% enter (list-layer open/close) |
+| Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim        |
+| Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                          |
+| Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                     |
+| Reveal            | `createViewSlide` `reveal`              | `clip-path` inset wipe                               |
+| Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                 |
+| Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                            |
+| List reorder      | `createListReorder`                     | Index FLIP, fixed height                             |
+| Dock              | `createDock`                            | Edge open/close + backdrop fade                      |
+| Fade              | `createFade`                            | Opacity-only show/hide                               |
+| Popover           | `createPopover`                         | Scale + fade from an origin                          |
+| Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`                      |
+| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N                               |
+| Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                |
+| Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                       |
+| Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                   |
+| Ripple            | `playRipple`                            | Touch ink at pointer                                 |
+| Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1              |
+| Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                 |
+| Spoiler           | `createSpoiler`                         | Dot-field overlay; reveal fades it out               |
 
 ## Reduced motion
 

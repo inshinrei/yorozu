@@ -71,7 +71,7 @@ export { INDICATOR_MS, INDICATOR_EASING, createSlidingIndicator } from "./slidin
 
 export type { ReorderAnimKind, OrderDiffByKey } from "./list-reorder/classify"
 export { buildOrderDiff, classifyReorderAnim } from "./list-reorder/classify"
-export type { ListReorder } from "./list-reorder/reorder"
+export type { ListReorder, ListReorderSyncOptions } from "./list-reorder/reorder"
 export {
     LIST_REORDER_MS,
     LIST_REORDER_EASING,
