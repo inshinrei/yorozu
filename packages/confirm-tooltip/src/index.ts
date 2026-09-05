@@ -18,3 +18,13 @@ export {
     bindHistoryWhenIdle,
     isPendingOverlayHistory,
 } from "./history"
+export {
+    CONFIRM_TOOLTIP_CLOSE_MS,
+    CONFIRM_TOOLTIP_INSIDE_SELECTOR,
+    CONFIRM_TOOLTIP_OPEN_MS,
+    CONFIRM_TOOLTIP_POINTER_NUDGE_PX,
+    CONFIRM_TOOLTIP_SCALE,
+    createConfirmTooltipSession,
+    type ConfirmTooltipSession,
+    type ConfirmTooltipSessionOpts,
+} from "./session"
