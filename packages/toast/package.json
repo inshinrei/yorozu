@@ -1,0 +1,14 @@
+{
+    "name": "@yorozu/toast",
+    "version": "0.5.2",
+    "type": "module",
+    "sideEffects": [
+        "*.css"
+    ],
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic toast session",
+    "exports": {
+        ".": "./src/index.ts"
+    }
+}
