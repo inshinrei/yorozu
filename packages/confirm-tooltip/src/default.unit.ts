@@ -43,6 +43,11 @@ describe("default iOS liquid-glass confirm styles", () => {
         for (let name of tokenNames) {
             expect(css).toContain(name)
         }
+        expect(css).toContain("--yorozu-confirm-z: 1100")
+        expect(css).toContain("--yorozu-confirm-blur: 20px")
+        expect(css).toContain("--yorozu-confirm-saturate: 180%")
+        expect(css).toContain("--yorozu-confirm-danger-bg: #ff3b30")
+        expect(css).toContain("--yorozu-confirm-bg: rgba(255, 255, 255, 0.72)")
         expect(css).toContain("prefers-color-scheme: dark")
     })
 
@@ -58,6 +63,13 @@ describe("default iOS liquid-glass confirm styles", () => {
         expect(css).not.toContain("outline-offset")
         expect(css).not.toContain("--vkui")
         expect(css).not.toContain("vkui")
+        expect(css).toContain("[data-yorozu-confirm-root]")
+        expect(css).toContain("[data-yorozu-confirm-backdrop]")
+        expect(css).toContain("[data-yorozu-confirm].closing")
+        expect(css).toContain("[data-yorozu-confirm-title]")
+        expect(css).toContain("[data-yorozu-confirm-desc]")
+        expect(css).toContain("[data-yorozu-confirm-actions]")
+        expect(css).toContain("[data-yorozu-confirm-danger]:disabled")
     })
 
     it("package.json exports tokens.css and default.css", () => {

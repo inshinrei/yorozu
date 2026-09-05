@@ -33,16 +33,25 @@ describe("confirm-tooltip-anchor", () => {
         let bubbleRan = false
         let child = document.createElement("div")
         document.body.appendChild(child)
-        child.addEventListener("pointerdown", (e) => e.stopPropagation())
-        document.addEventListener("pointerdown", () => {
+        let stop = (e: Event): void => {
+            e.stopPropagation()
+        }
+        let onBubble = (): void => {
             bubbleRan = true
-        })
+        }
+        child.addEventListener("pointerdown", stop)
+        document.addEventListener("pointerdown", onBubble)
         let unbind = bindConfirmPointer(document)
-        child.dispatchEvent(new PointerEvent("pointerdown", { clientX: 8, clientY: 9, bubbles: true }))
-        expect(lastConfirmAnchor()).toEqual({ x: 8, y: 9 })
-        expect(bubbleRan).toBe(false)
-        unbind()
-        child.remove()
+        try {
+            child.dispatchEvent(new PointerEvent("pointerdown", { clientX: 8, clientY: 9, bubbles: true }))
+            expect(lastConfirmAnchor()).toEqual({ x: 8, y: 9 })
+            expect(bubbleRan).toBe(false)
+        } finally {
+            unbind()
+            child.removeEventListener("pointerdown", stop)
+            document.removeEventListener("pointerdown", onBubble)
+            child.remove()
+        }
     })
 
     it("resolveConfirmAnchor prefers MouseEvent, then rect center, then last", () => {
