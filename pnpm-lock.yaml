@@ -136,6 +136,12 @@ importers:
         specifier: 7.7.1
         version: 7.7.1
 
+  packages/confirm-tooltip:
+    dependencies:
+      '@yorozu/context-menu':
+        specifier: workspace:^
+        version: link:../context-menu
+
   packages/context-menu:
     dependencies:
       '@yorozu/animations':

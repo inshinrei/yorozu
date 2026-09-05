@@ -1,0 +1,17 @@
+{
+    "name": "@yorozu/confirm-tooltip",
+    "version": "0.5.2",
+    "type": "module",
+    "sideEffects": [
+        "*.css"
+    ],
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic pointer-anchored confirm session",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/context-menu": "workspace:^"
+    }
+}
