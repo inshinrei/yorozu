@@ -1,10 +1,26 @@
+import { createMenuPopover } from "@yorozu/context-menu"
 import { bindToastItem } from "./bind"
-import type { ToastContent, ToastSession } from "./session"
+import type { ToastContent, ToastPlacement, ToastSession } from "./session"
 
+type MenuPopover = ReturnType<typeof createMenuPopover>
 type Painted = {
     el: HTMLElement
     unbind: () => void
     unmount: (() => void) | undefined
+    popover: MenuPopover
+    playback: ReturnType<MenuPopover["playOpen"]> | null
+    closing: boolean
+}
+
+function popoverOrigin(placement: ToastPlacement): string {
+    return placement.startsWith("top") ? "center top" : "center bottom"
+}
+
+function dropItem(item: Painted): void {
+    item.playback?.cancel()
+    item.unbind()
+    item.unmount?.()
+    item.el.remove()
 }
 
 export function attachToastRoot<T extends ToastContent>(session: ToastSession<T>, root: HTMLElement): () => void {
@@ -12,6 +28,9 @@ export function attachToastRoot<T extends ToastContent>(session: ToastSession<T>
     let items = new Map<string, Painted>()
 
     function paint(): void {
+        let placement = session.placement()
+        root.setAttribute("data-placement", placement)
+        let origin = popoverOrigin(placement)
         let records = session.toasts()
         let seen = new Set<string>()
         for (let record of records) {
@@ -19,6 +38,11 @@ export function attachToastRoot<T extends ToastContent>(session: ToastSession<T>
             let existing = items.get(record.id)
             if (existing) {
                 existing.el.classList.toggle("exiting", record.exiting)
+                if (record.exiting && !existing.closing) {
+                    existing.closing = true
+                    existing.playback?.cancel()
+                    existing.playback = existing.popover.playClose(existing.el, { origin })
+                }
                 continue
             }
             let el = document.createElement("div")
@@ -48,14 +72,22 @@ export function attachToastRoot<T extends ToastContent>(session: ToastSession<T>
             }
 
             let unbind = bindToastItem(el, session, record.id)
-            items.set(record.id, { el, unbind, unmount })
+            let popover = createMenuPopover()
+            let painted: Painted = {
+                el,
+                unbind,
+                unmount,
+                popover,
+                playback: null,
+                closing: record.exiting,
+            }
+            items.set(record.id, painted)
             root.append(el)
+            painted.playback = record.exiting ? popover.playClose(el, { origin }) : popover.playOpen(el, { origin })
         }
         for (let [id, item] of [...items]) {
             if (seen.has(id)) continue
-            item.unbind()
-            item.unmount?.()
-            item.el.remove()
+            dropItem(item)
             items.delete(id)
         }
     }
@@ -64,11 +96,7 @@ export function attachToastRoot<T extends ToastContent>(session: ToastSession<T>
     paint()
     return () => {
         unsub()
-        for (let item of items.values()) {
-            item.unbind()
-            item.unmount?.()
-            item.el.remove()
-        }
+        for (let item of items.values()) dropItem(item)
         items.clear()
     }
 }

@@ -12,5 +12,8 @@
         ".": "./src/index.ts",
         "./tokens.css": "./src/tokens.css",
         "./default.css": "./src/default.css"
+    },
+    "dependencies": {
+        "@yorozu/context-menu": "workspace:^"
     }
 }

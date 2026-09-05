@@ -3,14 +3,50 @@
 /* Optional default layout for toast. Hosts with their own theme skip this file. */
 [data-yorozu-toast-root] {
     position: fixed;
-    bottom: var(--yorozu-toast-inset);
-    left: var(--yorozu-toast-inset);
     display: flex;
     flex-direction: column;
     gap: var(--yorozu-toast-gap);
     z-index: var(--yorozu-toast-z);
     max-inline-size: var(--yorozu-toast-max-inline);
     pointer-events: none;
+}
+
+[data-yorozu-toast-root][data-placement="bottom-left"] {
+    bottom: var(--yorozu-toast-inset);
+    left: var(--yorozu-toast-inset);
+    align-items: flex-start;
+}
+
+[data-yorozu-toast-root][data-placement="bottom-center"] {
+    bottom: var(--yorozu-toast-inset);
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+[data-yorozu-toast-root][data-placement="bottom-right"] {
+    bottom: var(--yorozu-toast-inset);
+    right: var(--yorozu-toast-inset);
+    align-items: flex-end;
+}
+
+[data-yorozu-toast-root][data-placement="top-left"] {
+    top: var(--yorozu-toast-inset);
+    left: var(--yorozu-toast-inset);
+    align-items: flex-start;
+}
+
+[data-yorozu-toast-root][data-placement="top-center"] {
+    top: var(--yorozu-toast-inset);
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+[data-yorozu-toast-root][data-placement="top-right"] {
+    top: var(--yorozu-toast-inset);
+    right: var(--yorozu-toast-inset);
+    align-items: flex-end;
 }
 
 [data-yorozu-toast] {
@@ -32,16 +68,11 @@
     -webkit-backdrop-filter: blur(var(--yorozu-toast-blur)) saturate(var(--yorozu-toast-saturate));
     border: var(--yorozu-toast-border);
     box-shadow: var(--yorozu-toast-shadow);
+    opacity: 0;
     outline: none;
-    animation: yorozu-toast-enter var(--yorozu-toast-enter-ms) cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-    transition:
-        opacity var(--yorozu-toast-exit-ms) cubic-bezier(0.4, 0, 0.2, 1),
-        transform var(--yorozu-toast-exit-ms) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-yorozu-toast].exiting {
-    opacity: 0;
-    transform: translateY(1.25rem) scale(0.96);
     pointer-events: none;
 }
 
@@ -68,11 +99,4 @@
 
 [data-yorozu-toast][data-permanent] [data-yorozu-toast-close] {
     display: none;
-}
-
-@keyframes yorozu-toast-enter {
-    from {
-        opacity: 0;
-        transform: translateY(1.875rem) scale(0.95);
-    }
 }

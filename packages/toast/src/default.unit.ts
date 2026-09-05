@@ -27,8 +27,6 @@ let tokenNames = [
     "--yorozu-toast-close-color",
     "--yorozu-toast-close-hover",
     "--yorozu-toast-close-size",
-    "--yorozu-toast-enter-ms",
-    "--yorozu-toast-exit-ms",
 ]
 
 describe("default iOS liquid-glass toast styles", () => {
@@ -56,8 +54,14 @@ describe("default iOS liquid-glass toast styles", () => {
         expect(css).toContain("[data-yorozu-toast-content]")
         expect(css).toContain("[data-yorozu-toast-close]")
         expect(css).toContain("[data-yorozu-toast][data-permanent] [data-yorozu-toast-close]")
-        expect(css).toContain("@keyframes yorozu-toast-enter")
-        expect(css).toContain("cubic-bezier(0.34, 1.56, 0.64, 1)")
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-left"]')
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-center"]')
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-right"]')
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="top-left"]')
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="top-center"]')
+        expect(css).toContain('[data-yorozu-toast-root][data-placement="top-right"]')
+        expect(css).toContain("opacity: 0")
+        expect(css).not.toContain("@keyframes")
         expect(css).not.toContain("outline: auto")
         expect(css).not.toContain(".toast-item .toast-exiting")
         expect(css).not.toContain("--vkui")

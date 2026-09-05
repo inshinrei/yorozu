@@ -250,7 +250,11 @@ importers:
 
   packages/sortable: {}
 
-  packages/toast: {}
+  packages/toast:
+    dependencies:
+      '@yorozu/context-menu':
+        specifier: workspace:^
+        version: link:../context-menu
 
   packages/utils: {}
 

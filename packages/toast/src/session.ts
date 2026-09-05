@@ -1,7 +1,11 @@
+export type ToastPlacement = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right"
+
 export const TOAST_DURATION_MS: number = 5000
-export const TOAST_EXIT_MS: number = 300
+export const TOAST_EXIT_MS: number = 200
 export const TOAST_RESUME_MIN_MS: number = 50
-export const TOAST_ENTER_MS: number = 400
+export const TOAST_ENTER_MS: number = 150
+export const TOAST_SCALE: number = 0.85
+export const TOAST_PLACEMENT_DEFAULT: ToastPlacement = "bottom-left"
 
 export type ToastMount = (container: HTMLElement) => void | (() => void)
 export type ToastContent = string | ToastMount
@@ -23,6 +27,7 @@ export type ToastSessionOpts = {
     generateId?: () => string
     duration?: number
     exitMs?: number
+    placement?: ToastPlacement
 }
 
 export type ToastSession<T = ToastContent> = {
@@ -32,6 +37,7 @@ export type ToastSession<T = ToastContent> = {
     resume: (id: string) => void
     subscribe: (listener: () => void) => () => void
     toasts: () => readonly ToastRecord<T>[]
+    placement: () => ToastPlacement
     destroy: () => void
 }
 
@@ -67,6 +73,7 @@ export function createToastSession<T = ToastContent>(opts?: ToastSessionOpts): T
     let generateId = opts?.generateId ?? defaultId
     let defaultDuration = opts?.duration ?? TOAST_DURATION_MS
     let exitMs = opts?.exitMs ?? TOAST_EXIT_MS
+    let place = opts?.placement ?? TOAST_PLACEMENT_DEFAULT
     let slots: Slot<T>[] = []
     let listeners = new Set<() => void>()
     let alive = true
@@ -137,8 +144,8 @@ export function createToastSession<T = ToastContent>(opts?: ToastSessionOpts): T
             startedAt: null,
         }
         slots.push(slot)
-        notify()
         if (!resolved.permanent) armTimer(slot)
+        notify()
         return record.id
     }
 
@@ -203,5 +210,9 @@ export function createToastSession<T = ToastContent>(opts?: ToastSessionOpts): T
         listeners.clear()
     }
 
-    return { show, dismiss, pause, resume, subscribe, toasts, destroy }
+    function placement(): ToastPlacement {
+        return place
+    }
+
+    return { show, dismiss, pause, resume, subscribe, toasts, placement, destroy }
 }

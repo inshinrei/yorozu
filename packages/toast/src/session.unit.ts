@@ -3,7 +3,9 @@ import {
     TOAST_DURATION_MS,
     TOAST_ENTER_MS,
     TOAST_EXIT_MS,
+    TOAST_PLACEMENT_DEFAULT,
     TOAST_RESUME_MIN_MS,
+    TOAST_SCALE,
     createToastSession,
     type ToastSession,
 } from "./session"
@@ -25,11 +27,41 @@ describe("createToastSession", () => {
         vi.useRealTimers()
     })
 
-    it("exports duration tokens", () => {
+    it("exports duration tokens matching menu popover motion", () => {
         expect(TOAST_DURATION_MS).toBe(5000)
-        expect(TOAST_EXIT_MS).toBe(300)
         expect(TOAST_RESUME_MIN_MS).toBe(50)
-        expect(TOAST_ENTER_MS).toBe(400)
+        expect(TOAST_ENTER_MS).toBe(150)
+        expect(TOAST_EXIT_MS).toBe(200)
+        expect(TOAST_SCALE).toBe(0.85)
+        expect(TOAST_PLACEMENT_DEFAULT).toBe("bottom-left")
+    })
+
+    it("default generateId returns a non-empty id", () => {
+        let s = createToastSession()
+        let id = s.show("x")
+        expect(id.length).toBeGreaterThan(0)
+        expect(s.toasts()[0]!.id).toBe(id)
+        s.destroy()
+    })
+
+    it("placement defaults to bottom-left and can be set at create", () => {
+        expect(session!.placement()).toBe("bottom-left")
+        let s = createToastSession({ generateId: () => "p", placement: "top-right" })
+        expect(s.placement()).toBe("top-right")
+        s.destroy()
+    })
+
+    it("pause from a show subscriber still catches the timer", () => {
+        session!.subscribe(() => {
+            let id = session!.toasts()[0]?.id
+            if (id) session!.pause(id)
+        })
+        session!.show("x", 1000)
+        vi.advanceTimersByTime(5000)
+        expect(session!.toasts()[0]!.exiting).toBe(false)
+        session!.resume("id-1")
+        vi.advanceTimersByTime(1000)
+        expect(session!.toasts()[0]!.exiting).toBe(true)
     })
 
     it("adds a toast with default duration and returns the id", () => {
@@ -138,11 +170,14 @@ describe("createToastSession", () => {
 
     it("pause of already-paused and resume of running are no-ops", () => {
         session!.show("x", 1000)
+        vi.advanceTimersByTime(400)
         session!.pause("id-1")
         session!.pause("id-1")
         session!.resume("id-1")
         session!.resume("id-1")
-        vi.advanceTimersByTime(1000)
+        vi.advanceTimersByTime(599)
+        expect(session!.toasts()[0]!.exiting).toBe(false)
+        vi.advanceTimersByTime(1)
         expect(session!.toasts()[0]!.exiting).toBe(true)
     })
 

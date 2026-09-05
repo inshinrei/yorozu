@@ -57,6 +57,17 @@ describe("bindToastItem", () => {
         expect(session.toasts()).toHaveLength(1)
     })
 
+    it("pauses immediately when the item already matches :hover", () => {
+        session.show("x", 1000)
+        el.matches = (selector: string) => selector === ":hover"
+        unbind = bindToastItem(el, session, "id-1")
+        vi.advanceTimersByTime(5000)
+        expect(session.toasts()[0]!.exiting).toBe(false)
+        el.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        vi.advanceTimersByTime(1000)
+        expect(session.toasts()[0]!.exiting).toBe(true)
+    })
+
     it("unsubscribe stops hover and close", () => {
         session.show("x", 1000)
         unbind = bindToastItem(el, session, "id-1")

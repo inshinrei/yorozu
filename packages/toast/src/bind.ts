@@ -28,6 +28,7 @@ export function bindToastItem<T>(
     el.addEventListener("pointerenter", onEnter)
     el.addEventListener("pointerleave", onLeave)
     el.addEventListener("click", onClick)
+    if (el.matches(":hover")) session.pause(id)
     return () => {
         el.removeEventListener("pointerenter", onEnter)
         el.removeEventListener("pointerleave", onLeave)
