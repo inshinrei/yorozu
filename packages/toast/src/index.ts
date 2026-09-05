@@ -1,3 +1,4 @@
+export { bindToastItem } from "./bind"
 export {
     TOAST_DURATION_MS,
     TOAST_ENTER_MS,
