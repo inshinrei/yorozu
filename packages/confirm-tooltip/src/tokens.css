@@ -1,0 +1,46 @@
+/* Optional iOS liquid-glass tokens for confirm tooltip. Override via CSS custom properties. */
+[data-yorozu-confirm-root],
+[data-yorozu-confirm] {
+    --yorozu-confirm-min-width: 16rem;
+    --yorozu-confirm-max-width: min(20rem, calc(100vw - 32px));
+    --yorozu-confirm-padding: 0.75rem 0.75rem 0.625rem;
+    --yorozu-confirm-radius: 1rem;
+    --yorozu-confirm-z: 1100;
+    --yorozu-confirm-color: #000000;
+    --yorozu-confirm-font-family: system-ui, -apple-system, sans-serif;
+    --yorozu-confirm-font-size: 0.9375rem;
+    --yorozu-confirm-bg: rgba(255, 255, 255, 0.72);
+    --yorozu-confirm-blur: 20px;
+    --yorozu-confirm-saturate: 180%;
+    --yorozu-confirm-border: 1px solid rgba(0, 0, 0, 0.08);
+    --yorozu-confirm-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.2), 0 8px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --yorozu-confirm-title-weight: 600;
+    --yorozu-confirm-title-size: 0.9375rem;
+    --yorozu-confirm-title-line: 1.25rem;
+    --yorozu-confirm-desc-color: rgba(60, 60, 67, 0.8);
+    --yorozu-confirm-desc-size: 0.85rem;
+    --yorozu-confirm-desc-line: 1.2rem;
+    --yorozu-confirm-desc-margin: 0.35rem 0 0;
+    --yorozu-confirm-actions-margin: 0.75rem 0 0;
+    --yorozu-confirm-danger-bg: #ff3b30;
+    --yorozu-confirm-danger-color: #ffffff;
+    --yorozu-confirm-danger-radius: 0.375rem;
+    --yorozu-confirm-danger-padding: 0.4rem 0.9rem;
+    --yorozu-confirm-danger-size: 0.9rem;
+    --yorozu-confirm-danger-min-width: 5rem;
+    --yorozu-confirm-disabled-opacity: 0.5;
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-yorozu-confirm-root],
+    [data-yorozu-confirm] {
+        --yorozu-confirm-color: #ffffff;
+        --yorozu-confirm-bg: rgba(30, 30, 30, 0.72);
+        --yorozu-confirm-border: 1px solid rgba(255, 255, 255, 0.12);
+        --yorozu-confirm-shadow:
+            0 4px 16px rgba(0, 0, 0, 0.4), 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        --yorozu-confirm-desc-color: rgba(235, 235, 245, 0.7);
+        --yorozu-confirm-danger-bg: #ff453a;
+    }
+}

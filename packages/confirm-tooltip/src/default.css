@@ -1,0 +1,77 @@
+@import "./tokens.css";
+
+/* Optional default layout for confirm tooltip. Hosts with their own theme skip this file. */
+[data-yorozu-confirm-root] {
+    position: fixed;
+    inset: 0;
+    z-index: var(--yorozu-confirm-z);
+    pointer-events: none;
+}
+
+[data-yorozu-confirm-backdrop] {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: auto;
+}
+
+[data-yorozu-confirm] {
+    position: fixed;
+    z-index: 1;
+    pointer-events: auto;
+    box-sizing: border-box;
+    min-width: var(--yorozu-confirm-min-width);
+    max-width: var(--yorozu-confirm-max-width);
+    padding: var(--yorozu-confirm-padding);
+    border-radius: var(--yorozu-confirm-radius);
+    color: var(--yorozu-confirm-color);
+    font-family: var(--yorozu-confirm-font-family);
+    font-size: var(--yorozu-confirm-font-size);
+    background: var(--yorozu-confirm-bg);
+    backdrop-filter: blur(var(--yorozu-confirm-blur)) saturate(var(--yorozu-confirm-saturate));
+    -webkit-backdrop-filter: blur(var(--yorozu-confirm-blur)) saturate(var(--yorozu-confirm-saturate));
+    border: var(--yorozu-confirm-border);
+    box-shadow: var(--yorozu-confirm-shadow);
+    opacity: 0;
+    outline: none;
+}
+
+[data-yorozu-confirm].closing {
+    pointer-events: none;
+}
+
+[data-yorozu-confirm-title] {
+    font-weight: var(--yorozu-confirm-title-weight);
+    font-size: var(--yorozu-confirm-title-size);
+    line-height: var(--yorozu-confirm-title-line);
+}
+
+[data-yorozu-confirm-desc] {
+    margin: 0;
+    margin: var(--yorozu-confirm-desc-margin);
+    color: var(--yorozu-confirm-desc-color);
+    font-size: var(--yorozu-confirm-desc-size);
+    line-height: var(--yorozu-confirm-desc-line);
+}
+
+[data-yorozu-confirm-actions] {
+    display: flex;
+    justify-content: flex-end;
+    margin-block-start: var(--yorozu-confirm-actions-margin);
+}
+
+[data-yorozu-confirm-danger] {
+    padding: var(--yorozu-confirm-danger-padding);
+    border: none;
+    border-radius: var(--yorozu-confirm-danger-radius);
+    cursor: pointer;
+    font-size: var(--yorozu-confirm-danger-size);
+    min-width: var(--yorozu-confirm-danger-min-width);
+    background: var(--yorozu-confirm-danger-bg);
+    color: var(--yorozu-confirm-danger-color);
+}
+
+[data-yorozu-confirm-danger]:disabled {
+    opacity: var(--yorozu-confirm-disabled-opacity);
+    cursor: default;
+}
