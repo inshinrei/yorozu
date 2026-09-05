@@ -222,6 +222,10 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         clearPointerCaptureState()
     }
 
+    function isForeignPointer(e: PointerEvent): boolean {
+        return capturePointerId >= 0 && typeof e.pointerId === "number" && e.pointerId !== capturePointerId
+    }
+
     function endDrag(finalIdx: number): void {
         let key = draggingKey
         if (key == null) {
@@ -230,12 +234,14 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         }
         let srcIdx = baseKeys.indexOf(key)
         let to = toTargetIndex(srcIdx, finalIdx)
-        if (srcIdx !== to && srcIdx >= 0 && to >= 0) {
-            options.onReorder?.(moveItem(baseItems, srcIdx, to))
-        }
+        let next = srcIdx !== to && srcIdx >= 0 && to >= 0 ? moveItem(baseItems, srcIdx, to) : null
         reset()
         notify()
-        options.onDragEnd?.("pointerup")
+        try {
+            if (next) options.onReorder?.(next)
+        } finally {
+            options.onDragEnd?.("pointerup")
+        }
     }
 
     function becomeActive(key: string | number): void {
@@ -309,6 +315,7 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         if (typeof document === "undefined" || documentCleanup) return
 
         let handleMove = (e: PointerEvent) => {
+            if (isForeignPointer(e)) return
             lastX = e.clientX
             lastY = e.clientY
             tryActivateFromMove()
@@ -322,25 +329,30 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         }
 
         let handleUp = (e: PointerEvent) => {
+            if (isForeignPointer(e)) return
             lastX = e.clientX
             lastY = e.clientY
             currentX = lastX
             currentY = lastY
-            if (draggingKey != null) {
-                endDrag(computeInsertIndexNow())
-            } else {
-                abortPending()
+            try {
+                if (draggingKey != null) {
+                    endDrag(computeInsertIndexNow())
+                } else {
+                    abortPending()
+                }
+            } finally {
+                detachDocumentListeners()
             }
-            detachDocumentListeners()
         }
 
-        let handleCancel = () => {
+        let handleCancel = (e: PointerEvent) => {
+            if (isForeignPointer(e)) return
             cancel()
         }
 
         document.addEventListener("pointermove", handleMove)
-        document.addEventListener("pointerup", handleUp, { once: true })
-        document.addEventListener("pointercancel", handleCancel, { once: true })
+        document.addEventListener("pointerup", handleUp)
+        document.addEventListener("pointercancel", handleCancel)
 
         documentCleanup = () => {
             document.removeEventListener("pointermove", handleMove)

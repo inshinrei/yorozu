@@ -21,12 +21,12 @@ function fakeEl(start: number, size: number, axis: SortableAxis = "y"): HTMLElem
     return el
 }
 
-function pointer(type: string, clientX: number, clientY: number): PointerEvent {
+function pointer(type: string, clientX: number, clientY: number, pointerId = 1): PointerEvent {
     return new PointerEvent(type, {
         clientX,
         clientY,
         bubbles: true,
-        pointerId: 1,
+        pointerId,
         button: 0,
         pointerType: "mouse",
     })
@@ -126,9 +126,10 @@ function setup(opts?: {
     getViewport?: () => HTMLElement | null
     canDragKey?: (key: string | number) => boolean
     onDragEnd?: (reason: "pointerup" | "cancel") => void
+    onReorder?: (items: string[]) => void
 }) {
     let items = opts?.items ?? ["a", "b", "c"]
-    let onReorder = vi.fn()
+    let onReorder = vi.fn(opts?.onReorder)
     let session = createSortableSession({
         axis: opts?.axis ?? "y",
         getItems: () => items,
@@ -351,6 +352,64 @@ describe("createSortableSession", () => {
         moveTo(0, 35)
         upAt(0, 35)
         expect(onDragEnd).toHaveBeenCalledWith("pointerup")
+    })
+
+    it("onReorder throw still resets so a later pointerDown can activate", () => {
+        let { session, onReorder } = setup({
+            getItemSize: () => 40,
+            onReorder: () => {
+                throw new Error("reorder failed")
+            },
+        })
+        registerKeys(session, ["a", "b", "c"])
+
+        session.pointerDown("a", pointer("pointerdown", 0, 20))
+        moveTo(0, 150)
+        let onWindowError = (ev: Event) => {
+            ev.preventDefault()
+        }
+        window.addEventListener("error", onWindowError)
+        try {
+            upAt(0, 150)
+        } catch {
+            // host throw may surface from pointerup
+        } finally {
+            window.removeEventListener("error", onWindowError)
+        }
+        expect(onReorder).toHaveBeenCalledTimes(1)
+        expect(session.isActive).toBe(false)
+        expect(session.draggingKey).toBeNull()
+
+        session.pointerDown("a", pointer("pointerdown", 0, 20))
+        moveTo(0, 35)
+        expect(session.isActive).toBe(true)
+        expect(session.draggingKey).toBe("a")
+    })
+
+    it("ignores pointermove and pointerup from a foreign pointerId", () => {
+        let { session } = setup({ getItemSize: () => 40 })
+        registerKeys(session, ["a", "b", "c"])
+
+        session.pointerDown("a", pointer("pointerdown", 0, 20))
+        moveTo(0, 70)
+        expect(session.isActive).toBe(true)
+        let offsetA = session.getOffset("a")
+        let insert = session.insertIndex
+        expect(offsetA).toBe(50)
+        expect(insert).not.toBeNull()
+
+        document.dispatchEvent(pointer("pointermove", 0, 150, 2))
+        expect(session.getOffset("a")).toBe(offsetA)
+        expect(session.insertIndex).toBe(insert)
+
+        document.dispatchEvent(pointer("pointerup", 0, 150, 2))
+        expect(session.isActive).toBe(true)
+        expect(session.draggingKey).toBe("a")
+        expect(session.getOffset("a")).toBe(offsetA)
+
+        upAt(0, 70)
+        expect(session.isActive).toBe(false)
+        expect(session.draggingKey).toBeNull()
     })
 })
 
