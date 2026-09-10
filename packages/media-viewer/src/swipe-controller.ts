@@ -69,6 +69,8 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     let wheelActive = false
     /** After older/newer/close, ignore further wheel until idle release. */
     let sessionConsumed = false
+    /** After wheel bounce, ignore leftover wheel until idle. Does not block pointer. */
+    let wheelHoldoff = false
     let settleGen = 0
 
     function viewportSize(): { w: number; h: number } {
@@ -115,6 +117,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         pointerId = null
         wheelActive = false
         sessionConsumed = false
+        wheelHoldoff = false
         clearWheelTimer()
         cancelSettleRaf()
         clearLastDelta()
@@ -143,8 +146,9 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         clearWheelTimer()
         wheelTimer = setTimeout(() => {
             wheelTimer = null
-            if (sessionConsumed) {
+            if (sessionConsumed || wheelHoldoff) {
                 sessionConsumed = false
+                wheelHoldoff = false
                 wheelActive = false
                 return
             }
@@ -162,7 +166,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         gesturing = false
         pointerId = null
         wheelActive = false
-        if (sessionConsumed) refreshWheelIdleTimer()
+        if (sessionConsumed || wheelHoldoff) refreshWheelIdleTimer()
         else clearWheelTimer()
     }
 
@@ -283,10 +287,15 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             return
         }
         if (result === "bounce" && (offsetX !== 0 || offsetY !== 0)) {
+            let fromWheel = wheelActive
             endPointerWheel()
             axis = "none"
             clearLastDelta()
             animateOffsetToZero()
+            if (fromWheel) {
+                wheelHoldoff = true
+                refreshWheelIdleTimer()
+            }
             return
         }
         resetOffsetsInstant()
@@ -316,7 +325,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         startClientY = e.clientY
         gesturing = true
         wheelActive = false
-        if (sessionConsumed) refreshWheelIdleTimer()
+        if (sessionConsumed || wheelHoldoff) refreshWheelIdleTimer()
         else clearWheelTimer()
         axis = "none"
         offsetX = 0
@@ -357,7 +366,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
 
         if (pointerId != null) return true
 
-        if (sessionConsumed) {
+        if (sessionConsumed || wheelHoldoff) {
             refreshWheelIdleTimer()
             return true
         }

@@ -196,6 +196,28 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
+    it("wheel bounce ignores leftover wheel until idle", () => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).not.toHaveBeenCalled()
+        let leftover = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 })
+        let preventLeftover = vi.spyOn(leftover, "preventDefault")
+        expect(swipe.onWheel(leftover)).toBe(true)
+        expect(preventLeftover).toHaveBeenCalled()
+        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
+        swipe.onPointerCancel(pointer("pointercancel", { clientX: 400, clientY: 200 }))
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
     it("does not commit leftover wheel after pointer nav before idle", () => {
         vi.useFakeTimers()
         let onNewer = vi.fn()
