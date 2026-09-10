@@ -68,7 +68,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     let wheelTimer: ReturnType<typeof setTimeout> | null = null
     let settleRaf: number | null = null
     let wheelActive = false
-    /** After older/newer/close, ignore further wheel until idle release. */
+    /** After older/newer/close, ignore further wheel until cooldown idle. */
     let sessionConsumed = false
     /** After wheel bounce, ignore leftover wheel until idle. Does not block pointer. */
     let wheelHoldoff = false

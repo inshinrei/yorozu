@@ -795,6 +795,38 @@ describe("attachMediaViewer", () => {
         expect(bodyWheel.defaultPrevented).toBe(false)
     })
 
+    it("chrome header and overlay chrome wheel stopPropagates without preventDefault", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+                overlay: (el) => {
+                    el.textContent = "host-chrome"
+                },
+            },
+        })
+        let header = root.querySelector("[data-yorozu-media-header]") as HTMLElement
+        let chromeEl = root.querySelector("[data-yorozu-media-chrome]") as HTMLElement
+        for (let el of [header, chromeEl]) {
+            let wheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+            let stop = vi.spyOn(wheel, "stopPropagation")
+            el.dispatchEvent(wheel)
+            expect(wheel.defaultPrevented).toBe(false)
+            expect(stop).toHaveBeenCalled()
+        }
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let scrimWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        overlay.dispatchEvent(scrimWheel)
+        expect(scrimWheel.defaultPrevented).toBe(true)
+        api!.forceClose()
+        let bodyWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        document.body.dispatchEvent(bodyWheel)
+        expect(bodyWheel.defaultPrevented).toBe(false)
+    })
+
     it("filmstrip touchend clears the pan sample so the next gesture starts fresh", () => {
         viewer.open({ items: [img("a"), img("b")] })
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
@@ -838,4 +870,58 @@ describe("attachMediaViewer", () => {
         nav.dispatchEvent(nextFirst)
         expect(nextFirst.defaultPrevented).toBe(true)
     })
+
+    it.each(["pointerup", "pointercancel", "touchcancel"] as const)(
+        "filmstrip %s clears the pan sample so the next gesture starts fresh",
+        (type) => {
+            viewer.open({ items: [img("a"), img("b")] })
+            let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+            let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+            function touchMove(clientX: number, clientY: number): TouchEvent {
+                let touch = {
+                    identifier: 0,
+                    target: nav,
+                    clientX,
+                    clientY,
+                    pageX: clientX,
+                    pageY: clientY,
+                    screenX: clientX,
+                    screenY: clientY,
+                    radiusX: 0,
+                    radiusY: 0,
+                    rotationAngle: 0,
+                    force: 1,
+                }
+                return new TouchEvent("touchmove", {
+                    bubbles: true,
+                    cancelable: true,
+                    touches: [touch] as unknown as Touch[],
+                    targetTouches: [touch] as unknown as Touch[],
+                    changedTouches: [touch] as unknown as Touch[],
+                })
+            }
+            let first = touchMove(100, 100)
+            nav.dispatchEvent(first)
+            expect(first.defaultPrevented).toBe(true)
+            let panX = touchMove(200, 110)
+            nav.dispatchEvent(panX)
+            expect(panX.defaultPrevented).toBe(false)
+            if (type === "touchcancel") {
+                overlay.dispatchEvent(new TouchEvent("touchcancel", { bubbles: true, cancelable: true }))
+            } else {
+                overlay.dispatchEvent(
+                    new PointerEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 1,
+                        clientX: 200,
+                        clientY: 110,
+                    }),
+                )
+            }
+            let nextFirst = touchMove(250, 115)
+            nav.dispatchEvent(nextFirst)
+            expect(nextFirst.defaultPrevented).toBe(true)
+        },
+    )
 })
