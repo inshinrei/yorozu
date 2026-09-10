@@ -74,6 +74,18 @@ describe("createMediaImageZoom", () => {
         zoom.destroy()
     })
 
+    it("pinch below fit settles back to 1 with motion", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let zoom = sizedZoom()
+        zoom.applyRelativeZoomSoft(-0.6, { offsetX: 0, offsetY: 0 })
+        expect(zoom.scale()).toBeLessThan(1)
+        expect(zoom.scale()).toBeGreaterThanOrEqual(0.5)
+        zoom.endDrag({ withInertia: false, pinchOrigin: { offsetX: 0, offsetY: 0 } })
+        expect(zoom.isSettling()).toBe(true)
+        expect(zoom.scale()).toBeLessThan(1)
+        zoom.destroy()
+    })
+
     it("beginDrag / moveDrag / endDrag with inertia settles or snaps", () => {
         vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let zoom = sizedZoom()

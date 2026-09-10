@@ -188,7 +188,7 @@ describe("media-viewer zoom math", () => {
 
         it("softScaleLimits expand hard min/max", () => {
             let soft = softScaleLimits(1, 20)
-            expect(soft.min).toBeCloseTo(0.85, 5)
+            expect(soft.min).toBeCloseTo(0.5, 5)
             expect(soft.max).toBeCloseTo(23, 5)
         })
 

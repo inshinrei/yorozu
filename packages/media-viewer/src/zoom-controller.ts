@@ -6,6 +6,7 @@
 import { easeOutCubic, zoomAtOrigin } from "@yorozu/animations"
 import {
     MEDIA_MIN_SCALE,
+    MEDIA_ZOOM_SETTLE_MS,
     canZoomIn as canZoomInScale,
     canZoomOut as canZoomOutScale,
     formatZoomPercent,
@@ -138,7 +139,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         )
     }
 
-    function animateTo(target: MediaZoomState): void {
+    function animateTo(target: MediaZoomState, durationMs?: number): void {
         stopSettle()
         let from = current()
         if (zoomStatesNearlyEqual(from, target)) {
@@ -151,7 +152,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         }
 
         let remaining = zoomStateDistance(from, target, layoutWidth, layoutHeight)
-        let duration = zoomSettleDurationMs(remaining)
+        let duration = durationMs ?? zoomSettleDurationMs(remaining)
         let gen = ++settleGen
         settling = true
         let start = typeof performance !== "undefined" ? performance.now() : Date.now()
@@ -203,7 +204,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
 
         if (needsLegalize) {
             // Scale rubber bounce takes priority; skip pan coast on the same release.
-            animateTo(legal)
+            animateTo(legal, MEDIA_ZOOM_SETTLE_MS)
             clearMotionSamples()
             return
         }
