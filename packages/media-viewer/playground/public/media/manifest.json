@@ -477,8 +477,8 @@
     {
       "id": "img-080",
       "src": "/media/img-080.jpg",
-      "width": 1280,
-      "height": 720
+      "width": 360,
+      "height": 480
     },
     {
       "id": "img-081",
@@ -549,8 +549,8 @@
     {
       "id": "img-092",
       "src": "/media/img-092.jpg",
-      "width": 1280,
-      "height": 720
+      "width": 600,
+      "height": 900
     },
     {
       "id": "img-093",
@@ -579,8 +579,8 @@
     {
       "id": "img-097",
       "src": "/media/img-097.jpg",
-      "width": 720,
-      "height": 1280
+      "width": 480,
+      "height": 320
     },
     {
       "id": "img-098",
@@ -693,8 +693,8 @@
     {
       "id": "img-116",
       "src": "/media/img-116.jpg",
-      "width": 1280,
-      "height": 720
+      "width": 900,
+      "height": 300
     },
     {
       "id": "img-117",
@@ -723,8 +723,8 @@
     {
       "id": "img-121",
       "src": "/media/img-121.jpg",
-      "width": 720,
-      "height": 1280
+      "width": 700,
+      "height": 700
     },
     {
       "id": "img-122",
