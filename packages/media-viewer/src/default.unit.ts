@@ -84,6 +84,26 @@ describe("default media viewer styles", () => {
         expect(css).toContain("[data-current]")
         expect(css).toContain("opacity: 0.55")
         expect(css).toContain("--yorozu-media-filmstrip-ms")
+        expect(css).toContain("touch-action: pan-x")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
+    })
+
+    it("filmstrip overrides inherited touch-action none so overflow-x pan works", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(filmstripBlock).toContain("touch-action: pan-x")
+        let overlayBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewer\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(overlayBlock).toContain("touch-action: none")
+    })
+
+    it("footer sits above the filmstrip when the strip is present and stays at bottom when not", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let footerBlock = css.match(/(?:^|\n)\[data-yorozu-media-footer\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(footerBlock).toContain("bottom: 0")
+        expect(css).toContain(
+            "[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-footer]",
+        )
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
     })
 
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {

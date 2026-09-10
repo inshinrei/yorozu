@@ -149,6 +149,10 @@
     right: 0;
 }
 
+[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-footer] {
+    bottom: var(--yorozu-media-filmstrip-thumb-h);
+}
+
 [data-yorozu-media-chrome] {
     inset: 0;
 }
@@ -185,6 +189,7 @@ html.yorozu-media-ghost-animating [data-yorozu-media-filmstrip] {
     bottom: 0;
     z-index: 1;
     pointer-events: auto;
+    touch-action: pan-x;
     display: flex;
     overflow-x: auto;
     overflow-y: hidden;

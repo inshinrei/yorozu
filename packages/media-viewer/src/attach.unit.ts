@@ -67,6 +67,7 @@ describe("attachMediaViewer", () => {
         root.remove()
         document.documentElement.classList.remove(MEDIA_GHOST_ANIMATING_CLASS)
         Reflect.deleteProperty(HTMLElement.prototype, "animate")
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
     })
 
     it("open paints dialog + active img src", () => {
@@ -403,12 +404,33 @@ describe("attachMediaViewer", () => {
     it("pinch second pointer setPointerCapture on the viewport", () => {
         viewer.open({ items: [img("a")] })
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        let image = root.querySelector("[data-yorozu-media-zoom] img") as HTMLImageElement
         let capture = vi.fn()
         viewport.setPointerCapture = capture
-        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
-        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 2, clientX: 450, clientY: 200 }))
+        image.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
+        image.dispatchEvent(pointer("pointerdown", { pointerId: 2, clientX: 450, clientY: 200 }))
         expect(capture).toHaveBeenCalledWith(1)
         expect(capture).toHaveBeenCalledWith(2)
+    })
+
+    it("pointerdown on video does not setPointerCapture; zoom image still does", () => {
+        viewer.open({
+            items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        let capture = vi.fn()
+        viewport.setPointerCapture = capture
+        let video = root.querySelector("video") as HTMLVideoElement
+        video.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
+        expect(capture).not.toHaveBeenCalled()
+
+        viewer.open({ items: [img("a")] })
+        viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        capture = vi.fn()
+        viewport.setPointerCapture = capture
+        let image = root.querySelector("[data-yorozu-media-zoom] img") as HTMLImageElement
+        image.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
+        expect(capture).toHaveBeenCalledWith(1)
     })
 
     it("close ghost still plays when stage fit is null", async () => {
@@ -545,6 +567,42 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"] img')?.getAttribute("src")).toBe("x.jpg")
         viewer.open({ items: [img("p"), img("q")] })
         expect(root.querySelector("[data-yorozu-media-filmstrip]")).not.toBe(nav)
+    })
+
+    it("same-id setItems with urls replaces loading thumbs with img in place", () => {
+        viewer.open({
+            items: [
+                { id: "a", kind: "image", src: null },
+                { id: "b", kind: "image", src: null },
+            ],
+        })
+        let first = root.querySelector('[data-yorozu-media-thumb][data-index="0"]') as HTMLButtonElement
+        let second = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
+        expect(first.querySelector("[data-yorozu-media-loading]")).toBeTruthy()
+        expect(first.querySelector("img")).toBeNull()
+        viewer.setItems([img("a", "later-a.jpg"), img("b", "later-b.jpg")])
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"]')).toBe(first)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="1"]')).toBe(second)
+        expect(first.querySelector("[data-yorozu-media-loading]")).toBeNull()
+        expect(first.querySelector("img")?.getAttribute("src")).toBe("later-a.jpg")
+        expect(second.querySelector("img")?.getAttribute("src")).toBe("later-b.jpg")
+    })
+
+    it("scrolls the current thumb into view after open and goTo", () => {
+        let scrollIntoView = vi.fn()
+        HTMLElement.prototype.scrollIntoView = scrollIntoView
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
+        let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLButtonElement
+        expect(current.getAttribute("data-index")).toBe("2")
+        expect(scrollIntoView).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        scrollIntoView.mockClear()
+        let next = root.querySelector('[data-yorozu-media-thumb][data-index="0"]') as HTMLButtonElement
+        let nextScroll = vi.fn()
+        next.scrollIntoView = nextScroll
+        viewer.goTo(0)
+        expect(next.hasAttribute("data-current")).toBe(true)
+        expect(nextScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
     })
 
     it("wheel on the filmstrip is not trapped", () => {

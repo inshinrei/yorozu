@@ -611,17 +611,27 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (item.kind === "video") btn.setAttribute("data-yorozu-media-thumb-video", "")
         else btn.removeAttribute("data-yorozu-media-thumb-video")
         let src = thumbSrc(item)
+        let image = btn.querySelector("img")
+        let loading = btn.querySelector("[data-yorozu-media-loading]")
         if (src) {
-            let image = document.createElement("img")
-            image.src = src
-            image.alt = item.alt ?? ""
-            image.draggable = false
-            btn.append(image)
+            loading?.remove()
+            if (image instanceof HTMLImageElement) {
+                if (image.getAttribute("src") !== src) image.src = src
+                image.alt = item.alt ?? ""
+                return
+            }
+            let next = document.createElement("img")
+            next.src = src
+            next.alt = item.alt ?? ""
+            next.draggable = false
+            btn.append(next)
             return
         }
-        let loading = document.createElement("div")
-        loading.setAttribute("data-yorozu-media-loading", "")
-        btn.append(loading)
+        image?.remove()
+        if (loading) return
+        let placeholder = document.createElement("div")
+        placeholder.setAttribute("data-yorozu-media-loading", "")
+        btn.append(placeholder)
     }
 
     function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
@@ -638,12 +648,21 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
-    function syncThumbCurrent(track: HTMLElement, currentIndex: number): void {
+    function syncThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
         let thumbs = track.querySelectorAll("[data-yorozu-media-thumb]")
-        for (let el of thumbs) {
+        for (let i = 0; i < snap.items.length; i++) {
+            let el = thumbs[i]
             if (!(el instanceof HTMLButtonElement)) continue
-            markThumbCurrent(el, el.getAttribute("data-index") === String(currentIndex))
+            markThumbCurrent(el, i === snap.index)
+            fillThumb(el, snap.items[i]!)
         }
+    }
+
+    function scrollCurrentThumbIntoView(track: HTMLElement): void {
+        let current = track.querySelector("[data-yorozu-media-thumb][data-current]")
+        if (!(current instanceof HTMLElement)) return
+        if (typeof current.scrollIntoView !== "function") return
+        current.scrollIntoView({ inline: "center", block: "nearest" })
     }
 
     function onFilmstripClick(e: Event): void {
@@ -686,9 +705,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (filmstripIds !== ids) {
             rebuildThumbs(track, snap)
             filmstripIds = ids
-            return
+        } else {
+            syncThumbs(track, snap)
         }
-        syncThumbCurrent(track, snap.index)
+        scrollCurrentThumbIntoView(track)
     }
 
     function maybeToggleZoom(e: PointerEvent): void {
@@ -740,10 +760,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportPointerDown(e: PointerEvent): void {
-        try {
-            viewport?.setPointerCapture(e.pointerId)
-        } catch {
-            // optional
+        let t = e.target
+        if (!(t instanceof Element && t.closest("button, a, input, textarea, select, video"))) {
+            try {
+                viewport?.setPointerCapture(e.pointerId)
+            } catch {
+                // optional
+            }
         }
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
         if (isImage() && pointers.size >= 2) {
