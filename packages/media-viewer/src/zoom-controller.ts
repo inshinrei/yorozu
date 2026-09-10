@@ -156,7 +156,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         settling = true
         let start = typeof performance !== "undefined" ? performance.now() : Date.now()
 
-        let frame = (now: number): void => {
+        const frame = (now: number): void => {
             if (gen !== settleGen) return
             let t = Math.min(1, (now - start) / duration)
             let eased = easeOutCubic(t)
@@ -350,6 +350,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             stopSettle()
             clearMotionSamples()
             dragging = false
+            applyState(resetZoom())
         },
     }
 }

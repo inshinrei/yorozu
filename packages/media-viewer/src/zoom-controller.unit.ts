@@ -111,4 +111,17 @@ describe("createMediaImageZoom", () => {
         expect(zoom.scale()).toBe(MEDIA_MAX_ZOOM_FACTOR)
         zoom.destroy()
     })
+
+    it("destroy resets scale and translate to identity", () => {
+        let zoom = sizedZoom()
+        zoom.zoomIn()
+        zoom.panBy(40, -20)
+        expect(zoom.scale()).toBe(MEDIA_ZOOM_STEP)
+        expect(zoom.translateX()).not.toBe(0)
+        zoom.destroy()
+        expect(zoom.scale()).toBe(1)
+        expect(zoom.translateX()).toBe(0)
+        expect(zoom.translateY()).toBe(0)
+        expect(zoom.transformStyle()).toBe("translate3d(0px, 0px, 0) scale(1)")
+    })
 })

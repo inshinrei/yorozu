@@ -371,7 +371,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function trapWheel(e: WheelEvent): boolean {
-        if (e.ctrlKey || e.metaKey) return false
+        if (!cbs.getEnabled() || cbs.getPrefersReducedMotion() || e.ctrlKey || e.metaKey) return false
         e.preventDefault()
         e.stopPropagation()
         onWheel(e)

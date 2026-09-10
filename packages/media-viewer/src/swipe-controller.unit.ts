@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { MEDIA_SWIPE_EDGE_RESIST, MEDIA_SWIPE_X_THRESHOLD } from "./swipe"
+import { MEDIA_SWIPE_EDGE_RESIST, MEDIA_SWIPE_WHEEL_RELEASE_MS, MEDIA_SWIPE_X_THRESHOLD } from "./swipe"
 import { createMediaSwipe } from "./swipe-controller"
 
 function pointer(type: string, init: Partial<PointerEventInit>): PointerEvent {
@@ -59,6 +59,7 @@ describe("createMediaSwipe", () => {
     })
 
     it("bounces on reverse-cancel after past-threshold drag", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
@@ -67,7 +68,14 @@ describe("createMediaSwipe", () => {
         swipe.onPointerMove(pointer("pointermove", { clientX: 310, clientY: 200 }))
         swipe.onPointerUp(pointer("pointerup", { clientX: 310, clientY: 200 }))
         expect(onNewer).not.toHaveBeenCalled()
-        expect(swipe.settling() || swipe.offsetX() !== 0 || swipe.offsetY() !== 0 || swipe.axis() === "none").toBe(true)
+        let bounced = swipe.offsetX()
+        expect(bounced).not.toBe(0)
+        expect(swipe.settling()).toBe(true)
+        vi.advanceTimersByTime(50)
+        expect(Math.abs(swipe.offsetX())).toBeLessThan(Math.abs(bounced))
+        vi.advanceTimersByTime(400)
+        expect(swipe.offsetX()).toBe(0)
+        expect(onNewer).not.toHaveBeenCalled()
         swipe.destroy()
     })
 
@@ -128,6 +136,80 @@ describe("createMediaSwipe", () => {
         expect(swipe.offsetX()).toBeCloseTo(resisted, 5)
         swipe.onPointerUp(pointer("pointerup", { clientX: 300, clientY: 200 }))
         expect(onNewer).not.toHaveBeenCalled()
+        swipe.destroy()
+    })
+
+    it("trapWheel skips preventDefault when disabled, reduced motion, or modifier", () => {
+        let disabled = createMediaSwipe(baseCbs({ getEnabled: () => false }))
+        let blocked = wheel({ deltaX: 80 })
+        let preventBlocked = vi.spyOn(blocked, "preventDefault")
+        expect(disabled.trapWheel(blocked)).toBe(false)
+        expect(preventBlocked).not.toHaveBeenCalled()
+        disabled.destroy()
+
+        let reduced = createMediaSwipe(baseCbs({ getPrefersReducedMotion: () => true }))
+        let reducedEv = wheel({ deltaX: 80 })
+        let preventReduced = vi.spyOn(reducedEv, "preventDefault")
+        expect(reduced.trapWheel(reducedEv)).toBe(false)
+        expect(preventReduced).not.toHaveBeenCalled()
+        reduced.destroy()
+
+        let mods = createMediaSwipe(baseCbs())
+        let ctrl = wheel({ deltaX: 80, ctrlKey: true })
+        let meta = wheel({ deltaX: 80, metaKey: true })
+        let preventCtrl = vi.spyOn(ctrl, "preventDefault")
+        let preventMeta = vi.spyOn(meta, "preventDefault")
+        expect(mods.trapWheel(ctrl)).toBe(false)
+        expect(mods.trapWheel(meta)).toBe(false)
+        expect(preventCtrl).not.toHaveBeenCalled()
+        expect(preventMeta).not.toHaveBeenCalled()
+        mods.destroy()
+    })
+
+    it("trapWheel preventDefault then onWheel when enabled", () => {
+        let order: string[] = []
+        let onNewer = vi.fn(() => {
+            order.push("newer")
+        })
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let ev = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1 })
+        let origPrevent = ev.preventDefault.bind(ev)
+        ev.preventDefault = (): void => {
+            order.push("prevent")
+            origPrevent()
+        }
+        expect(swipe.trapWheel(ev)).toBe(true)
+        expect(order[0]).toBe("prevent")
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("vertical pointer drag past threshold closes", () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 280 }))
+        expect(onClose).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("wheel idle 90ms commits; destroy clears the wheel timer", () => {
+        vi.useFakeTimers()
+        expect(MEDIA_SWIPE_WHEEL_RELEASE_MS).toBe(90)
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        expect(swipe.onWheel(wheel({ deltaX: 60, deltaY: 0 }))).toBe(true)
+        expect(onNewer).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(90)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+
+        let late = vi.fn()
+        let doomed = createMediaSwipe(baseCbs({ onNewer: late }))
+        expect(doomed.onWheel(wheel({ deltaX: 60, deltaY: 0 }))).toBe(true)
+        doomed.destroy()
+        vi.advanceTimersByTime(90)
+        expect(late).not.toHaveBeenCalled()
         swipe.destroy()
     })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { createMediaShell, MEDIA_CLOSE_MS, MEDIA_OPEN_MS } from "./shell"
+import { createMediaShell, MEDIA_CHROME_MS, MEDIA_CLOSE_MS, MEDIA_OPEN_MS, MEDIA_SWITCH_MS } from "./shell"
 
 describe("createMediaShell", () => {
     afterEach(() => {
@@ -135,6 +135,8 @@ describe("createMediaShell", () => {
         expect(finish).toHaveBeenCalledTimes(1)
         expect(MEDIA_OPEN_MS).toBe(220)
         expect(MEDIA_CLOSE_MS).toBe(200)
+        expect(MEDIA_CHROME_MS).toBe(150)
+        expect(MEDIA_SWITCH_MS).toBe(320)
         shell.destroy()
     })
 
@@ -184,6 +186,55 @@ describe("createMediaShell", () => {
         await expect(shell.startOpen()).resolves.toBeUndefined()
         expect(shell.phase()).toEqual({ kind: "ready" })
         expect(shell.openPhase()).toBe("open")
+        shell.destroy()
+    })
+
+    it("opaque content keys use lastNav for switch dir, not Number(head)", () => {
+        let last: "prev" | "next" | "key" | "swipe" | "jump" | null = "next"
+        let shell = createMediaShell({
+            skipGhost: () => false,
+            hasOpenOrigin: () => false,
+            onFinishClose: () => {},
+            lastNav: () => last,
+        })
+        shell.trackContentKey("file-abc")
+        shell.trackContentKey("file-def")
+        expect(shell.switchDir()).toBe("newer")
+
+        last = "prev"
+        shell.trackContentKey("file-abc")
+        expect(shell.switchDir()).toBe("older")
+
+        shell.markNav("key")
+        last = "prev"
+        shell.trackContentKey("file-other")
+        expect(shell.switchDir()).toBe("older")
+
+        last = "swipe"
+        shell.trackContentKey("file-swipe")
+        expect(shell.switchDir()).toBe("none")
+        shell.destroy()
+    })
+
+    it("markNav is consumed so the next switch can read lastNav()", () => {
+        let last: "key" | "swipe" | "jump" | "prev" | "next" | null = "key"
+        let shell = createMediaShell({
+            skipGhost: () => false,
+            hasOpenOrigin: () => false,
+            onFinishClose: () => {},
+            lastNav: () => last,
+        })
+        shell.trackContentKey("0:a")
+        shell.trackContentKey("1:b")
+        expect(shell.switchDir()).toBe("newer")
+
+        shell.markNav("jump")
+        shell.trackContentKey("4:z")
+        expect(shell.switchDir()).toBe("jump")
+
+        last = "swipe"
+        shell.trackContentKey("5:z")
+        expect(shell.switchDir()).toBe("none")
         shell.destroy()
     })
 

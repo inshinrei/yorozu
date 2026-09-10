@@ -186,4 +186,83 @@ describe("createMediaViewer", () => {
         expect(viewer!.snapshot().open).toBe(false)
         expect(n).toBeGreaterThanOrEqual(after)
     })
+
+    it("open with empty items is still open with current null", () => {
+        viewer!.open({ items: [] })
+        let snap = viewer!.snapshot()
+        expect(snap.open).toBe(true)
+        expect(snap.current).toBeNull()
+        expect(snap.items).toEqual([])
+        expect(snap.index).toBe(0)
+    })
+
+    it("forceClose without beginClose closes and fires onClose once", () => {
+        viewer!.open({ items: [img("a")] })
+        expect(viewer!.snapshot().open).toBe(true)
+        viewer!.forceClose()
+        expect(viewer!.snapshot().open).toBe(false)
+        expect(onClose).toHaveBeenCalledTimes(1)
+        viewer!.forceClose()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("setItems uses the passed index, clamped", () => {
+        viewer!.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        viewer!.setItems([img("x"), img("y"), img("z"), img("w")], 2)
+        expect(viewer!.snapshot().index).toBe(2)
+        expect(viewer!.snapshot().current?.id).toBe("z")
+        viewer!.setItems([img("only")], 9)
+        expect(viewer!.snapshot().index).toBe(0)
+        expect(viewer!.snapshot().current?.id).toBe("only")
+        viewer!.setItems([], 3)
+        expect(viewer!.snapshot().index).toBe(0)
+        expect(viewer!.snapshot().current).toBeNull()
+    })
+
+    it("goTo the same index is a no-op", () => {
+        viewer!.open({ items: [img("a"), img("b")], index: 1 })
+        let ticks = 0
+        viewer!.subscribe(() => {
+            ticks += 1
+        })
+        ticks = 0
+        viewer!.goTo(1)
+        expect(ticks).toBe(0)
+        expect(onIndexChange).not.toHaveBeenCalled()
+        viewer!.goTo(0)
+        expect(ticks).toBe(1)
+        expect(onIndexChange).toHaveBeenCalledTimes(1)
+    })
+
+    it("reduced motion: wantsGhost close is false even with origin", () => {
+        let origin = {
+            id: "a",
+            rect: { top: 0, left: 0, width: 10, height: 10 },
+            imageUrl: "a.jpg",
+            objectFit: "cover" as const,
+        }
+        let reduced = createMediaViewer({ prefersReducedMotion: () => true })
+        reduced.open({ items: [img("a")], origin })
+        expect(reduced.snapshot().origin).toEqual(origin)
+        expect(reduced.wantsGhost("close")).toBe(false)
+        expect(reduced.beginClose()).toBe(false)
+        reduced.destroy()
+    })
+
+    it("subscribe after destroy does not add listeners; double destroy is a no-op", () => {
+        let n = 0
+        viewer!.open({ items: [img("a"), img("b")] })
+        viewer!.destroy()
+        let stop = viewer!.subscribe(() => {
+            n += 1
+        })
+        viewer!.open({ items: [img("z")] })
+        viewer!.next()
+        viewer!.close()
+        viewer!.forceClose()
+        viewer!.destroy()
+        stop()
+        expect(n).toBe(0)
+        expect(viewer!.snapshot().open).toBe(false)
+    })
 })

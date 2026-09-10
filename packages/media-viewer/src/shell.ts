@@ -26,11 +26,13 @@ export type MediaShell = {
     requestClose: () => Promise<void>
     forceClose: () => void
     trackContentKey: (contentKey: string) => void
-    markNav: (kind: MediaViewerNavFrom) => void
+    markNav: (kind: MediaViewerNavFrom | "prev" | "next") => void
     destroy: () => void
 }
 
-/** Leading integer or `index:id` so adjacent prev/next can set switchDir. */
+type MediaShellNav = MediaViewerNavFrom | "prev" | "next"
+
+/** Numeric `index:id` head used when lastNav is `"key"` or unset. */
 function contentIndex(key: string): number | null {
     let colon = key.indexOf(":")
     let head = colon >= 0 ? key.slice(0, colon) : key
@@ -38,6 +40,17 @@ function contentIndex(key: string): number | null {
     let n = Number(head)
     if (!Number.isFinite(n)) return null
     return n
+}
+
+function dirFromKeyNav(prevKey: string, nextKey: string): MediaSwitchDirection {
+    let from = contentIndex(prevKey)
+    let to = contentIndex(nextKey)
+    if (from != null && to != null) {
+        if (to === from - 1) return "older"
+        if (to === from + 1) return "newer"
+        return to < from ? "older" : "newer"
+    }
+    return "newer"
 }
 
 function tick(): Promise<void> {
@@ -58,14 +71,14 @@ export function createMediaShell(opts: {
     runCloseGhost?: () => boolean | Promise<boolean>
     cancelGhost?: () => void
     onFinishClose: () => void
-    lastNav?: () => MediaViewerNavFrom | null
+    lastNav?: () => MediaViewerNavFrom | "prev" | "next" | null
 }): MediaShell {
     let alive = true
     let finished = false
     let openStarted = false
     let closeTimer: ReturnType<typeof setTimeout> | null = null
     let closeWait: (() => void) | null = null
-    let markedNav: MediaViewerNavFrom | null = null
+    let markedNav: MediaShellNav | null = null
     let lastKey: string | null = null
     let switchDirection: MediaSwitchDirection = "none"
     let switchKey = 0
@@ -74,8 +87,29 @@ export function createMediaShell(opts: {
             ? { kind: "ready" }
             : { kind: "open-flight", pinnedUrl: opts.getOpenPinnedUrl?.() ?? null, scrimSolid: false }
 
-    function resolveLastNav(): MediaViewerNavFrom | null {
-        return markedNav ?? opts.lastNav?.() ?? null
+    function consumeNav(): MediaShellNav | null {
+        let marked = markedNav
+        let callback = opts.lastNav?.() ?? null
+        markedNav = null
+        return marked ?? callback
+    }
+
+    function switchDirFromNav(nav: MediaShellNav | null, prevKey: string, nextKey: string): MediaSwitchDirection {
+        if (nav === "swipe") return "none"
+        if (nav === "jump") return "jump"
+        if (nav === "prev") return "older"
+        if (nav === "next") return "newer"
+        if (nav === "key") {
+            let callback = opts.lastNav?.() ?? null
+            if (callback === "prev") return "older"
+            if (callback === "next") return "newer"
+            return dirFromKeyNav(prevKey, nextKey)
+        }
+        let from = contentIndex(prevKey)
+        let to = contentIndex(nextKey)
+        if (from != null && to != null && to === from - 1) return "older"
+        if (from != null && to != null && to === from + 1) return "newer"
+        return "jump"
     }
 
     function finishClose(): void {
@@ -167,24 +201,10 @@ export function createMediaShell(opts: {
         let prev = lastKey
         lastKey = contentKey
         switchKey += 1
-        if (resolveLastNav() === "swipe") {
-            switchDirection = "none"
-            return
-        }
-        let from = contentIndex(prev)
-        let to = contentIndex(contentKey)
-        if (from != null && to != null && to === from - 1) {
-            switchDirection = "older"
-            return
-        }
-        if (from != null && to != null && to === from + 1) {
-            switchDirection = "newer"
-            return
-        }
-        switchDirection = "jump"
+        switchDirection = switchDirFromNav(consumeNav(), prev, contentKey)
     }
 
-    function markNav(kind: MediaViewerNavFrom): void {
+    function markNav(kind: MediaViewerNavFrom | "prev" | "next"): void {
         markedNav = kind
     }
 

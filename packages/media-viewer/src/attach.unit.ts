@@ -377,4 +377,65 @@ describe("attachMediaViewer", () => {
         expect(Math.abs(tx)).toBeLessThan(500)
         expect(tx).toBeLessThanOrEqual(0)
     })
+
+    it("consecutive same-direction switch restarts animation via reflow", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
+        let reads = 0
+        Object.defineProperty(strip, "offsetWidth", {
+            configurable: true,
+            get: () => {
+                reads += 1
+                return 400
+            },
+        })
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
+        expect(strip.getAttribute("data-switch")).toBe("newer")
+        let firstKey = strip.getAttribute("data-switch-key")
+        let afterFirst = reads
+        expect(afterFirst).toBeGreaterThan(0)
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
+        expect(strip.getAttribute("data-switch")).toBe("newer")
+        expect(strip.getAttribute("data-switch-key")).not.toBe(firstKey)
+        expect(reads).toBeGreaterThan(afterFirst)
+    })
+
+    it("pinch second pointer setPointerCapture on the viewport", () => {
+        viewer.open({ items: [img("a")] })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        let capture = vi.fn()
+        viewport.setPointerCapture = capture
+        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 2, clientX: 450, clientY: 200 }))
+        expect(capture).toHaveBeenCalledWith(1)
+        expect(capture).toHaveBeenCalledWith(2)
+    })
+
+    it("close ghost still plays when stage fit is null", async () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        expect(viewer.beginClose()).toBe(true)
+        let before = animate.mock.calls.length
+        api!.close()
+        let overlay = root.querySelector("[data-yorozu-media-viewer]")
+        expect(
+            document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS) ||
+                overlay?.getAttribute("data-phase") === "closing",
+        ).toBe(true)
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => resolve())
+            })
+        })
+        expect(animate.mock.calls.length).toBeGreaterThan(before)
+    })
 })

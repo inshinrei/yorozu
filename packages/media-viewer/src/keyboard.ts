@@ -21,6 +21,8 @@ export function bindMediaViewerKeys(handlers: MediaViewerKeyHandlers, target?: E
             return
         }
         if (event.metaKey || event.ctrlKey) return
+        let el = event.target
+        if (el instanceof Element && el.closest("input, textarea, select, [contenteditable]")) return
         if (key === "ArrowLeft") {
             if (!handlers.getAllowSwitch()) return
             event.preventDefault()
@@ -49,6 +51,7 @@ export function bindMediaViewerKeys(handlers: MediaViewerKeyHandlers, target?: E
             if (!handlers.getAllowZoom()) return
             event.preventDefault()
             handlers.resetZoom()
+            return
         }
     }
 

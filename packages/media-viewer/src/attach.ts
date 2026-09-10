@@ -258,6 +258,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 strip.removeAttribute("data-switch-key")
             } else if (strip.getAttribute("data-switch") !== dir || strip.getAttribute("data-switch-key") !== key) {
                 strip.removeAttribute("data-switch")
+                void strip.offsetWidth
                 strip.setAttribute("data-switch-key", key)
                 strip.setAttribute("data-switch", dir)
             }
@@ -306,7 +307,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 fromStage = { top: box.top, left: box.left, width: box.width, height: box.height }
             }
         }
-        if (!fromStage) return false
+        if (!fromStage) {
+            let fb = viewportFallback()
+            fromStage = { top: 0, left: 0, width: fb.width, height: fb.height }
+        }
         let fadeOut = target == null
         if (target) {
             let clipEl = opts?.getHistoryClipRoot?.()
@@ -629,6 +633,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportPointerDown(e: PointerEvent): void {
+        try {
+            viewport?.setPointerCapture(e.pointerId)
+        } catch {
+            // optional
+        }
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
         if (isImage() && pointers.size >= 2) {
             if (!pinching) startPinch()

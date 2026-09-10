@@ -226,6 +226,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     }
 
     function subscribe(listener: () => void): () => void {
+        if (!alive) return () => {}
         listeners.add(listener)
         return () => {
             listeners.delete(listener)
