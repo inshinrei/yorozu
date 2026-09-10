@@ -215,7 +215,7 @@ describe("attachMediaViewer", () => {
         expect(api!.percentLabel()).toBe("125%")
     })
 
-    it("tap without drag toggles fit and max even when already zoomed", () => {
+    it("tap without drag does not change scale", () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({
             items: [img("a")],
@@ -228,18 +228,12 @@ describe("attachMediaViewer", () => {
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointerup", { clientX: 200, clientY: 200 }))
-        expect(api!.scale()).toBe(20)
-        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
-        viewport.dispatchEvent(pointer("pointermove", { clientX: 205, clientY: 200 }))
-        viewport.dispatchEvent(pointer("pointerup", { clientX: 205, clientY: 200 }))
         expect(api!.scale()).toBe(1)
+        api!.zoomIn()
+        expect(api!.scale()).toBe(1.25)
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointerup", { clientX: 200, clientY: 200 }))
-        expect(api!.scale()).toBe(20)
-        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
-        viewport.dispatchEvent(pointer("pointermove", { clientX: 240, clientY: 200 }))
-        viewport.dispatchEvent(pointer("pointerup", { clientX: 240, clientY: 200 }))
-        expect(api!.scale()).toBe(20)
+        expect(api!.scale()).toBe(1.25)
     })
 
     it("two-pointer pinch zooms the image and legalizes on release", () => {

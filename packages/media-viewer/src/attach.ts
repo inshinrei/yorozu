@@ -738,16 +738,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
-    function maybeToggleZoom(e: PointerEvent): void {
-        if (shell && shell.openPhase() !== "open") return
-        let current = viewer.snapshot().current
-        if (current?.kind !== "image" || !current.src) return
-        let t = e.target
-        if (t instanceof Element && t.closest("button, a, input, textarea, select, video")) return
-        zoom.toggleZoom(pointFromEvent(e))
-        scheduleRender()
-    }
-
     function pinchDistance(): number {
         if (pointers.size < 2) return 0
         let pts = [...pointers.values()]
@@ -873,7 +863,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         swipe.onPointerUp(e)
         if (tapPointerId === e.pointerId) {
-            if (!tapMoved) maybeToggleZoom(e)
             tapPointerId = null
         }
         scheduleRender()
