@@ -205,6 +205,10 @@ body {
     width: 100%;
 }
 
+.pg-album[data-count="1"] {
+    width: min(100%, 12rem);
+}
+
 .pg-cell {
     position: absolute;
     margin: 0;

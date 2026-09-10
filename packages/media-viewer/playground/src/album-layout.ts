@@ -1,7 +1,7 @@
 /**
  * Multi-media album grid layout (ratios → absolute cells).
  * Pure geometry — no DOM. Callers pass width/height ratios of image|video items.
- * n=1 full-width; n≥2 one multi-row packer (attempt/score).
+ * n=1 capped width; 2≤n≤10 single row; n>10 rows of 10 with remainder last.
  */
 
 /** Bit flags: which outer sides of the album container a cell touches. */
@@ -39,21 +39,17 @@ export type CalculateAlbumLayoutOpts = {
     spacing?: number
 }
 
-const MAX_COMPLEX_LAYOUT_ROW_ITEMS = 3
-const MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS = 4
-const EXTENDED_LAYOUT_EXTRA_ROW_COUNT = 2
-const MIN_EXTENDED_LAYOUT_ROW_COUNT = 5
-
 /** Default album spacing in px. */
 export const DEFAULT_ALBUM_SPACING: number = 2
 
 /** Default album max width in px. */
 export const DEFAULT_ALBUM_MAX_WIDTH: number = 450
 
-type Attempt = {
-    lineCounts: number[]
-    heights: number[]
-}
+/** Cap for a lone album item so it is not full-bleed. */
+export const DEFAULT_ALBUM_SINGLE_MAX_WIDTH: number = 160
+
+/** Max thumbs per row (and last-row cap) for multi-item albums. */
+export const MAX_ALBUM_ROW_ITEMS: number = 10
 
 type LayoutParams = {
     ratios: number[]
@@ -77,94 +73,20 @@ function getAverageRatio(ratios: number[]): number {
 }
 
 /**
- * Candidate row partitions for the packer.
- * Single-row maxCounts [LAST] is required for n=2–4 so side-by-side layouts
- * remain reachable (multi-row-only templates yield only stacked [[1,1]] for n=2).
+ * Row partition: single row for n≤10; fill rows of 10 with remainder last for n>10.
  */
-function buildBaseLineCounts(count: number, averageRatio: number): number[][] {
-    return [
-        [MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS],
-        [MAX_COMPLEX_LAYOUT_ROW_ITEMS, MAX_COMPLEX_LAYOUT_ROW_ITEMS],
-        [
-            MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-            averageRatio < 0.85 ? MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS : MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-            MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-        ],
-        [
-            MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-            MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-            MAX_COMPLEX_LAYOUT_ROW_ITEMS,
-            MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS,
-        ],
-    ].flatMap((maxCounts) => buildLineCounts(count, maxCounts))
-}
-
-function buildExtendedLineCounts(count: number): number[][] {
-    let minRowCount = Math.max(
-        MIN_EXTENDED_LAYOUT_ROW_COUNT,
-        Math.ceil((count - MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS) / MAX_COMPLEX_LAYOUT_ROW_ITEMS) + 1,
-    )
-    let maxRowCount = Math.min(count, minRowCount + EXTENDED_LAYOUT_EXTRA_ROW_COUNT)
-    let lineCounts: number[][] = []
-
-    for (let rowCount = minRowCount; rowCount <= maxRowCount; rowCount++) {
-        let current = buildExtendedLineCount(count, rowCount)
-        if (current) {
-            lineCounts.push(current)
-        }
+function buildAlbumLineCounts(count: number): number[] {
+    if (count <= MAX_ALBUM_ROW_ITEMS) {
+        return [count]
     }
-
+    let lineCounts: number[] = []
+    let remaining = count
+    while (remaining > 0) {
+        let rowItems = Math.min(MAX_ALBUM_ROW_ITEMS, remaining)
+        lineCounts.push(rowItems)
+        remaining -= rowItems
+    }
     return lineCounts
-}
-
-function buildExtendedLineCount(count: number, rowCount: number): number[] | undefined {
-    let lineCounts = Array.from({ length: rowCount }, () => 1)
-    let maxCounts = Array.from({ length: rowCount }, () => MAX_COMPLEX_LAYOUT_ROW_ITEMS)
-    maxCounts[rowCount - 1] = MAX_COMPLEX_LAYOUT_LAST_ROW_ITEMS
-
-    if (count > accumulate(maxCounts, 0)) {
-        return undefined
-    }
-
-    let remainingCount = count - rowCount
-    for (let row = rowCount - 1; row >= 0 && remainingCount; row--) {
-        let addedCount = Math.min(remainingCount, maxCounts[row]! - lineCounts[row]!)
-        lineCounts[row] += addedCount
-        remainingCount -= addedCount
-    }
-
-    return lineCounts
-}
-
-function buildLineCounts(count: number, maxCounts: number[]): number[][] {
-    let lineCounts: number[][] = []
-    collectLineCounts(count, maxCounts, [], lineCounts)
-    return lineCounts
-}
-
-function collectLineCounts(
-    remainingCount: number,
-    maxCounts: number[],
-    currentLineCounts: number[],
-    result: number[][],
-): void {
-    if (!maxCounts.length) {
-        if (!remainingCount) {
-            result.push([...currentLineCounts])
-        }
-        return
-    }
-
-    let [maxCurrentCount, ...restMaxCounts] = maxCounts
-    let maxRestCount = accumulate(restMaxCounts, 0)
-    let minCurrentCount = Math.max(1, remainingCount - maxRestCount)
-    let maxAllowedCount = Math.min(maxCurrentCount!, remainingCount - restMaxCounts.length)
-
-    for (let currentCount = minCurrentCount; currentCount <= maxAllowedCount; currentCount++) {
-        currentLineCounts.push(currentCount)
-        collectLineCounts(remainingCount - currentCount, restMaxCounts, currentLineCounts, result)
-        currentLineCounts.pop()
-    }
 }
 
 function cropRatios(ratios: number[], averageRatio: number): number[] {
@@ -198,7 +120,7 @@ function calculateContainerSize(layout: AlbumCell[]): { width: number; height: n
 
 /**
  * Compute absolute album cells from width/height ratios (width ÷ height).
- * Empty ratios → empty layout. n=1 full-width; n≥2 multi-row packer.
+ * Empty ratios → empty layout. n=1 capped; 2≤n≤10 one row; n>10 rows of 10.
  */
 export function calculateAlbumLayoutByRatios(ratios: number[], opts?: CalculateAlbumLayoutOpts): AlbumLayout {
     if (!ratios.length) {
@@ -245,13 +167,14 @@ export function albumRatiosFromSizes(
 }
 
 function layoutSingle({ ratios, maxWidth, maxHeight }: LayoutParams): AlbumCell[] {
-    let height = Math.round(Math.min(maxWidth / ratios[0]!, maxHeight))
+    let width = Math.min(maxWidth, DEFAULT_ALBUM_SINGLE_MAX_WIDTH)
+    let height = Math.round(Math.min(width / ratios[0]!, maxHeight))
     return [
         {
             dimensions: {
                 x: 0,
                 y: 0,
-                width: maxWidth,
+                width,
                 height,
             },
             sides: AlbumRectPart.Left | AlbumRectPart.Top | AlbumRectPart.Right | AlbumRectPart.Bottom,
@@ -263,14 +186,12 @@ function layoutWithComplexLayouter({
     ratios: originalRatios,
     averageRatio,
     maxWidth,
-    minWidth,
     spacing,
-    maxHeight = (4 * maxWidth) / 3,
 }: LayoutParams): AlbumCell[] {
     let ratios = cropRatios(originalRatios, averageRatio)
     let count = originalRatios.length
     let result = new Array<AlbumCell>(count)
-    let attempts: Attempt[] = []
+    let lineCounts = buildAlbumLineCounts(count)
 
     let multiHeight = (offset: number, attemptCount: number): number => {
         let attemptRatios = ratios.slice(offset, offset + attemptCount)
@@ -278,70 +199,19 @@ function layoutWithComplexLayouter({
         return (maxWidth - (attemptCount - 1) * spacing) / sum
     }
 
-    let pushAttempt = (lineCounts: number[]): void => {
-        let heights: number[] = []
-        let offset = 0
-        for (let currentCount of lineCounts) {
-            heights.push(multiHeight(offset, currentCount))
-            offset += currentCount
-        }
-        attempts.push({ lineCounts, heights })
+    let heights: number[] = []
+    let offset = 0
+    for (let currentCount of lineCounts) {
+        heights.push(multiHeight(offset, currentCount))
+        offset += currentCount
     }
 
-    for (let counts of buildBaseLineCounts(count, averageRatio)) {
-        pushAttempt(counts)
-    }
-
-    if (!attempts.length) {
-        for (let counts of buildExtendedLineCounts(count)) {
-            pushAttempt(counts)
-        }
-    }
-
-    let optimalAttempt: Attempt | undefined
-    let optimalDiff = 0
-    for (let i = 0; i < attempts.length; i++) {
-        let { heights, lineCounts } = attempts[i]!
-        let lineCount = lineCounts.length
-        let totalHeight = accumulate(heights, 0) + spacing * (lineCount - 1)
-        let minLineHeight = Math.min(...heights)
-        let bad1 = minLineHeight < minWidth ? 1.5 : 1
-        let bad2 = ((): number => {
-            for (let line = 1; line !== lineCount; ++line) {
-                if (lineCounts[line - 1]! > lineCounts[line]!) {
-                    return 1.5
-                }
-            }
-            return 1
-        })()
-        let diff = Math.abs(totalHeight - maxHeight) * bad1 * bad2
-
-        if (!optimalAttempt || diff < optimalDiff) {
-            optimalAttempt = attempts[i]
-            optimalDiff = diff
-        }
-    }
-
-    // Fallback if no attempt (should not happen for reasonable counts)
-    if (!optimalAttempt) {
-        return layoutSingle({
-            ratios: originalRatios,
-            averageRatio: 1,
-            maxWidth,
-            minWidth,
-            maxHeight,
-            spacing,
-        })
-    }
-
-    let optimalCounts = optimalAttempt.lineCounts
-    let optimalHeights = optimalAttempt.heights
-    let rowCount = optimalCounts.length
+    let rowCount = lineCounts.length
     let index = 0
     let y = 0
     for (let row = 0; row !== rowCount; ++row) {
-        let colCount = optimalCounts[row]!
-        let lineHeight = optimalHeights[row]!
+        let colCount = lineCounts[row]!
+        let lineHeight = heights[row]!
         let height = Math.round(lineHeight)
         let x = 0
 

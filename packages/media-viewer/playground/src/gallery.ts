@@ -154,6 +154,7 @@ function renderAlbum(
 ): HTMLElement {
     let album = document.createElement("div")
     album.className = "pg-album"
+    album.dataset.count = String(entries.length)
     let ratios = albumRatiosFromSizes(entries)
     let maxWidth = albumPackWidth()
     let { layout, containerStyle } = calculateAlbumLayoutByRatios(ratios, {

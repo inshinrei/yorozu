@@ -4,6 +4,7 @@ import {
     albumRatiosFromSizes,
     calculateAlbumLayoutByRatios,
     DEFAULT_ALBUM_MAX_WIDTH,
+    DEFAULT_ALBUM_SINGLE_MAX_WIDTH,
     DEFAULT_ALBUM_SPACING,
 } from "./album-layout"
 
@@ -40,25 +41,33 @@ describe("calculateAlbumLayoutByRatios", () => {
         expect(calculateAlbumLayoutByRatios([])).toEqual({ layout: [], containerStyle: { width: 0, height: 0 } })
     })
 
-    it("n=1 is full width", () => {
+    it("n=1 is capped, not full maxWidth", () => {
+        expect(DEFAULT_ALBUM_SINGLE_MAX_WIDTH).toBe(160)
         let { layout, containerStyle } = calculateAlbumLayoutByRatios([1.5], { maxWidth: 450, maxHeight: 450 })
         expect(layout).toHaveLength(1)
-        expect(layout[0]!.dimensions.width).toBe(450)
-        expect(containerStyle.width).toBe(450)
+        expect(layout[0]!.dimensions.width).toBe(160)
+        expect(containerStyle.width).toBe(160)
     })
 
-    it("defaults max width to 450", () => {
+    it("defaults max width to 450 and single cap to 160", () => {
         expect(DEFAULT_ALBUM_MAX_WIDTH).toBe(450)
         expect(DEFAULT_ALBUM_SPACING).toBe(2)
         expect(AlbumRectPart).toEqual({ None: 0, Top: 1, Right: 2, Bottom: 4, Left: 8 })
         let { layout, containerStyle } = calculateAlbumLayoutByRatios([1])
-        expect(layout[0]!.dimensions.width).toBe(DEFAULT_ALBUM_MAX_WIDTH)
-        expect(containerStyle.width).toBe(450)
-        expect(layout[0]!.dimensions.height).toBe(450)
+        expect(layout[0]!.dimensions.width).toBe(DEFAULT_ALBUM_SINGLE_MAX_WIDTH)
+        expect(containerStyle.width).toBe(160)
+        expect(layout[0]!.dimensions.height).toBe(160)
     })
 
     it("lays out two equal squares side by side", () => {
-        let { layout, containerStyle } = calculateAlbumLayoutByRatios([1, 1], {
+        let { layout, containerStyle } = calculateAlbumLayoutByRatios([1, 1], GOLDEN_OPTS)
+        expect(layout[0]!.dimensions).toEqual({ x: 0, y: 0, width: 224, height: 224 })
+        expect(layout[1]!.dimensions).toEqual({ x: 226, y: 0, width: 224, height: 224 })
+        expect(containerStyle).toEqual({ width: 450, height: 224 })
+    })
+
+    it("lays out two similar wide landscapes side by side", () => {
+        let { layout, containerStyle } = calculateAlbumLayoutByRatios([1.5, 1.5], {
             maxWidth: 450,
             maxHeight: 450,
             spacing: DEFAULT_ALBUM_SPACING,
@@ -67,24 +76,8 @@ describe("calculateAlbumLayoutByRatios", () => {
         expect(layout[0]!.dimensions.y).toBe(0)
         expect(layout[1]!.dimensions.y).toBe(0)
         expect(layout[1]!.dimensions.x).toBeGreaterThan(0)
-        expect(layout[0]!.dimensions.x + layout[0]!.dimensions.width + DEFAULT_ALBUM_SPACING).toBe(
-            layout[1]!.dimensions.x,
-        )
         expect(containerStyle.width).toBe(450)
-        expect(containerStyle.height).toBeGreaterThan(0)
-    })
-
-    it("lays out two similar wide landscapes stacked", () => {
-        let { layout, containerStyle } = calculateAlbumLayoutByRatios([1.5, 1.5], {
-            maxWidth: 450,
-            maxHeight: 450,
-            spacing: DEFAULT_ALBUM_SPACING,
-        })
-        expect(layout).toHaveLength(2)
-        expect(layout[0]!.dimensions.x).toBe(0)
-        expect(layout[1]!.dimensions.x).toBe(0)
-        expect(layout[1]!.dimensions.y).toBeGreaterThan(0)
-        expect(containerStyle.width).toBe(450)
+        assertNoOverlapPositive(layout)
     })
 
     it("lays out three items without overlap", () => {
@@ -109,7 +102,7 @@ describe("calculateAlbumLayoutByRatios", () => {
         assertNoOverlapPositive(layout)
     })
 
-    it("lays out five-plus with multi-row packer", () => {
+    it("lays out five on one row", () => {
         let ratios = [1, 1.2, 0.9, 1.1, 1.3]
         let { layout, containerStyle } = calculateAlbumLayoutByRatios(ratios, {
             maxWidth: 450,
@@ -117,7 +110,28 @@ describe("calculateAlbumLayoutByRatios", () => {
         })
         expect(layout).toHaveLength(5)
         expect(containerStyle.width).toBe(450)
-        expect(layout.some((c) => c.sides & AlbumRectPart.Bottom)).toBe(true)
+        expect(new Set(layout.map((c) => c.dimensions.y))).toEqual(new Set([0]))
+        assertNoOverlapPositive(layout)
+    })
+
+    it("n=2 through n=10 pack on one row", () => {
+        for (let n of [2, 3, 4, 5, 6, 10]) {
+            let ratios = Array.from({ length: n }, () => 1)
+            let { layout, containerStyle } = calculateAlbumLayoutByRatios(ratios, GOLDEN_OPTS)
+            expect(layout).toHaveLength(n)
+            expect(containerStyle.width).toBe(450)
+            expect(new Set(layout.map((c) => c.dimensions.y))).toEqual(new Set([0]))
+            assertNoOverlapPositive(layout)
+        }
+    })
+
+    it("n=11 uses a second row and at most 10 cells on the first", () => {
+        let ratios = Array.from({ length: 11 }, () => 1)
+        let { layout } = calculateAlbumLayoutByRatios(ratios, GOLDEN_OPTS)
+        expect(layout).toHaveLength(11)
+        let firstRow = layout.filter((c) => c.dimensions.y === 0)
+        expect(firstRow.length).toBe(10)
+        expect(layout.some((c) => c.dimensions.y > 0)).toBe(true)
         assertNoOverlapPositive(layout)
     })
 
@@ -144,49 +158,5 @@ describe("calculateAlbumLayoutByRatios", () => {
         }
         expect(containerStyle.width).toBe(maxRight)
         expect(containerStyle.height).toBe(maxBottom)
-    })
-
-    it("locks golden geometry for n=2/3/4/5", () => {
-        expect(calculateAlbumLayoutByRatios([1, 1], GOLDEN_OPTS)).toEqual({
-            containerStyle: { width: 450, height: 224 },
-            layout: [
-                { dimensions: { x: 0, y: 0, width: 224, height: 224 }, sides: 13 },
-                { dimensions: { x: 226, y: 0, width: 224, height: 224 }, sides: 7 },
-            ],
-        })
-        expect(calculateAlbumLayoutByRatios([1.5, 1.5], GOLDEN_OPTS)).toEqual({
-            containerStyle: { width: 450, height: 602 },
-            layout: [
-                { dimensions: { x: 0, y: 0, width: 450, height: 300 }, sides: 11 },
-                { dimensions: { x: 0, y: 302, width: 450, height: 300 }, sides: 14 },
-            ],
-        })
-        expect(calculateAlbumLayoutByRatios([1.2, 1, 1], GOLDEN_OPTS)).toEqual({
-            containerStyle: { width: 450, height: 601 },
-            layout: [
-                { dimensions: { x: 0, y: 0, width: 450, height: 375 }, sides: 11 },
-                { dimensions: { x: 0, y: 377, width: 224, height: 224 }, sides: 12 },
-                { dimensions: { x: 226, y: 377, width: 224, height: 224 }, sides: 6 },
-            ],
-        })
-        expect(calculateAlbumLayoutByRatios([2, 1, 1, 1], GOLDEN_OPTS)).toEqual({
-            containerStyle: { width: 450, height: 376 },
-            layout: [
-                { dimensions: { x: 0, y: 0, width: 450, height: 225 }, sides: 11 },
-                { dimensions: { x: 0, y: 227, width: 149, height: 149 }, sides: 12 },
-                { dimensions: { x: 151, y: 227, width: 149, height: 149 }, sides: 4 },
-                { dimensions: { x: 302, y: 227, width: 148, height: 149 }, sides: 6 },
-            ],
-        })
-        expect(calculateAlbumLayoutByRatios([1, 1.2, 0.9, 1.1, 1.3], GOLDEN_OPTS)).toEqual({
-            containerStyle: { width: 450, height: 337 },
-            layout: [
-                { dimensions: { x: 0, y: 0, width: 204, height: 204 }, sides: 9 },
-                { dimensions: { x: 206, y: 0, width: 244, height: 204 }, sides: 3 },
-                { dimensions: { x: 0, y: 206, width: 131, height: 131 }, sides: 12 },
-                { dimensions: { x: 133, y: 206, width: 144, height: 131 }, sides: 4 },
-                { dimensions: { x: 279, y: 206, width: 171, height: 131 }, sides: 6 },
-            ],
-        })
     })
 })
