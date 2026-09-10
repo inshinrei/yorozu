@@ -89,6 +89,20 @@ describe("createMediaImageZoom", () => {
         zoom.destroy()
     })
 
+    it("setViewportSize / setLayoutSize / setNaturalSize no-op does not stop settle", () => {
+        let zoom = sizedZoom()
+        zoom.applyRelativeZoomSoft(22, { offsetX: 0, offsetY: 0 })
+        expect(zoom.scale()).toBeGreaterThan(MEDIA_MAX_ZOOM_FACTOR)
+        zoom.endDrag({ withInertia: false, pinchOrigin: { offsetX: 0, offsetY: 0 } })
+        expect(zoom.isSettling()).toBe(true)
+        zoom.setViewportSize(400, 300)
+        zoom.setLayoutSize(400, 300)
+        zoom.setNaturalSize(800, 600)
+        expect(zoom.isSettling()).toBe(true)
+        expect(zoom.scale()).toBeGreaterThan(MEDIA_MAX_ZOOM_FACTOR)
+        zoom.destroy()
+    })
+
     it("wheel hard-clamps without soft overshoot", () => {
         let zoom = sizedZoom()
         // Large wheel notches should still land ≤ max

@@ -183,6 +183,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         if (olderFlag) {
             navFrom = from
             opts?.onRequestOlder?.()
+            notify()
             return
         }
     }
@@ -200,6 +201,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         if (newerFlag) {
             navFrom = from
             opts?.onRequestNewer?.()
+            notify()
             return
         }
     }

@@ -58,6 +58,13 @@ describe("default media viewer styles", () => {
         expect(css).toContain("[data-swipe-dismiss]")
         expect(css).toContain("--yorozu-media-dismiss-alpha")
         expect(css).not.toContain("data-gallery-stage-media")
+        expect(css).toContain('[data-switch="newer"]')
+        expect(css).toContain('[data-switch="older"]')
+        expect(css).toContain('[data-switch="jump"]')
+        expect(css).toContain("@keyframes yorozu-media-switch-newer")
+        expect(css).toContain("@keyframes yorozu-media-switch-older")
+        expect(css).toContain("@keyframes yorozu-media-switch-jump")
+        expect(css).toContain("--yorozu-media-switch-ms")
     })
 
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {

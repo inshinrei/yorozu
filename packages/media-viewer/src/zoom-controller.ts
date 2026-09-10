@@ -261,17 +261,25 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             clearMotionSamples()
         },
         setNaturalSize(width: number, _height: number): void {
-            naturalWidth = width > 0 ? width : 0
+            let next = width > 0 ? width : 0
+            if (next === naturalWidth) return
+            naturalWidth = next
             setScaleToward(scale, null)
         },
         setLayoutSize(width: number, height: number): void {
-            layoutWidth = width > 0 ? width : 0
-            layoutHeight = height > 0 ? height : 0
+            let nextW = width > 0 ? width : 0
+            let nextH = height > 0 ? height : 0
+            if (nextW === layoutWidth && nextH === layoutHeight) return
+            layoutWidth = nextW
+            layoutHeight = nextH
             setScaleToward(scale, null)
         },
         setViewportSize(width: number, height: number): void {
-            viewportWidth = width > 0 ? width : 0
-            viewportHeight = height > 0 ? height : 0
+            let nextW = width > 0 ? width : 0
+            let nextH = height > 0 ? height : 0
+            if (nextW === viewportWidth && nextH === viewportHeight) return
+            viewportWidth = nextW
+            viewportHeight = nextH
             setScaleToward(scale, null)
         },
         applyWheel(deltaY: number, origin?: MediaPoint | null): void {

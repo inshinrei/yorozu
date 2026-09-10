@@ -29,6 +29,8 @@ export type MediaSwipeCallbacks = {
     onOlder: () => void
     onNewer: () => void
     onClose: () => void
+    /** When false, a committed swipe bounces instead of rebasing (pagination edge). Default true. */
+    willRebaseNav?: (dir: "older" | "newer") => boolean
 }
 
 export type MediaSwipe = {
@@ -209,14 +211,16 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
 
     function commitHorizontalNav(dir: "older" | "newer"): void {
         let { w } = viewportSize()
-        let rebased = rebasedOffsetAfterNav(offsetX, dir, w)
+        let fromOffset = offsetX
+        let rebase = cbs.willRebaseNav?.(dir) !== false
+        let rebased = rebasedOffsetAfterNav(fromOffset, dir, w)
         endPointerWheel()
         axis = "none"
         offsetY = 0
         settling = false
         clearLastDelta()
         cancelSettleRaf()
-        offsetX = rebased
+        offsetX = rebase ? rebased : fromOffset
         armWheelCooldown()
         if (dir === "older") cbs.onOlder()
         else cbs.onNewer()

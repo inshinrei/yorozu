@@ -138,6 +138,24 @@ describe("createMediaViewer", () => {
         expect(onRequestNewer).toHaveBeenCalledTimes(1)
     })
 
+    it("edge prev/next notify subscribers so lastNav is visible", () => {
+        let ticks = 0
+        viewer!.subscribe(() => {
+            ticks += 1
+        })
+        viewer!.open({ items: [img("a")], canOlder: true, canNewer: true })
+        ticks = 0
+        viewer!.prev("swipe")
+        expect(onRequestOlder).toHaveBeenCalledTimes(1)
+        expect(viewer!.snapshot().index).toBe(0)
+        expect(viewer!.lastNav()).toBe("swipe")
+        expect(ticks).toBe(1)
+        viewer!.next("key")
+        expect(onRequestNewer).toHaveBeenCalledTimes(1)
+        expect(viewer!.lastNav()).toBe("key")
+        expect(ticks).toBe(2)
+    })
+
     it("setItems keeps current id when present; explicit neighbors win including null", () => {
         viewer!.open({ items: [img("a"), img("b")], index: 1 })
         viewer!.setItems([img("x"), img("b"), img("y")])

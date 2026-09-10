@@ -94,6 +94,25 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
+    it("bounces without rebase when willRebaseNav is false", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(
+            baseCbs({
+                onNewer,
+                willRebaseNav: () => false,
+            }),
+        )
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        let dragged = swipe.offsetX()
+        expect(dragged).toBeLessThan(0)
+        swipe.onPointerUp(pointer("pointerup", { clientX: 300, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(Math.abs(swipe.offsetX())).toBeLessThan(200)
+        expect(swipe.offsetX()).toBeLessThanOrEqual(0)
+        swipe.destroy()
+    })
+
     it("resists and bounces when canNewer is false", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(

@@ -100,6 +100,22 @@ describe("createMediaShell", () => {
         shell.destroy()
     })
 
+    it("trackContentKey still sets switch dir when skipGhost is true", () => {
+        let shell = createMediaShell({
+            skipGhost: () => true,
+            hasOpenOrigin: () => false,
+            onFinishClose: () => {},
+        })
+        shell.trackContentKey("0:a")
+        shell.markNav("key")
+        shell.trackContentKey("1:b")
+        expect(shell.switchDir()).toBe("newer")
+        shell.markNav("jump")
+        shell.trackContentKey("4:z")
+        expect(shell.switchDir()).toBe("jump")
+        shell.destroy()
+    })
+
     it("requestClose without a close ghost waits MEDIA_CLOSE_MS", async () => {
         vi.useFakeTimers()
         let finish = vi.fn()

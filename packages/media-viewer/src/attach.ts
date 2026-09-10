@@ -15,6 +15,7 @@ import type {
     MediaViewerItem,
     MediaViewerNavFrom,
     MediaViewerNeighbor,
+    MediaViewerOpenOpts,
     MediaViewerSnapshot,
 } from "./types"
 import { wheelIntent, wheelPanDeltas, type MediaPoint } from "./zoom"
@@ -86,6 +87,17 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let dragOriginY = 0
     let dragStartX = 0
     let dragStartY = 0
+    let pointers = new Map<number, { x: number; y: number }>()
+    let pinching = false
+    let pinchDist = 0
+    let pinchOrigin: MediaPoint | null = null
+    let openSeq = 0
+    let paintedOpenSeq = -1
+    let innerOpen = viewer.open
+    viewer.open = (openOpts: MediaViewerOpenOpts): void => {
+        openSeq += 1
+        innerOpen(openOpts)
+    }
 
     function reducedMotion(): boolean {
         return (opts?.prefersReducedMotion ?? prefersReducedMotion)()
@@ -125,6 +137,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         },
         onClose: (): void => {
             requestViewerClose()
+        },
+        willRebaseNav: (dir: "older" | "newer"): boolean => {
+            let snap = viewer.snapshot()
+            if (dir === "older") return snap.index > 0
+            return snap.index < snap.items.length - 1
         },
     })
 
@@ -184,14 +201,22 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
     }
 
+    function measureStageEl(): HTMLElement | null {
+        if (!overlay) return viewport
+        let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]")
+        if (zoomEl instanceof HTMLElement) return zoomEl
+        let active = overlay.querySelector('[data-side="active"]')
+        if (active instanceof HTMLElement) return active
+        return viewport
+    }
+
     function measureZoom(): void {
         if (detached || !viewport) return
         let current = viewer.snapshot().current
-        let stage = paintedStageEl() ?? viewport
-        let box = stage.getBoundingClientRect()
+        let stage = measureStageEl() ?? viewport
         let fallback = viewportFallback()
-        let vw = box.width || stage.clientWidth || fallback.width
-        let vh = box.height || stage.clientHeight || fallback.height
+        let vw = stage.clientWidth || fallback.width
+        let vh = stage.clientHeight || fallback.height
         let content = stageContentSize(vw, vh, readPadding(stage))
         zoom.setViewportSize(content.width, content.height)
         let nw = current?.naturalWidth || 0
@@ -226,6 +251,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (strip) {
             let next = swipe.transformStyle()
             strip.style.transform = next ?? ""
+            let dir = shell?.switchDir() ?? "none"
+            let key = String(shell?.switchAnimKey() ?? 0)
+            if (dir === "none") {
+                strip.removeAttribute("data-switch")
+                strip.removeAttribute("data-switch-key")
+            } else if (strip.getAttribute("data-switch") !== dir || strip.getAttribute("data-switch-key") !== key) {
+                strip.removeAttribute("data-switch")
+                strip.setAttribute("data-switch-key", key)
+                strip.setAttribute("data-switch", dir)
+            }
         }
         let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]") as HTMLElement | null
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
@@ -378,6 +413,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             zoom.reset()
             scheduleRender()
         },
+        percentLabel: (): string => zoom.percentLabel(),
+        scale: (): number => zoom.scale(),
         snapshot: (): MediaViewerSnapshot => viewer.snapshot(),
     }
 
@@ -547,43 +584,101 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (shell && shell.openPhase() !== "open") return
         let current = viewer.snapshot().current
         if (current?.kind !== "image" || !current.src) return
-        if (zoom.isZoomed()) return
         let t = e.target
         if (t instanceof Element && t.closest("button, a, input, textarea, select, video")) return
         zoom.toggleZoom(pointFromEvent(e))
         scheduleRender()
     }
 
+    function pinchDistance(): number {
+        if (pointers.size < 2) return 0
+        let pts = [...pointers.values()]
+        return Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y)
+    }
+
+    function pinchMidpoint(): MediaPoint {
+        let pts = [...pointers.values()]
+        if (pts.length < 2) return { offsetX: 0, offsetY: 0 }
+        return pointFromEvent({
+            clientX: (pts[0]!.x + pts[1]!.x) / 2,
+            clientY: (pts[0]!.y + pts[1]!.y) / 2,
+        })
+    }
+
+    function startPinch(): void {
+        if (!isImage()) return
+        pinching = true
+        tapMoved = true
+        if (zoomDragging) {
+            zoomDragging = false
+            zoom.endDrag({ withInertia: false })
+        }
+        swipe.reset()
+        pinchDist = pinchDistance()
+        pinchOrigin = pinchMidpoint()
+        zoom.beginDrag()
+    }
+
+    function endPinch(): void {
+        if (!pinching) return
+        pinching = false
+        zoomDragging = false
+        zoom.endDrag({ pinchOrigin, withInertia: false })
+        pinchOrigin = null
+        pinchDist = 0
+    }
+
     function onViewportPointerDown(e: PointerEvent): void {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (isImage() && pointers.size >= 2) {
+            if (!pinching) startPinch()
+            scheduleRender()
+            return
+        }
         tapPointerId = e.pointerId
         tapX = e.clientX
         tapY = e.clientY
         tapMoved = false
+        dragOriginX = e.clientX
+        dragOriginY = e.clientY
         if (swipe.onPointerDown(e)) {
             zoomDragging = false
             scheduleRender()
             return
         }
-        if (isImage() && zoom.isZoomed()) {
-            zoom.beginDrag()
-            zoomDragging = true
-            dragOriginX = e.clientX
-            dragOriginY = e.clientY
-            let start = zoom.getDragStartTranslate()
-            dragStartX = start.translateX
-            dragStartY = start.translateY
-            try {
-                viewport?.setPointerCapture(e.pointerId)
-            } catch {
-                // optional
-            }
-        }
         scheduleRender()
     }
 
     function onViewportPointerMove(e: PointerEvent): void {
+        if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (pinching && pointers.size >= 2) {
+            e.preventDefault()
+            let dist = pinchDistance()
+            if (pinchDist > 0 && dist > 0) {
+                let amount = dist / pinchDist - 1
+                pinchOrigin = pinchMidpoint()
+                zoom.applyRelativeZoomSoft(amount, pinchOrigin)
+                pinchDist = dist
+            }
+            scheduleRender()
+            return
+        }
         if (tapPointerId === e.pointerId) {
-            if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > TAP_MOVE_PX) tapMoved = true
+            if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > TAP_MOVE_PX) {
+                tapMoved = true
+                if (!zoomDragging && !pinching && isImage() && zoom.isZoomed()) {
+                    zoom.beginDrag()
+                    zoomDragging = true
+                    let start = zoom.getDragStartTranslate()
+                    dragStartX = start.translateX
+                    dragStartY = start.translateY
+                    try {
+                        viewport?.setPointerCapture(e.pointerId)
+                    } catch {
+                        // optional
+                    }
+                }
+            }
         }
         if (zoomDragging) {
             e.preventDefault()
@@ -596,6 +691,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportPointerUp(e: PointerEvent): void {
+        pointers.delete(e.pointerId)
+        if (pinching) {
+            if (pointers.size < 2) endPinch()
+            if (tapPointerId === e.pointerId) tapPointerId = null
+            scheduleRender()
+            return
+        }
         if (zoomDragging) {
             zoomDragging = false
             zoom.endDrag()
@@ -612,6 +714,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportPointerCancel(e: PointerEvent): void {
+        pointers.delete(e.pointerId)
+        if (pinching) {
+            if (pointers.size < 2) endPinch()
+            if (tapPointerId === e.pointerId) tapPointerId = null
+            scheduleRender()
+            return
+        }
         if (zoomDragging) {
             zoomDragging = false
             zoom.endDrag({ withInertia: false })
@@ -622,21 +731,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportWheel(e: WheelEvent): void {
-        if (!isImage()) return
-        let intent = wheelIntent(zoom.isZoomed(), e.ctrlKey || e.metaKey)
-        if (intent === "swipe") return
-        e.preventDefault()
-        e.stopPropagation()
-        if (intent === "zoom") {
-            zoom.applyWheel(e.deltaY, pointFromEvent(e))
-        } else {
-            let pan = wheelPanDeltas(e.deltaX, e.deltaY, e.deltaMode)
-            zoom.panBy(-pan.deltaX, -pan.deltaY)
+        if (isImage()) {
+            let intent = wheelIntent(zoom.isZoomed(), e.ctrlKey || e.metaKey)
+            if (intent === "zoom") {
+                e.preventDefault()
+                e.stopPropagation()
+                zoom.applyWheel(e.deltaY, pointFromEvent(e))
+                scheduleRender()
+                return
+            }
+            if (intent === "pan") {
+                e.preventDefault()
+                e.stopPropagation()
+                let pan = wheelPanDeltas(e.deltaX, e.deltaY, e.deltaMode)
+                zoom.panBy(-pan.deltaX, -pan.deltaY)
+                scheduleRender()
+                return
+            }
         }
-        scheduleRender()
-    }
-
-    function onOverlayWheel(e: WheelEvent): void {
         swipe.trapWheel(e)
         scheduleRender()
     }
@@ -673,7 +785,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         viewport.addEventListener("pointerup", onViewportPointerUp, { signal })
         viewport.addEventListener("pointercancel", onViewportPointerCancel, { signal })
         viewport.addEventListener("wheel", onViewportWheel, { signal, passive: false })
-        overlay.addEventListener("wheel", onOverlayWheel, { signal, passive: false })
 
         if (typeof ResizeObserver === "function") {
             resizeObserver = new ResizeObserver(() => measureZoom())
@@ -696,6 +807,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         zoom.reset()
         zoomDragging = false
         tapPointerId = null
+        pointers.clear()
+        pinching = false
+        pinchOrigin = null
+        pinchDist = 0
         lastContentId = null
         startedOpen = false
         let currentShell = shell
@@ -714,10 +829,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let snap = viewer.snapshot()
         if (!snap.open) {
             tearDownOverlay()
+            paintedOpenSeq = -1
             return
         }
+        let isFreshOpen = overlay == null || openSeq !== paintedOpenSeq
+        if (isFreshOpen && overlay != null) tearDownOverlay()
         let created = overlay == null
         if (created) createOverlay()
+        paintedOpenSeq = openSeq
         ensureShell()
         paintPanes(snap)
         if (snap.current?.id !== lastContentId) {
@@ -764,6 +883,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     return (): void => {
         if (detached) return
         detached = true
+        viewer.open = innerOpen
         unsub()
         tearDownOverlay()
         swipe.destroy()

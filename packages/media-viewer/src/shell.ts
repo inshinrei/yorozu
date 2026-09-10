@@ -167,7 +167,7 @@ export function createMediaShell(opts: {
         let prev = lastKey
         lastKey = contentKey
         switchKey += 1
-        if (opts.skipGhost() || resolveLastNav() === "swipe") {
+        if (resolveLastNav() === "swipe") {
             switchDirection = "none"
             return
         }
