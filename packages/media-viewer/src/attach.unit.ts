@@ -905,6 +905,32 @@ describe("attachMediaViewer", () => {
         vi.useRealTimers()
     })
 
+    it("swipe-close leftover wheel does not restart the linger lock", () => {
+        vi.useFakeTimers()
+        viewer.open({ items: [img("a")] })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 400, clientY: 280 }))
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let first = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(first)
+        expect(first.defaultPrevented).toBe(true)
+        vi.advanceTimersByTime(50)
+        let leftover = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(leftover)
+        expect(leftover.defaultPrevented).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS - 50)
+        let after = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(after)
+        expect(after.defaultPrevented).toBe(false)
+        scroller.remove()
+        vi.useRealTimers()
+    })
+
     it("forceClose does not linger-lock the page scroller", () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({

@@ -391,7 +391,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         scrollLockLinger = null
     }
 
-    function bumpScrollLockLingerTimer(): void {
+    function startScrollLockLingerTimer(): void {
         if (scrollLockLingerTimer != null) clearTimeout(scrollLockLingerTimer)
         scrollLockLingerTimer = setTimeout(() => {
             scrollLockLingerTimer = null
@@ -405,11 +405,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let signal = scrollLockLinger.signal
         const onLingerScroll = (e: Event): void => {
             e.preventDefault()
-            bumpScrollLockLingerTimer()
         }
         window.addEventListener("wheel", onLingerScroll, { capture: true, passive: false, signal })
         window.addEventListener("touchmove", onLingerScroll, { capture: true, passive: false, signal })
-        bumpScrollLockLingerTimer()
+        startScrollLockLingerTimer()
     }
 
     function requestViewerClose(closeOpts?: { ghost?: boolean }): void {
