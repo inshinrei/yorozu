@@ -594,25 +594,55 @@ describe("attachMediaViewer", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
         let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLButtonElement
         expect(current.getAttribute("data-index")).toBe("2")
-        expect(scrollIntoView).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        expect(scrollIntoView).toHaveBeenCalledWith({
+            inline: "center",
+            block: "nearest",
+            behavior: "smooth",
+        })
         scrollIntoView.mockClear()
         let next = root.querySelector('[data-yorozu-media-thumb][data-index="0"]') as HTMLButtonElement
         let nextScroll = vi.fn()
         next.scrollIntoView = nextScroll
         viewer.goTo(0)
         expect(next.hasAttribute("data-current")).toBe(true)
-        expect(nextScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        expect(nextScroll).toHaveBeenCalledWith({
+            inline: "center",
+            block: "nearest",
+            behavior: "smooth",
+        })
         let mid = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
         let midScroll = vi.fn()
         mid.scrollIntoView = midScroll
         viewer.next()
         expect(mid.hasAttribute("data-current")).toBe(true)
-        expect(midScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        expect(midScroll).toHaveBeenCalledWith({
+            inline: "center",
+            block: "nearest",
+            behavior: "smooth",
+        })
         let firstScroll = vi.fn()
         next.scrollIntoView = firstScroll
         viewer.prev("swipe")
         expect(next.hasAttribute("data-current")).toBe(true)
-        expect(firstScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        expect(firstScroll).toHaveBeenCalledWith({
+            inline: "center",
+            block: "nearest",
+            behavior: "smooth",
+        })
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+    })
+
+    it("scrolls the current thumb with instant behavior when reduced motion is on", () => {
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        let scrollIntoView = vi.fn()
+        HTMLElement.prototype.scrollIntoView = scrollIntoView
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        expect(scrollIntoView).toHaveBeenCalledWith({
+            inline: "center",
+            block: "nearest",
+            behavior: "instant",
+        })
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
     })
 

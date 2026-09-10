@@ -663,7 +663,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let current = track.querySelector("[data-yorozu-media-thumb][data-current]")
         if (!(current instanceof HTMLElement)) return
         if (typeof current.scrollIntoView !== "function") return
-        current.scrollIntoView({ inline: "center", block: "nearest" })
+        current.scrollIntoView({
+            inline: "center",
+            block: "nearest",
+            behavior: reducedMotion() ? "instant" : "smooth",
+        })
     }
 
     function onFilmstripClick(e: Event): void {
