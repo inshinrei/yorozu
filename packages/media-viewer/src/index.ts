@@ -82,3 +82,16 @@ export type { MediaPoint, MediaZoomState, MediaZoomVelocity, MediaZoomSample } f
 export { createMediaImageZoom } from "./zoom-controller"
 export type { MediaImageZoom } from "./zoom-controller"
 export { stageContentSize, fitContain } from "./layout"
+export { MEDIA_ORIGIN_ATTR, mediaOriginSelector, queryMediaOriginEl, captureOriginFromDom } from "./origin"
+export {
+    MEDIA_GHOST_ANIMATING_CLASS,
+    MEDIA_GHOST_HANDOFF_CLASS,
+    MEDIA_GHOST_MS,
+    MEDIA_GHOST_END_MS,
+    DEFAULT_MEDIA_INSETS,
+    createMediaGhost,
+    computeStageFitRectFromElement,
+} from "./ghost"
+export type { MediaGhostHandle, MediaGhost } from "./ghost"
+export { MEDIA_OPEN_MS, MEDIA_CLOSE_MS, MEDIA_CHROME_MS, MEDIA_SWITCH_MS, createMediaShell } from "./shell"
+export type { MediaOpenClosePhase, MediaSwitchDirection, MediaShell } from "./shell"
