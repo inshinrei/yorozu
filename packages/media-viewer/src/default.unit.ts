@@ -103,6 +103,16 @@ describe("default media viewer styles", () => {
         expect(overlayBlock).toContain("touch-action: none")
     })
 
+    it("filmstrip list is max-content with auto margin and no min-width center flex", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(listBlock.length).toBeGreaterThan(0)
+        expect(listBlock).toContain("width: max-content")
+        expect(listBlock).toContain("margin-inline: auto")
+        expect(listBlock).not.toContain("min-width: 100%")
+        expect(listBlock).not.toContain("justify-content: center")
+    })
+
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let closingBlock =

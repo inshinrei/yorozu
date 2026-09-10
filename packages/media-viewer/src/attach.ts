@@ -664,19 +664,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (!filmstripEl) return
         let current = filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]")
         if (!(current instanceof HTMLElement)) return
-        let thumbW = current.offsetWidth
-        let stripW = filmstripEl.clientWidth
-        let offsetLeft = 0
-        let node: HTMLElement | null = current
-        while (node != null && node !== filmstripEl) {
-            offsetLeft += node.offsetLeft
-            let parent = node.offsetParent
-            if (!(parent instanceof HTMLElement)) break
-            if (parent === filmstripEl) break
-            if (!filmstripEl.contains(parent)) break
-            node = parent
-        }
-        let left = offsetLeft + thumbW / 2 - stripW / 2
+        let stripBox = filmstripEl.getBoundingClientRect()
+        let thumbBox = current.getBoundingClientRect()
+        if (!(stripBox.width > 0) || !(thumbBox.width > 0)) return
+        let left = filmstripEl.scrollLeft + (thumbBox.left + thumbBox.width / 2) - (stripBox.left + stripBox.width / 2)
         if (typeof filmstripEl.scrollTo === "function") {
             filmstripEl.scrollTo({ left, behavior })
             return

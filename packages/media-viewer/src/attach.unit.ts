@@ -69,6 +69,7 @@ describe("attachMediaViewer", () => {
         Reflect.deleteProperty(HTMLElement.prototype, "animate")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollTo")
+        Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect")
     })
 
     it("open paints dialog + active img src", () => {
@@ -625,6 +626,19 @@ describe("attachMediaViewer", () => {
     it("centers the current thumb with scrollTo on open, goTo, and prev/next", () => {
         let scrollTo = vi.fn()
         HTMLElement.prototype.scrollTo = scrollTo
+        let layoutBox = {
+            left: 0,
+            width: 100,
+            top: 0,
+            height: 40,
+            right: 100,
+            bottom: 40,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+        }
+        let rect = (): DOMRect => layoutBox as DOMRect
+        HTMLElement.prototype.getBoundingClientRect = rect
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("2")
@@ -646,10 +660,62 @@ describe("attachMediaViewer", () => {
         stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
         let scrollTo = vi.fn()
         HTMLElement.prototype.scrollTo = scrollTo
+        let layoutBox = {
+            left: 0,
+            width: 100,
+            top: 0,
+            height: 40,
+            right: 100,
+            bottom: 40,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+        }
+        HTMLElement.prototype.getBoundingClientRect = () => layoutBox as DOMRect
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
         expect(scrollTo).toHaveBeenCalledWith(
             expect.objectContaining({ behavior: "instant", left: expect.any(Number) }),
         )
+    })
+
+    it("centers current thumb from strip scrollLeft plus layout rect mid delta", () => {
+        let scrollTo = vi.fn()
+        HTMLElement.prototype.scrollTo = scrollTo
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let target = nav.querySelector('[data-yorozu-media-thumb][data-index="2"]') as HTMLElement
+        expect(target).toBeTruthy()
+        Object.defineProperty(nav, "scrollLeft", { configurable: true, value: 40, writable: true })
+        let stripBox = {
+            left: 100,
+            width: 200,
+            top: 0,
+            height: 40,
+            right: 300,
+            bottom: 40,
+            x: 100,
+            y: 0,
+            toJSON: () => ({}),
+        }
+        let thumbBox = {
+            left: 280,
+            width: 60,
+            top: 0,
+            height: 40,
+            right: 340,
+            bottom: 40,
+            x: 280,
+            y: 0,
+            toJSON: () => ({}),
+        }
+        nav.getBoundingClientRect = () => stripBox as DOMRect
+        target.getBoundingClientRect = () => thumbBox as DOMRect
+        scrollTo.mockClear()
+        viewer.goTo(2)
+        let thumbMid = thumbBox.left + thumbBox.width / 2
+        let stripMid = stripBox.left + stripBox.width / 2
+        let expectedLeft = 40 + thumbMid - stripMid
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: expectedLeft, behavior: "smooth" }))
     })
 
     it("applies compact filmstrip max-width by default and full width when set", () => {

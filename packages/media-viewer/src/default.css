@@ -217,8 +217,7 @@ html.yorozu-media-ghost-animating [data-yorozu-media-filmstrip] {
     align-items: stretch;
     gap: var(--yorozu-media-filmstrip-gap);
     width: max-content;
-    min-width: 100%;
-    justify-content: center;
+    margin-inline: auto;
 }
 
 [data-yorozu-media-thumb] {
