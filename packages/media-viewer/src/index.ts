@@ -42,3 +42,43 @@ export {
 export type { MediaSwipeAxis, MediaSwipeCommit, CommitSwipeArgs } from "./swipe"
 export { createMediaSwipe } from "./swipe-controller"
 export type { MediaSwipe, MediaSwipeCallbacks } from "./swipe-controller"
+export {
+    MEDIA_MIN_SCALE,
+    MEDIA_MAX_ZOOM_FACTOR,
+    MEDIA_ZOOM_STEP,
+    MEDIA_WHEEL_DELTA_SCALE,
+    MEDIA_WHEEL_AMOUNT_MAX,
+    MEDIA_WHEEL_PAN_SENSITIVITY,
+    MEDIA_WHEEL_PAN_FLICK_ACCEL,
+    MEDIA_WHEEL_PAN_FLICK_REF_PX,
+    MEDIA_PAN_INERTIA_COAST_MS,
+    MEDIA_PAN_INERTIA_MAX_COAST_PX,
+    MEDIA_PAN_INERTIA_MIN_SPEED_PX_MS,
+    MEDIA_PAN_INERTIA_SAMPLE_WINDOW_MS,
+    MEDIA_ZOOM_SETTLE_MS,
+    MEDIA_ZOOM_SETTLE_MS_MIN,
+    MEDIA_SOFT_SCALE_MIN_FACTOR,
+    MEDIA_SOFT_SCALE_MAX_FACTOR,
+    maxScaleFromNatural,
+    canZoomIn,
+    canZoomOut,
+    stepScale,
+    resetZoom,
+    formatZoomPercent,
+    wheelZoomAmount,
+    scaleByRelativeAmount,
+    wheelPanDeltas,
+    wheelIntent,
+    zoomSettleDurationMs,
+    softScaleLimits,
+    velocityFromSamples,
+    projectPanInertia,
+    legalizeZoomState,
+    zoomStateDistance,
+    lerpZoomState,
+    zoomStatesNearlyEqual,
+} from "./zoom"
+export type { MediaPoint, MediaZoomState, MediaZoomVelocity, MediaZoomSample } from "./zoom"
+export { createMediaImageZoom } from "./zoom-controller"
+export type { MediaImageZoom } from "./zoom-controller"
+export { stageContentSize, fitContain } from "./layout"
