@@ -5,6 +5,7 @@
 import { easeOutCubic } from "@yorozu/animations"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
+    MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
     MEDIA_SWIPE_WHEEL_RELEASE_MS,
     clampSwipeOffsetX,
     clampSwipeOffsetY,
@@ -144,6 +145,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
 
     function refreshWheelIdleTimer(): void {
         clearWheelTimer()
+        let delay = sessionConsumed || wheelHoldoff ? MEDIA_SWIPE_WHEEL_COOLDOWN_MS : MEDIA_SWIPE_WHEEL_RELEASE_MS
         wheelTimer = setTimeout(() => {
             wheelTimer = null
             if (sessionConsumed || wheelHoldoff) {
@@ -154,7 +156,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             }
             if (!wheelActive) return
             finishGesture()
-        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        }, delay)
     }
 
     function markSessionConsumed(): void {

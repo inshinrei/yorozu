@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { MEDIA_SWIPE_EDGE_RESIST, MEDIA_SWIPE_WHEEL_RELEASE_MS, MEDIA_SWIPE_X_THRESHOLD } from "./swipe"
+import {
+    MEDIA_SWIPE_EDGE_RESIST,
+    MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
+    MEDIA_SWIPE_WHEEL_RELEASE_MS,
+    MEDIA_SWIPE_X_THRESHOLD,
+} from "./swipe"
 import { createMediaSwipe } from "./swipe-controller"
 
 function pointer(type: string, init: Partial<PointerEventInit>): PointerEvent {
@@ -177,8 +182,9 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("commits once per wheel session until idle release", () => {
+    it("commits once per wheel session until cooldown idle", () => {
         vi.useFakeTimers()
+        expect(MEDIA_SWIPE_WHEEL_COOLDOWN_MS).toBe(420)
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
@@ -191,6 +197,9 @@ describe("createMediaSwipe", () => {
         expect(preventLeftover).toHaveBeenCalled()
         expect(onNewer).toHaveBeenCalledTimes(1)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
         expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(2)
         swipe.destroy()
@@ -228,6 +237,9 @@ describe("createMediaSwipe", () => {
         expect(swipe.onWheel(leftover)).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(0)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
         expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()

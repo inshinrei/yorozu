@@ -619,6 +619,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (image instanceof HTMLImageElement) {
                 if (image.getAttribute("src") !== src) image.src = src
                 image.alt = item.alt ?? ""
+                image.draggable = false
                 return
             }
             let next = document.createElement("img")
@@ -926,6 +927,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
         let filmstripTouchX: number | null = null
         let filmstripTouchY: number | null = null
+        const clearFilmstripTouchSample = (): void => {
+            filmstripTouchX = null
+            filmstripTouchY = null
+        }
         const lockPageScroll = (e: Event): void => {
             let t = e.target
             if (t instanceof Element && t.closest("[data-yorozu-media-filmstrip]")) {
@@ -933,8 +938,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 if (!isFilmstripPanX(e)) e.preventDefault()
                 return
             }
-            filmstripTouchX = null
-            filmstripTouchY = null
+            clearFilmstripTouchSample()
+            if (
+                t instanceof Element &&
+                t.closest("[data-yorozu-media-header], [data-yorozu-media-footer], [data-yorozu-media-chrome]")
+            ) {
+                e.stopPropagation()
+                return
+            }
             e.preventDefault()
             e.stopPropagation()
         }
@@ -958,6 +969,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         overlay.addEventListener("wheel", lockPageScroll, { passive: false, signal })
         overlay.addEventListener("touchmove", lockPageScroll, { passive: false, signal })
+        overlay.addEventListener("touchend", clearFilmstripTouchSample, { signal })
+        overlay.addEventListener("touchcancel", clearFilmstripTouchSample, { signal })
+        overlay.addEventListener("pointerup", clearFilmstripTouchSample, { signal })
+        overlay.addEventListener("pointercancel", clearFilmstripTouchSample, { signal })
 
         viewport.addEventListener("pointerdown", onViewportPointerDown, { signal })
         viewport.addEventListener("pointermove", onViewportPointerMove, { signal, passive: false })

@@ -236,7 +236,7 @@ describe("attachMediaViewer", () => {
         expect(api!.scale()).toBeLessThanOrEqual(20)
     })
 
-    it("trapWheel is bound on the viewport; overlay lock still prevents footer wheel", () => {
+    it("trapWheel is bound on the viewport; chrome footer wheel is not preventDefault", () => {
         viewer.open({
             items: [img("a")],
             chrome: {
@@ -249,8 +249,10 @@ describe("attachMediaViewer", () => {
         })
         let footer = root.querySelector("[data-yorozu-media-footer]") as HTMLElement
         let chromeWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        let stopChrome = vi.spyOn(chromeWheel, "stopPropagation")
         footer.dispatchEvent(chromeWheel)
-        expect(chromeWheel.defaultPrevented).toBe(true)
+        expect(chromeWheel.defaultPrevented).toBe(false)
+        expect(stopChrome).toHaveBeenCalled()
 
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         let stageWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
@@ -588,6 +590,17 @@ describe("attachMediaViewer", () => {
         expect(second.querySelector("img")?.getAttribute("src")).toBe("later-b.jpg")
     })
 
+    it("reusing an existing thumb img sets draggable false on same-id setItems", () => {
+        viewer.open({ items: [img("a", "a.jpg"), img("b", "b.jpg")] })
+        let thumbImg = root.querySelector('[data-yorozu-media-thumb][data-index="0"] img') as HTMLImageElement
+        expect(thumbImg).toBeTruthy()
+        thumbImg.draggable = true
+        viewer.setItems([img("a", "a2.jpg"), img("b", "b2.jpg")])
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"] img')).toBe(thumbImg)
+        expect(thumbImg.getAttribute("src")).toBe("a2.jpg")
+        expect(thumbImg.draggable).toBe(false)
+    })
+
     it("scrolls the current thumb into view after open, goTo, and prev/next", () => {
         let scrollIntoView = vi.fn()
         HTMLElement.prototype.scrollIntoView = scrollIntoView
@@ -744,5 +757,78 @@ describe("attachMediaViewer", () => {
         scroller.dispatchEvent(leftoverWheel)
         expect(leftoverWheel.defaultPrevented).toBe(false)
         scroller.remove()
+    })
+
+    it("chrome footer wheel stopPropagates without preventDefault; overlay scrim still locks", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                footer: (el, chromeApi) => {
+                    api = chromeApi
+                    el.textContent = "host-footer"
+                },
+            },
+        })
+        let footer = root.querySelector("[data-yorozu-media-footer]") as HTMLElement
+        let footerWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        let stopFooter = vi.spyOn(footerWheel, "stopPropagation")
+        footer.dispatchEvent(footerWheel)
+        expect(footerWheel.defaultPrevented).toBe(false)
+        expect(stopFooter).toHaveBeenCalled()
+
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let scrimWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        overlay.dispatchEvent(scrimWheel)
+        expect(scrimWheel.defaultPrevented).toBe(true)
+
+        api!.forceClose()
+        let bodyWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        document.body.dispatchEvent(bodyWheel)
+        expect(bodyWheel.defaultPrevented).toBe(false)
+    })
+
+    it("filmstrip touchend clears the pan sample so the next gesture starts fresh", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+
+        function touchMove(clientX: number, clientY: number): TouchEvent {
+            let touch = {
+                identifier: 0,
+                target: nav,
+                clientX,
+                clientY,
+                pageX: clientX,
+                pageY: clientY,
+                screenX: clientX,
+                screenY: clientY,
+                radiusX: 0,
+                radiusY: 0,
+                rotationAngle: 0,
+                force: 1,
+            }
+            return new TouchEvent("touchmove", {
+                bubbles: true,
+                cancelable: true,
+                touches: [touch] as unknown as Touch[],
+                targetTouches: [touch] as unknown as Touch[],
+                changedTouches: [touch] as unknown as Touch[],
+            })
+        }
+
+        let first = touchMove(100, 100)
+        nav.dispatchEvent(first)
+        expect(first.defaultPrevented).toBe(true)
+
+        let panX = touchMove(200, 110)
+        nav.dispatchEvent(panX)
+        expect(panX.defaultPrevented).toBe(false)
+
+        overlay.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true }))
+
+        let nextFirst = touchMove(250, 115)
+        nav.dispatchEvent(nextFirst)
+        expect(nextFirst.defaultPrevented).toBe(true)
     })
 })
