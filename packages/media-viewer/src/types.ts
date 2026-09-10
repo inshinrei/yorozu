@@ -54,6 +54,7 @@ export type MediaViewerOpenOpts = {
     index?: number
     origin?: MediaViewerOrigin | null
     ghost?: boolean
+    filmstrip?: boolean
     neighbors?: { older: MediaViewerNeighbor | null; newer: MediaViewerNeighbor | null }
     canOlder?: boolean
     canNewer?: boolean
@@ -70,6 +71,7 @@ export type MediaViewerSnapshot = {
     canNewer: boolean
     origin: MediaViewerOrigin | null
     ghost: boolean
+    filmstrip: boolean
 }
 
 export type MediaViewerSessionOpts = {
@@ -91,6 +93,7 @@ export type MediaViewer = {
     prev: (from?: MediaViewerNavFrom) => void
     next: (from?: MediaViewerNavFrom) => void
     goTo: (index: number) => void
+    setFilmstrip: (on: boolean) => void
     chrome: () => MediaViewerChromeSlots | null
     lastNav: () => MediaViewerNavFrom | null
     wantsGhost: (kind: "open" | "close") => boolean

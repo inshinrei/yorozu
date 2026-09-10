@@ -12,4 +12,11 @@
     --yorozu-media-switch-ms: 320ms;
     --yorozu-media-ghost-ms: 200ms;
     --yorozu-media-radius: 0.75rem;
+    --yorozu-media-filmstrip-ms: 0.2s;
+    --yorozu-media-filmstrip-thumb-h: 4rem;
+    --yorozu-media-filmstrip-thumb-w: 2.75rem;
+    --yorozu-media-filmstrip-current-w: 3.75rem;
+    --yorozu-media-filmstrip-gap: 1px;
+    --yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5);
+    --yorozu-media-filmstrip-radius: 0.25rem;
 }

@@ -438,4 +438,124 @@ describe("attachMediaViewer", () => {
         })
         expect(animate.mock.calls.length).toBeGreaterThan(before)
     })
+
+    it("two items paint a filmstrip sibling of footer; one item does not", () => {
+        viewer.open({ items: [img("a")] })
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBeNull()
+        viewer.open({ items: [img("a"), img("b")] })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let footer = root.querySelector("[data-yorozu-media-footer]") as HTMLElement
+        expect(nav).toBeTruthy()
+        expect(nav.getAttribute("role")).toBe("navigation")
+        expect(nav.getAttribute("aria-label")).toBe("Gallery items")
+        expect(nav.parentElement).toBe(footer.parentElement)
+        expect(root.querySelector("[data-yorozu-media-viewport] [data-yorozu-media-filmstrip]")).toBeNull()
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        expect(track).toBeTruthy()
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")] as HTMLButtonElement[]
+        expect(thumbs).toHaveLength(2)
+        expect(thumbs[0]!.tagName).toBe("BUTTON")
+        expect(thumbs[0]!.getAttribute("data-index")).toBe("0")
+        expect(thumbs[0]!.getAttribute("aria-current")).toBe("true")
+        expect(thumbs[0]!.getAttribute("data-current")).toBe("")
+        expect(thumbs[0]!.disabled).toBe(true)
+        expect(thumbs[1]!.getAttribute("data-index")).toBe("1")
+        expect(thumbs[1]!.hasAttribute("data-current")).toBe(false)
+        expect(thumbs[1]!.disabled).toBe(false)
+        expect(thumbs[0]!.querySelector("img")?.getAttribute("src")).toBe("a.jpg")
+    })
+
+    it("open({ filmstrip: false }) does not paint the filmstrip; host footer still mounts", () => {
+        viewer.open({
+            items: [img("a"), img("b")],
+            filmstrip: false,
+            chrome: {
+                footer: (el) => {
+                    el.textContent = "host-footer"
+                },
+            },
+        })
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-footer]")?.textContent).toBe("host-footer")
+    })
+
+    it("clicking a thumb calls goTo for that index", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        let thumb = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
+        thumb.click()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(viewer.lastNav()).toBe("jump")
+        expect(onIndexChange).toHaveBeenCalledTimes(1)
+        let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLButtonElement
+        expect(current.getAttribute("data-index")).toBe("1")
+        expect(current.disabled).toBe(true)
+    })
+
+    it("video thumbs get data-yorozu-media-thumb-video and use poster or src as img", () => {
+        viewer.open({
+            items: [
+                img("a"),
+                { id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" },
+                { id: "w", kind: "video", src: "w.mp4" },
+                { id: "empty", kind: "image" },
+            ],
+        })
+        let videoPoster = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
+        expect(videoPoster.hasAttribute("data-yorozu-media-thumb-video")).toBe(true)
+        expect(videoPoster.querySelector("img")?.getAttribute("src")).toBe("p.jpg")
+        let videoSrc = root.querySelector('[data-yorozu-media-thumb][data-index="2"]') as HTMLButtonElement
+        expect(videoSrc.hasAttribute("data-yorozu-media-thumb-video")).toBe(true)
+        expect(videoSrc.querySelector("img")?.getAttribute("src")).toBe("w.mp4")
+        let missing = root.querySelector('[data-yorozu-media-thumb][data-index="3"]') as HTMLButtonElement
+        expect(missing.hasAttribute("data-yorozu-media-thumb-video")).toBe(false)
+        expect(missing.querySelector("[data-yorozu-media-loading]")).toBeTruthy()
+        expect(
+            root
+                .querySelector('[data-yorozu-media-thumb][data-index="0"]')
+                ?.hasAttribute("data-yorozu-media-thumb-video"),
+        ).toBe(false)
+    })
+
+    it("setFilmstrip(false) removes the filmstrip node; setFilmstrip(true) paints it again", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBeTruthy()
+        viewer.setFilmstrip(false)
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-footer]")).toBeTruthy()
+        viewer.setFilmstrip(true)
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBeTruthy()
+    })
+
+    it("same item ids update data-current without remounting the nav; id changes rebuild thumbs", () => {
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let first = root.querySelector('[data-yorozu-media-thumb][data-index="0"]') as HTMLButtonElement
+        viewer.goTo(1)
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBe(nav)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"]')).toBe(first)
+        expect(first.hasAttribute("data-current")).toBe(false)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="1"]')?.hasAttribute("data-current")).toBe(true)
+        viewer.setItems([img("a"), img("b")], 0)
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBe(nav)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"]')).toBe(first)
+        expect(first.hasAttribute("data-current")).toBe(true)
+        viewer.setItems([img("x"), img("y")])
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).toBe(nav)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"]')).not.toBe(first)
+        expect(root.querySelector('[data-yorozu-media-thumb][data-index="0"] img')?.getAttribute("src")).toBe("x.jpg")
+        viewer.open({ items: [img("p"), img("q")] })
+        expect(root.querySelector("[data-yorozu-media-filmstrip]")).not.toBe(nav)
+    })
+
+    it("wheel on the filmstrip is not trapped", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let chromeWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        nav.dispatchEvent(chromeWheel)
+        expect(chromeWheel.defaultPrevented).toBe(false)
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        let stageWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        viewport.dispatchEvent(stageWheel)
+        expect(stageWheel.defaultPrevented).toBe(true)
+    })
 })

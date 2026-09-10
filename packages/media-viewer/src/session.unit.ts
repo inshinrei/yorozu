@@ -37,6 +37,7 @@ describe("createMediaViewer", () => {
             canNewer: false,
             origin: null,
             ghost: false,
+            filmstrip: false,
         })
         expect(viewer!.snapshot()).not.toBe(viewer!.snapshot())
         expect(viewer!.chrome()).toBeNull()
@@ -264,5 +265,54 @@ describe("createMediaViewer", () => {
         stop()
         expect(n).toBe(0)
         expect(viewer!.snapshot().open).toBe(false)
+    })
+
+    it("filmstrip defaults on for 2+ items and off for 0–1", () => {
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        viewer!.open({ items: [] })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        viewer!.open({ items: [img("a")] })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        viewer!.open({ items: [img("a"), img("b")] })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        viewer!.open({ items: [img("a"), img("b"), img("c")] })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: false })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        viewer!.open({ items: [img("a")], filmstrip: true })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+    })
+
+    it("setFilmstrip forces off and turns on only with 2+ items; notifies on change", () => {
+        let ticks = 0
+        viewer!.subscribe(() => {
+            ticks += 1
+        })
+        viewer!.open({ items: [img("a"), img("b"), img("c")] })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        ticks = 0
+        viewer!.setFilmstrip(false)
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        expect(ticks).toBe(1)
+        viewer!.setFilmstrip(false)
+        expect(ticks).toBe(1)
+        viewer!.setFilmstrip(true)
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        expect(ticks).toBe(2)
+
+        viewer!.open({ items: [img("a")] })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        ticks = 0
+        viewer!.setFilmstrip(true)
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        viewer!.setFilmstrip(false)
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        expect(ticks).toBeGreaterThanOrEqual(1)
+        viewer!.setItems([img("a"), img("b")])
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        ticks = 0
+        viewer!.setFilmstrip(true)
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        expect(ticks).toBe(1)
     })
 })

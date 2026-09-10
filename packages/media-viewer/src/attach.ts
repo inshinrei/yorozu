@@ -1,5 +1,5 @@
 /**
- * Overlay + stage + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
+ * Overlay + stage + optional filmstrip + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
  */
 import { dualRaf, isRectFullyVisibleIn, prefersReducedMotion } from "@yorozu/animations"
 import { computeStageFitRectFromElement, createMediaGhost, DEFAULT_MEDIA_INSETS, type MediaGhost } from "./ghost"
@@ -72,6 +72,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let header: HTMLElement | null = null
     let footer: HTMLElement | null = null
     let chromeEl: HTMLElement | null = null
+    let filmstripEl: HTMLElement | null = null
+    let filmstripIds: string | null = null
     let shell: MediaShell | null = null
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
@@ -584,6 +586,111 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         syncPane("newer", snap.neighbors.newer)
     }
 
+    function itemIdKey(list: readonly MediaViewerItem[]): string {
+        return list.map((item) => item.id).join("\0")
+    }
+
+    function thumbSrc(item: MediaViewerItem): string | null {
+        if (item.kind === "video") return item.poster || item.src || null
+        return item.src ?? null
+    }
+
+    function markThumbCurrent(btn: HTMLButtonElement, current: boolean): void {
+        if (current) {
+            btn.setAttribute("aria-current", "true")
+            btn.setAttribute("data-current", "")
+            btn.disabled = true
+            return
+        }
+        btn.removeAttribute("aria-current")
+        btn.removeAttribute("data-current")
+        btn.disabled = false
+    }
+
+    function fillThumb(btn: HTMLButtonElement, item: MediaViewerItem): void {
+        if (item.kind === "video") btn.setAttribute("data-yorozu-media-thumb-video", "")
+        else btn.removeAttribute("data-yorozu-media-thumb-video")
+        let src = thumbSrc(item)
+        if (src) {
+            let image = document.createElement("img")
+            image.src = src
+            image.alt = item.alt ?? ""
+            image.draggable = false
+            btn.append(image)
+            return
+        }
+        let loading = document.createElement("div")
+        loading.setAttribute("data-yorozu-media-loading", "")
+        btn.append(loading)
+    }
+
+    function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
+        track.replaceChildren()
+        for (let i = 0; i < snap.items.length; i++) {
+            let item = snap.items[i]!
+            let btn = document.createElement("button")
+            btn.type = "button"
+            btn.setAttribute("data-yorozu-media-thumb", "")
+            btn.setAttribute("data-index", String(i))
+            markThumbCurrent(btn, i === snap.index)
+            fillThumb(btn, item)
+            track.append(btn)
+        }
+    }
+
+    function syncThumbCurrent(track: HTMLElement, currentIndex: number): void {
+        let thumbs = track.querySelectorAll("[data-yorozu-media-thumb]")
+        for (let el of thumbs) {
+            if (!(el instanceof HTMLButtonElement)) continue
+            markThumbCurrent(el, el.getAttribute("data-index") === String(currentIndex))
+        }
+    }
+
+    function onFilmstripClick(e: Event): void {
+        let t = e.target
+        if (!(t instanceof Element)) return
+        let btn = t.closest("[data-yorozu-media-thumb]")
+        if (!(btn instanceof HTMLButtonElement) || btn.disabled) return
+        let i = Number(btn.getAttribute("data-index"))
+        if (!Number.isInteger(i)) return
+        viewer.goTo(i)
+    }
+
+    function removeFilmstrip(): void {
+        filmstripEl?.remove()
+        filmstripEl = null
+        filmstripIds = null
+    }
+
+    function paintFilmstrip(snap: MediaViewerSnapshot): void {
+        if (!overlay) return
+        if (!snap.filmstrip) {
+            removeFilmstrip()
+            return
+        }
+        let ids = itemIdKey(snap.items)
+        if (!filmstripEl) {
+            filmstripEl = document.createElement("nav")
+            filmstripEl.setAttribute("data-yorozu-media-filmstrip", "")
+            filmstripEl.setAttribute("role", "navigation")
+            filmstripEl.setAttribute("aria-label", "Gallery items")
+            let track = document.createElement("div")
+            track.setAttribute("role", "list")
+            filmstripEl.append(track)
+            filmstripEl.addEventListener("click", onFilmstripClick, abort ? { signal: abort.signal } : undefined)
+            overlay.append(filmstripEl)
+            filmstripIds = null
+        }
+        let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+        if (!track) return
+        if (filmstripIds !== ids) {
+            rebuildThumbs(track, snap)
+            filmstripIds = ids
+            return
+        }
+        syncThumbCurrent(track, snap.index)
+    }
+
     function maybeToggleZoom(e: PointerEvent): void {
         if (shell && shell.openPhase() !== "open") return
         let current = viewer.snapshot().current
@@ -822,6 +929,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         pinchDist = 0
         lastContentId = null
         startedOpen = false
+        filmstripEl = null
+        filmstripIds = null
         let currentShell = shell
         shell = null
         currentShell?.destroy()
@@ -858,6 +967,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             shell.trackContentKey(`${snap.index}:${snap.current.id}`)
         }
         syncChrome()
+        paintFilmstrip(snap)
         if (!overlay) return
         bindKeys()
         applyOverlayAttrs()

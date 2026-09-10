@@ -19,6 +19,13 @@ let tokenNames = [
     "--yorozu-media-switch-ms",
     "--yorozu-media-ghost-ms",
     "--yorozu-media-radius",
+    "--yorozu-media-filmstrip-ms",
+    "--yorozu-media-filmstrip-thumb-h",
+    "--yorozu-media-filmstrip-thumb-w",
+    "--yorozu-media-filmstrip-current-w",
+    "--yorozu-media-filmstrip-gap",
+    "--yorozu-media-filmstrip-bg",
+    "--yorozu-media-filmstrip-radius",
 ]
 
 describe("default media viewer styles", () => {
@@ -39,6 +46,13 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-switch-ms: 320ms")
         expect(css).toContain("--yorozu-media-ghost-ms: 200ms")
         expect(css).toContain("--yorozu-media-radius: 0.75rem")
+        expect(css).toContain("--yorozu-media-filmstrip-ms: 0.2s")
+        expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
+        expect(css).toContain("--yorozu-media-filmstrip-thumb-w: 2.75rem")
+        expect(css).toContain("--yorozu-media-filmstrip-current-w: 3.75rem")
+        expect(css).toContain("--yorozu-media-filmstrip-gap: 1px")
+        expect(css).toContain("--yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5)")
+        expect(css).toContain("--yorozu-media-filmstrip-radius: 0.25rem")
         expect(css).toContain("[data-yorozu-media-viewer]")
     })
 
@@ -65,6 +79,11 @@ describe("default media viewer styles", () => {
         expect(css).toContain("@keyframes yorozu-media-switch-older")
         expect(css).toContain("@keyframes yorozu-media-switch-jump")
         expect(css).toContain("--yorozu-media-switch-ms")
+        expect(css).toContain("[data-yorozu-media-filmstrip]")
+        expect(css).toContain("[data-yorozu-media-thumb]")
+        expect(css).toContain("[data-current]")
+        expect(css).toContain("opacity: 0.55")
+        expect(css).toContain("--yorozu-media-filmstrip-ms")
     })
 
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {

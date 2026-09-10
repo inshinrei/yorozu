@@ -50,6 +50,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let newerFlag = false
     let chromeSlots: MediaViewerChromeSlots | null = null
     let navFrom: MediaViewerNavFrom | null = null
+    let filmstripWanted = true
     let listeners = new Set<() => void>()
 
     function notify(): void {
@@ -75,6 +76,10 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         }
     }
 
+    function resolveFilmstrip(): boolean {
+        return filmstripWanted && items.length >= 2
+    }
+
     function snapshot(): MediaViewerSnapshot {
         return {
             open: openFlag,
@@ -86,6 +91,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
             canNewer: index < items.length - 1 || newerFlag,
             origin,
             ghost: openGhost,
+            filmstrip: resolveFilmstrip(),
         }
     }
 
@@ -109,6 +115,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         newerFlag = openOpts.canNewer === true
         chromeSlots = openOpts.chrome ?? null
         navFrom = null
+        filmstripWanted = openOpts.filmstrip !== false
         openFlag = true
         notify()
     }
@@ -217,6 +224,13 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         if (item != null) opts?.onIndexChange?.(index, item)
     }
 
+    function setFilmstrip(on: boolean): void {
+        if (!alive) return
+        if (filmstripWanted === on) return
+        filmstripWanted = on
+        notify()
+    }
+
     function chrome(): MediaViewerChromeSlots | null {
         return chromeSlots
     }
@@ -253,6 +267,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         prev,
         next,
         goTo,
+        setFilmstrip,
         chrome,
         lastNav,
         wantsGhost,
