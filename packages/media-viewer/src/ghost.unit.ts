@@ -108,6 +108,17 @@ describe("createMediaGhost", () => {
         expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(false)
     })
 
+    it("failed playClose clears the animating class", () => {
+        let handle = ghost.playClose({
+            host,
+            fromStage: { top: 0, left: 0, width: 0, height: 0 },
+            target: { ...seed, rect: { top: 0, left: 0, width: 0, height: 0 } },
+        })
+        expect(handle).toBeNull()
+        expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(false)
+        expect(host.querySelector("[data-yorozu-media-ghost]")).toBeNull()
+    })
+
     it("playClose does not auto-clear the animating class when done", async () => {
         let handle = ghost.playClose({
             host,

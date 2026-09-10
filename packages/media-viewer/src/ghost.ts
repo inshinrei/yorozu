@@ -183,6 +183,7 @@ export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?
             durationMs: playOpts.durationMs,
         })
         if (!playback) {
+            if (gen === my) setAnimating(false)
             return null
         }
         stampClone(playOpts.host)

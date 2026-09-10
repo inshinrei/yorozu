@@ -122,6 +122,55 @@ describe("createMediaShell", () => {
         shell.destroy()
     })
 
+    it("requestClose during open ghost keeps close-flight if onLand or failed ghost fire later", async () => {
+        let land: (() => void | Promise<void>) | undefined
+        let finishOpen: ((ran: boolean) => void) | undefined
+        let shell = createMediaShell({
+            skipGhost: () => false,
+            hasOpenOrigin: () => true,
+            runOpenGhost: ({ onLand }) => {
+                land = onLand
+                return new Promise((resolve) => {
+                    finishOpen = resolve
+                })
+            },
+            runCloseGhost: () => new Promise(() => {}),
+            onFinishClose: () => {},
+        })
+        let started = shell.startOpen()
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve())
+        })
+        expect(shell.phase().kind).toBe("open-flight")
+
+        void shell.requestClose()
+        expect(shell.phase()).toEqual({ kind: "close-flight" })
+
+        await land!()
+        expect(shell.phase()).toEqual({ kind: "close-flight" })
+
+        finishOpen!(false)
+        await started
+        expect(shell.phase()).toEqual({ kind: "close-flight" })
+        expect(shell.openPhase()).toBe("closing")
+        shell.destroy()
+    })
+
+    it("throwing open ghost recovers to ready if still opening", async () => {
+        let shell = createMediaShell({
+            skipGhost: () => false,
+            hasOpenOrigin: () => true,
+            runOpenGhost: () => {
+                throw new Error("ghost failed")
+            },
+            onFinishClose: () => {},
+        })
+        await expect(shell.startOpen()).resolves.toBeUndefined()
+        expect(shell.phase()).toEqual({ kind: "ready" })
+        expect(shell.openPhase()).toBe("open")
+        shell.destroy()
+    })
+
     it("forceClose cancels ghost and finishes immediately", () => {
         let finish = vi.fn()
         let cancel = vi.fn()

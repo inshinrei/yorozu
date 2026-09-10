@@ -103,14 +103,21 @@ export function createMediaShell(opts: {
         await tick()
         if (!alive || currentPhase.kind !== "open-flight") return
         currentPhase = { kind: "open-flight", pinnedUrl: currentPhase.pinnedUrl, scrimSolid: true }
-        let ran = await opts.runOpenGhost?.({
-            onLand: async () => {
-                currentPhase = { kind: "ready" }
-                await tick()
-            },
-        })
-        if (!alive) return
-        if (!ran) currentPhase = { kind: "ready" }
+        let ran = false
+        try {
+            ran =
+                (await opts.runOpenGhost?.({
+                    onLand: async () => {
+                        if (!alive || finished || currentPhase.kind !== "open-flight") return
+                        currentPhase = { kind: "ready" }
+                        await tick()
+                    },
+                })) === true
+        } catch {
+            ran = false
+        }
+        if (!alive || finished) return
+        if (!ran && currentPhase.kind === "open-flight") currentPhase = { kind: "ready" }
     }
 
     async function requestClose(): Promise<void> {
