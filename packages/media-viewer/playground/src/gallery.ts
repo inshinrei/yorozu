@@ -10,9 +10,9 @@ export const ALBUM_CYCLE_SIZES: number[] = [1, 2, 3, 4, 5, 6, 10]
 
 export const EMPTY_MEDIA_HINT: string = "No media yet — add playground/public/media/manifest.json"
 
-/** Packer width: fill the host when measured, else the default token. */
-export function albumMaxWidth(availableWidth: number): number {
-    return availableWidth > 0 ? Math.floor(availableWidth) : DEFAULT_ALBUM_MAX_WIDTH
+/** Packer geometry width — always the default token; CSS stretches the container. */
+export function albumPackWidth(): number {
+    return DEFAULT_ALBUM_MAX_WIDTH
 }
 
 export type ManifestMedia = {
@@ -151,20 +151,17 @@ function renderAlbum(
     items: MediaViewerItem[],
     startIndex: number,
     onOpen: GalleryOpenHandler,
-    availableWidth: number,
 ): HTMLElement {
     let album = document.createElement("div")
     album.className = "pg-album"
     let ratios = albumRatiosFromSizes(entries)
-    let maxWidth = albumMaxWidth(availableWidth)
+    let maxWidth = albumPackWidth()
     let { layout, containerStyle } = calculateAlbumLayoutByRatios(ratios, {
         maxWidth,
         maxHeight: maxWidth,
         spacing: DEFAULT_ALBUM_SPACING,
     })
     if (!(containerStyle.width > 0) || !(containerStyle.height > 0)) return album
-    album.style.width = `${containerStyle.width}px`
-    album.style.maxWidth = "100%"
     album.style.aspectRatio = `${containerStyle.width} / ${containerStyle.height}`
     for (let i = 0; i < entries.length; i++) {
         let entry = entries[i]
@@ -201,24 +198,16 @@ export function mountGallery(host: HTMLElement, opts: MountGalleryOpts): () => v
         let grid = document.createElement("div")
         grid.className = "pg-albums"
         host.append(grid)
-        let width = albumMaxWidth(host.clientWidth)
         let albums = groupIntoAlbums(entries)
         let offset = 0
         for (let group of albums) {
-            grid.append(renderAlbum(group, items, offset, opts.onOpen, width))
+            grid.append(renderAlbum(group, items, offset, opts.onOpen))
             offset += group.length
         }
     }
 
     paint()
-    let observer: ResizeObserver | null = null
-    if (typeof ResizeObserver === "function") {
-        observer = new ResizeObserver(() => paint())
-        observer.observe(host)
-    }
     return () => {
-        observer?.disconnect()
-        observer = null
         host.replaceChildren()
     }
 }

@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_ALBUM_MAX_WIDTH } from "./album-layout"
-import { albumMaxWidth } from "./gallery"
+import { albumPackWidth } from "./gallery"
 
-describe("albumMaxWidth", () => {
-    it("uses the host width when positive", () => {
-        expect(albumMaxWidth(1280)).toBe(1280)
-        expect(albumMaxWidth(900.7)).toBe(900)
-    })
-
-    it("falls back to the default packer width when unmeasured", () => {
-        expect(albumMaxWidth(0)).toBe(DEFAULT_ALBUM_MAX_WIDTH)
-        expect(albumMaxWidth(-4)).toBe(DEFAULT_ALBUM_MAX_WIDTH)
+describe("albumPackWidth", () => {
+    it("returns DEFAULT_ALBUM_MAX_WIDTH (450), not a host width like 1280", () => {
+        let fakeAvailableWidth = 1280
+        expect(albumPackWidth()).toBe(DEFAULT_ALBUM_MAX_WIDTH)
+        expect(albumPackWidth()).toBe(450)
+        expect(albumPackWidth()).not.toBe(fakeAvailableWidth)
     })
 })
