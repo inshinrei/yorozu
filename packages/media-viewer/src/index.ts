@@ -95,3 +95,5 @@ export {
 export type { MediaGhostHandle, MediaGhost } from "./ghost"
 export { MEDIA_OPEN_MS, MEDIA_CLOSE_MS, MEDIA_CHROME_MS, MEDIA_SWITCH_MS, createMediaShell } from "./shell"
 export type { MediaOpenClosePhase, MediaSwitchDirection, MediaShell } from "./shell"
+export { bindMediaViewerKeys } from "./keyboard"
+export type { MediaViewerKeyHandlers } from "./keyboard"
