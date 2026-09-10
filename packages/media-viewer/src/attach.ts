@@ -660,15 +660,28 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
-    function scrollCurrentThumbIntoView(track: HTMLElement): void {
-        let current = track.querySelector("[data-yorozu-media-thumb][data-current]")
+    function centerCurrentThumb(behavior: ScrollBehavior): void {
+        if (!filmstripEl) return
+        let current = filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]")
         if (!(current instanceof HTMLElement)) return
-        if (typeof current.scrollIntoView !== "function") return
-        current.scrollIntoView({
-            inline: "center",
-            block: "nearest",
-            behavior: reducedMotion() ? "instant" : "smooth",
-        })
+        let thumbW = current.offsetWidth
+        let stripW = filmstripEl.clientWidth
+        let offsetLeft = 0
+        let node: HTMLElement | null = current
+        while (node != null && node !== filmstripEl) {
+            offsetLeft += node.offsetLeft
+            let parent = node.offsetParent
+            if (!(parent instanceof HTMLElement)) break
+            if (parent === filmstripEl) break
+            if (!filmstripEl.contains(parent)) break
+            node = parent
+        }
+        let left = offsetLeft + thumbW / 2 - stripW / 2
+        if (typeof filmstripEl.scrollTo === "function") {
+            filmstripEl.scrollTo({ left, behavior })
+            return
+        }
+        filmstripEl.scrollLeft = left
     }
 
     function onFilmstripClick(e: Event): void {
@@ -694,7 +707,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             return
         }
         let ids = itemIdKey(snap.items)
+        let createdThisPaint = false
         if (!filmstripEl) {
+            createdThisPaint = true
             filmstripEl = document.createElement("nav")
             filmstripEl.setAttribute("data-yorozu-media-filmstrip", "")
             filmstripEl.setAttribute("role", "navigation")
@@ -714,7 +729,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         } else {
             syncThumbs(track, snap)
         }
-        scrollCurrentThumbIntoView(track)
+        let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
+        let behavior: ScrollBehavior = instant ? "instant" : "smooth"
+        centerCurrentThumb(behavior)
+        void dualRaf().then(() => {
+            if (detached || !filmstripEl) return
+            centerCurrentThumb(behavior)
+        })
     }
 
     function maybeToggleZoom(e: PointerEvent): void {
@@ -1052,7 +1073,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         measureZoom()
         if (created && !startedOpen) {
             startedOpen = true
-            void shell?.startOpen().then(() => applyOverlayAttrs())
+            void shell?.startOpen().then(() => {
+                applyOverlayAttrs()
+                centerCurrentThumb("instant")
+            })
             overlay.focus({ preventScroll: true })
         }
     }

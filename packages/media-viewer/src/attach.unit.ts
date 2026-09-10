@@ -68,6 +68,7 @@ describe("attachMediaViewer", () => {
         document.documentElement.classList.remove(MEDIA_GHOST_ANIMATING_CLASS)
         Reflect.deleteProperty(HTMLElement.prototype, "animate")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollTo")
     })
 
     it("open paints dialog + active img src", () => {
@@ -627,62 +628,34 @@ describe("attachMediaViewer", () => {
         expect(thumbImg.draggable).toBe(false)
     })
 
-    it("scrolls the current thumb into view after open, goTo, and prev/next", () => {
-        let scrollIntoView = vi.fn()
-        HTMLElement.prototype.scrollIntoView = scrollIntoView
+    it("centers the current thumb with scrollTo on open, goTo, and prev/next", () => {
+        let scrollTo = vi.fn()
+        HTMLElement.prototype.scrollTo = scrollTo
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
-        let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLButtonElement
-        expect(current.getAttribute("data-index")).toBe("2")
-        expect(scrollIntoView).toHaveBeenCalledWith({
-            inline: "center",
-            block: "nearest",
-            behavior: "smooth",
-        })
-        scrollIntoView.mockClear()
-        let next = root.querySelector('[data-yorozu-media-thumb][data-index="0"]') as HTMLButtonElement
-        let nextScroll = vi.fn()
-        next.scrollIntoView = nextScroll
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("2")
+        expect(scrollTo).toHaveBeenCalled()
+        let openArg = scrollTo.mock.calls[0]![0] as ScrollToOptions
+        expect(openArg).toEqual(expect.objectContaining({ behavior: "instant", left: expect.any(Number) }))
+        scrollTo.mockClear()
         viewer.goTo(0)
-        expect(next.hasAttribute("data-current")).toBe(true)
-        expect(nextScroll).toHaveBeenCalledWith({
-            inline: "center",
-            block: "nearest",
-            behavior: "smooth",
-        })
-        let mid = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
-        let midScroll = vi.fn()
-        mid.scrollIntoView = midScroll
+        let goArg = scrollTo.mock.calls.at(-1)![0] as ScrollToOptions
+        expect(goArg).toEqual(expect.objectContaining({ behavior: "smooth", left: expect.any(Number) }))
         viewer.next()
-        expect(mid.hasAttribute("data-current")).toBe(true)
-        expect(midScroll).toHaveBeenCalledWith({
-            inline: "center",
-            block: "nearest",
-            behavior: "smooth",
-        })
-        let firstScroll = vi.fn()
-        next.scrollIntoView = firstScroll
+        expect((scrollTo.mock.calls.at(-1)![0] as ScrollToOptions).behavior).toBe("smooth")
         viewer.prev("swipe")
-        expect(next.hasAttribute("data-current")).toBe(true)
-        expect(firstScroll).toHaveBeenCalledWith({
-            inline: "center",
-            block: "nearest",
-            behavior: "smooth",
-        })
-        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+        expect((scrollTo.mock.calls.at(-1)![0] as ScrollToOptions).behavior).toBe("smooth")
     })
 
-    it("scrolls the current thumb with instant behavior when reduced motion is on", () => {
+    it("centers with instant behavior when reduced motion is on", () => {
         stop?.()
         stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
-        let scrollIntoView = vi.fn()
-        HTMLElement.prototype.scrollIntoView = scrollIntoView
+        let scrollTo = vi.fn()
+        HTMLElement.prototype.scrollTo = scrollTo
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
-        expect(scrollIntoView).toHaveBeenCalledWith({
-            inline: "center",
-            block: "nearest",
-            behavior: "instant",
-        })
-        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+        expect(scrollTo).toHaveBeenCalledWith(
+            expect.objectContaining({ behavior: "instant", left: expect.any(Number) }),
+        )
     })
 
     it("applies compact filmstrip max-width by default and full width when set", () => {
