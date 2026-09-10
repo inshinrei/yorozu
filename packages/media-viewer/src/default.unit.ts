@@ -23,6 +23,7 @@ let tokenNames = [
     "--yorozu-media-filmstrip-thumb-h",
     "--yorozu-media-filmstrip-thumb-w",
     "--yorozu-media-filmstrip-current-w",
+    "--yorozu-media-filmstrip-current-h",
     "--yorozu-media-filmstrip-gap",
     "--yorozu-media-filmstrip-bg",
     "--yorozu-media-filmstrip-radius",
@@ -52,6 +53,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-w: 2.75rem")
         expect(css).toContain("--yorozu-media-filmstrip-current-w: 3.75rem")
+        expect(css).toContain("--yorozu-media-filmstrip-current-h: 5.5rem")
         expect(css).toContain("--yorozu-media-filmstrip-gap: 1px")
         expect(css).toContain("--yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5)")
         expect(css).toContain("--yorozu-media-filmstrip-radius: 0.25rem")
@@ -89,7 +91,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("opacity: 0.55")
         expect(css).toContain("--yorozu-media-filmstrip-ms")
         expect(css).toContain("touch-action: pan-x")
-        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
     })
 
     it("filmstrip overrides inherited touch-action none so overflow-x pan works", () => {
@@ -130,19 +132,39 @@ describe("default media viewer styles", () => {
         expect(css).toContain(
             "[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-footer]",
         )
-        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
     })
 
-    it("tokens include filmstrip stage gap", () => {
+    it("tokens include filmstrip stage gap and taller current thumb height", () => {
         let css = readFileSync(join(here, "tokens.css"), "utf8")
         expect(css).toContain("--yorozu-media-filmstrip-stage-gap: 0.75rem")
+        expect(css).toContain("--yorozu-media-filmstrip-current-h: 5.5rem")
+        expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
     })
 
     it("filmstrip presence adds pane bottom padding above the strip", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain("[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-pane]")
         expect(css).toContain(
-            "padding-bottom: calc(var(--yorozu-media-filmstrip-thumb-h) + var(--yorozu-media-filmstrip-stage-gap))",
+            "padding-bottom: calc(var(--yorozu-media-filmstrip-current-h) + var(--yorozu-media-filmstrip-stage-gap))",
+        )
+    })
+
+    it("current filmstrip thumb is taller; bar and chrome clear current-h", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(filmstripBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
+        let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(listBlock).toContain("align-items: flex-end")
+        let thumbBlock = css.match(/(?:^|\n)\[data-yorozu-media-thumb\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(thumbBlock).toContain("height: var(--yorozu-media-filmstrip-thumb-h)")
+        expect(thumbBlock).toContain("height var(--yorozu-media-filmstrip-ms)")
+        let currentBlock = css.match(/(?:^|\n)\[data-yorozu-media-thumb\]\[data-current\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(currentBlock).toContain("width: var(--yorozu-media-filmstrip-current-w)")
+        expect(currentBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
+        expect(css).toContain(
+            "padding-bottom: calc(var(--yorozu-media-filmstrip-current-h) + var(--yorozu-media-filmstrip-stage-gap))",
         )
     })
 
