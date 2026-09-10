@@ -32,7 +32,6 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
-    padding: var(--yorozu-media-pad-top) var(--yorozu-media-pad-x) var(--yorozu-media-pad-bottom);
     box-sizing: border-box;
 }
 
@@ -47,6 +46,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: var(--yorozu-media-pad-top) var(--yorozu-media-pad-x) var(--yorozu-media-pad-bottom);
+    box-sizing: border-box;
 }
 
 /* prettier-ignore */

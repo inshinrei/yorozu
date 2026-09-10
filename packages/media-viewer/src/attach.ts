@@ -162,6 +162,15 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
+    function paintedStageEl(): HTMLElement | null {
+        if (!overlay) return viewport
+        let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]")
+        if (zoomEl instanceof HTMLElement) return zoomEl
+        let active = overlay.querySelector('[data-side="active"]')
+        if (active instanceof HTMLElement) return active
+        return viewport
+    }
+
     function naturalForFit(snap: MediaViewerSnapshot): { width: number; height: number } {
         let current = snap.current
         let seed = snap.origin
@@ -178,11 +187,12 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function measureZoom(): void {
         if (detached || !viewport) return
         let current = viewer.snapshot().current
-        let box = viewport.getBoundingClientRect()
+        let stage = paintedStageEl() ?? viewport
+        let box = stage.getBoundingClientRect()
         let fallback = viewportFallback()
-        let vw = box.width || viewport.clientWidth || fallback.width
-        let vh = box.height || viewport.clientHeight || fallback.height
-        let content = stageContentSize(vw, vh, readPadding(viewport))
+        let vw = box.width || stage.clientWidth || fallback.width
+        let vh = box.height || stage.clientHeight || fallback.height
+        let content = stageContentSize(vw, vh, readPadding(stage))
         zoom.setViewportSize(content.width, content.height)
         let nw = current?.naturalWidth || 0
         let nh = current?.naturalHeight || 0
@@ -229,7 +239,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         await dualRaf()
         if (detached || !viewport || !overlay) return false
         applyOverlayAttrs()
-        let to = computeStageFitRectFromElement(viewport, naturalForFit(snap))
+        let stage = paintedStageEl() ?? viewport
+        let to = computeStageFitRectFromElement(stage, naturalForFit(snap))
         let handle = ghost.playOpen({
             host: ghostHost(),
             seed,
@@ -252,9 +263,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let current = snap.current
         let live = current ? captureOriginFromDom(current.id) : null
         let target = live ?? snap.origin
-        let fromStage = viewport ? computeStageFitRectFromElement(viewport, naturalForFit(snap)) : null
-        if (!fromStage && viewport) {
-            let box = viewport.getBoundingClientRect()
+        let stage = paintedStageEl() ?? viewport
+        let fromStage = stage ? computeStageFitRectFromElement(stage, naturalForFit(snap)) : null
+        if (!fromStage && stage) {
+            let box = stage.getBoundingClientRect()
             if (box.width > 0 && box.height > 0) {
                 fromStage = { top: box.top, left: box.left, width: box.width, height: box.height }
             }

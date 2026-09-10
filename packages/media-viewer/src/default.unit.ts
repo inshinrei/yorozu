@@ -60,6 +60,19 @@ describe("default media viewer styles", () => {
         expect(css).not.toContain("data-gallery-stage-media")
     })
 
+    it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let viewportBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(viewportBlock).toContain("overflow: hidden")
+        expect(viewportBlock).not.toContain("padding")
+        let stripBlock = css.match(/(?:^|\n)\[data-yorozu-media-strip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(stripBlock).toContain("inset: 0")
+        let paneBlock = css.match(/(?:^|\n)\[data-yorozu-media-pane\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(paneBlock).toContain("--yorozu-media-pad-top")
+        expect(paneBlock).toContain("--yorozu-media-pad-x")
+        expect(paneBlock).toContain("--yorozu-media-pad-bottom")
+    })
+
     it("package.json exports tokens.css and default.css", () => {
         let pkg = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf8")) as {
             exports: Record<string, string>
