@@ -1,0 +1,15 @@
+/* Optional default tokens for the media viewer overlay. Override via CSS custom properties. */
+[data-yorozu-media-viewer] {
+    --yorozu-media-z: 1400;
+    --yorozu-media-scrim: #19191a;
+    --yorozu-media-pad-top: 3.25rem;
+    --yorozu-media-pad-bottom: 3.25rem;
+    --yorozu-media-pad-x: 0.75rem;
+    --yorozu-media-slide-gap: 40px;
+    --yorozu-media-open-ms: 220ms;
+    --yorozu-media-close-ms: 200ms;
+    --yorozu-media-chrome-ms: 150ms;
+    --yorozu-media-switch-ms: 320ms;
+    --yorozu-media-ghost-ms: 200ms;
+    --yorozu-media-radius: 0.75rem;
+}
