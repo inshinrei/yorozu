@@ -10,6 +10,11 @@ export const ALBUM_CYCLE_SIZES: number[] = [1, 2, 3, 4, 5, 6, 10]
 
 export const EMPTY_MEDIA_HINT: string = "No media yet — add playground/public/media/manifest.json"
 
+/** Packer width: fill the host when measured, else the default token. */
+export function albumMaxWidth(availableWidth: number): number {
+    return availableWidth > 0 ? Math.floor(availableWidth) : DEFAULT_ALBUM_MAX_WIDTH
+}
+
 export type ManifestMedia = {
     id: string
     src: string
@@ -146,13 +151,15 @@ function renderAlbum(
     items: MediaViewerItem[],
     startIndex: number,
     onOpen: GalleryOpenHandler,
+    availableWidth: number,
 ): HTMLElement {
     let album = document.createElement("div")
     album.className = "pg-album"
     let ratios = albumRatiosFromSizes(entries)
+    let maxWidth = albumMaxWidth(availableWidth)
     let { layout, containerStyle } = calculateAlbumLayoutByRatios(ratios, {
-        maxWidth: DEFAULT_ALBUM_MAX_WIDTH,
-        maxHeight: DEFAULT_ALBUM_MAX_WIDTH,
+        maxWidth,
+        maxHeight: maxWidth,
         spacing: DEFAULT_ALBUM_SPACING,
     })
     if (!(containerStyle.width > 0) || !(containerStyle.height > 0)) return album
@@ -174,7 +181,7 @@ function renderAlbum(
     return album
 }
 
-export function mountGallery(host: HTMLElement, opts: MountGalleryOpts): void {
+export function mountGallery(host: HTMLElement, opts: MountGalleryOpts): () => void {
     let images = opts.images ?? []
     let videos = opts.videos ?? []
     let entries: ManifestMedia[] = [...images, ...videos]
@@ -183,23 +190,35 @@ export function mountGallery(host: HTMLElement, opts: MountGalleryOpts): void {
         ...videos.map((entry) => toViewerItem(entry, "video")),
     ]
 
-    host.replaceChildren()
-
-    if (entries.length === 0) {
-        let empty = document.createElement("p")
-        empty.className = "pg-empty"
-        empty.textContent = EMPTY_MEDIA_HINT
-        host.append(empty)
+    function paint(): void {
+        host.replaceChildren()
+        if (entries.length === 0) {
+            let empty = document.createElement("p")
+            empty.className = "pg-empty"
+            empty.textContent = EMPTY_MEDIA_HINT
+            host.append(empty)
+        }
+        let grid = document.createElement("div")
+        grid.className = "pg-albums"
+        host.append(grid)
+        let width = albumMaxWidth(host.clientWidth)
+        let albums = groupIntoAlbums(entries)
+        let offset = 0
+        for (let group of albums) {
+            grid.append(renderAlbum(group, items, offset, opts.onOpen, width))
+            offset += group.length
+        }
     }
 
-    let grid = document.createElement("div")
-    grid.className = "pg-albums"
-    host.append(grid)
-
-    let albums = groupIntoAlbums(entries)
-    let offset = 0
-    for (let group of albums) {
-        grid.append(renderAlbum(group, items, offset, opts.onOpen))
-        offset += group.length
+    paint()
+    let observer: ResizeObserver | null = null
+    if (typeof ResizeObserver === "function") {
+        observer = new ResizeObserver(() => paint())
+        observer.observe(host)
+    }
+    return () => {
+        observer?.disconnect()
+        observer = null
+        host.replaceChildren()
     }
 }

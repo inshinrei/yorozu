@@ -26,6 +26,7 @@ let tokenNames = [
     "--yorozu-media-filmstrip-gap",
     "--yorozu-media-filmstrip-bg",
     "--yorozu-media-filmstrip-radius",
+    "--yorozu-media-filmstrip-max-width",
 ]
 
 describe("default media viewer styles", () => {
@@ -53,6 +54,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-filmstrip-gap: 1px")
         expect(css).toContain("--yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5)")
         expect(css).toContain("--yorozu-media-filmstrip-radius: 0.25rem")
+        expect(css).toContain("--yorozu-media-filmstrip-max-width: 36%")
         expect(css).toContain("[data-yorozu-media-viewer]")
     })
 
@@ -92,6 +94,9 @@ describe("default media viewer styles", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(filmstripBlock).toContain("touch-action: pan-x")
+        expect(filmstripBlock).toContain("overflow-x: auto")
+        expect(filmstripBlock).toContain("width: min(100%, var(--yorozu-media-filmstrip-max-width))")
+        expect(filmstripBlock).toContain("margin-inline: auto")
         let overlayBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewer\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(overlayBlock).toContain("touch-action: none")
     })

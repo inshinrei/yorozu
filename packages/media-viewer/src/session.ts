@@ -10,6 +10,8 @@ import type {
     MediaViewerSnapshot,
 } from "./types"
 
+export const MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT: string = "36%"
+
 export type {
     MediaKind,
     MediaViewer,
@@ -51,6 +53,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let chromeSlots: MediaViewerChromeSlots | null = null
     let navFrom: MediaViewerNavFrom | null = null
     let filmstripWanted = true
+    let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
     let listeners = new Set<() => void>()
 
     function notify(): void {
@@ -92,6 +95,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
             origin,
             ghost: openGhost,
             filmstrip: resolveFilmstrip(),
+            filmstripMaxWidth,
         }
     }
 
@@ -116,6 +120,9 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         chromeSlots = openOpts.chrome ?? null
         navFrom = null
         filmstripWanted = openOpts.filmstrip !== false
+        if (typeof openOpts.filmstripMaxWidth === "string" && openOpts.filmstripMaxWidth.trim() !== "") {
+            filmstripMaxWidth = openOpts.filmstripMaxWidth.trim()
+        }
         openFlag = true
         notify()
     }
@@ -231,6 +238,15 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         notify()
     }
 
+    function setFilmstripMaxWidth(width: string): void {
+        if (!alive) return
+        let next = width.trim()
+        if (next === "") next = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
+        if (filmstripMaxWidth === next) return
+        filmstripMaxWidth = next
+        notify()
+    }
+
     function chrome(): MediaViewerChromeSlots | null {
         return chromeSlots
     }
@@ -268,6 +284,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         next,
         goTo,
         setFilmstrip,
+        setFilmstripMaxWidth,
         chrome,
         lastNav,
         wantsGhost,

@@ -588,7 +588,7 @@ describe("attachMediaViewer", () => {
         expect(second.querySelector("img")?.getAttribute("src")).toBe("later-b.jpg")
     })
 
-    it("scrolls the current thumb into view after open and goTo", () => {
+    it("scrolls the current thumb into view after open, goTo, and prev/next", () => {
         let scrollIntoView = vi.fn()
         HTMLElement.prototype.scrollIntoView = scrollIntoView
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
@@ -602,7 +602,29 @@ describe("attachMediaViewer", () => {
         viewer.goTo(0)
         expect(next.hasAttribute("data-current")).toBe(true)
         expect(nextScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        let mid = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLButtonElement
+        let midScroll = vi.fn()
+        mid.scrollIntoView = midScroll
+        viewer.next()
+        expect(mid.hasAttribute("data-current")).toBe(true)
+        expect(midScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
+        let firstScroll = vi.fn()
+        next.scrollIntoView = firstScroll
+        viewer.prev("swipe")
+        expect(next.hasAttribute("data-current")).toBe(true)
+        expect(firstScroll).toHaveBeenCalledWith({ inline: "center", block: "nearest" })
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+    })
+
+    it("applies compact filmstrip max-width by default and full width when set", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.style.getPropertyValue("--yorozu-media-filmstrip-max-width")).toBe("36%")
+        viewer.setFilmstripMaxWidth("100%")
+        expect(overlay.style.getPropertyValue("--yorozu-media-filmstrip-max-width")).toBe("100%")
+        viewer.open({ items: [img("a"), img("b")], filmstripMaxWidth: "24rem" })
+        overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.style.getPropertyValue("--yorozu-media-filmstrip-max-width")).toBe("24rem")
     })
 
     it("wheel on the filmstrip is not trapped", () => {

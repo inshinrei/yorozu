@@ -55,6 +55,8 @@ export type MediaViewerOpenOpts = {
     origin?: MediaViewerOrigin | null
     ghost?: boolean
     filmstrip?: boolean
+    /** CSS length for strip max width (`36%`, `100%`, `24rem`). Default compact. */
+    filmstripMaxWidth?: string
     neighbors?: { older: MediaViewerNeighbor | null; newer: MediaViewerNeighbor | null }
     canOlder?: boolean
     canNewer?: boolean
@@ -72,6 +74,7 @@ export type MediaViewerSnapshot = {
     origin: MediaViewerOrigin | null
     ghost: boolean
     filmstrip: boolean
+    filmstripMaxWidth: string
 }
 
 export type MediaViewerSessionOpts = {
@@ -94,6 +97,7 @@ export type MediaViewer = {
     next: (from?: MediaViewerNavFrom) => void
     goTo: (index: number) => void
     setFilmstrip: (on: boolean) => void
+    setFilmstripMaxWidth: (width: string) => void
     chrome: () => MediaViewerChromeSlots | null
     lastNav: () => MediaViewerNavFrom | null
     wantsGhost: (kind: "open" | "close") => boolean

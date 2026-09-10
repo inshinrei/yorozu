@@ -19,4 +19,5 @@
     --yorozu-media-filmstrip-gap: 1px;
     --yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5);
     --yorozu-media-filmstrip-radius: 0.25rem;
+    --yorozu-media-filmstrip-max-width: 36%;
 }

@@ -1,4 +1,4 @@
-export { createMediaViewer } from "./session"
+export { createMediaViewer, MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT } from "./session"
 export type {
     MediaKind,
     MediaViewer,

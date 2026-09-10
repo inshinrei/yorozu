@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createMediaViewer, type MediaViewer, type MediaViewerItem } from "./session"
+import { createMediaViewer, MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT, type MediaViewer, type MediaViewerItem } from "./session"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
@@ -38,7 +38,9 @@ describe("createMediaViewer", () => {
             origin: null,
             ghost: false,
             filmstrip: false,
+            filmstripMaxWidth: MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
         })
+        expect(MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT).toBe("36%")
         expect(viewer!.snapshot()).not.toBe(viewer!.snapshot())
         expect(viewer!.chrome()).toBeNull()
         expect(viewer!.lastNav()).toBeNull()
@@ -314,5 +316,24 @@ describe("createMediaViewer", () => {
         viewer!.setFilmstrip(true)
         expect(viewer!.snapshot().filmstrip).toBe(true)
         expect(ticks).toBe(1)
+    })
+
+    it("filmstripMaxWidth defaults compact and can be set to full width", () => {
+        viewer!.open({ items: [img("a"), img("b")] })
+        expect(viewer!.snapshot().filmstripMaxWidth).toBe("36%")
+        viewer!.open({ items: [img("a"), img("b")], filmstripMaxWidth: "100%" })
+        expect(viewer!.snapshot().filmstripMaxWidth).toBe("100%")
+        let ticks = 0
+        viewer!.subscribe(() => {
+            ticks += 1
+        })
+        viewer!.setFilmstripMaxWidth("24rem")
+        expect(viewer!.snapshot().filmstripMaxWidth).toBe("24rem")
+        expect(ticks).toBe(1)
+        viewer!.setFilmstripMaxWidth("  24rem  ")
+        expect(ticks).toBe(1)
+        viewer!.setFilmstripMaxWidth("   ")
+        expect(viewer!.snapshot().filmstripMaxWidth).toBe(MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT)
+        expect(ticks).toBe(2)
     })
 })

@@ -250,6 +250,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (dismiss) overlay.setAttribute("data-swipe-dismiss", "")
         else overlay.removeAttribute("data-swipe-dismiss")
         overlay.style.setProperty("--yorozu-media-dismiss-alpha", String(swipe.dismissOpacity()))
+        overlay.style.setProperty("--yorozu-media-filmstrip-max-width", viewer.snapshot().filmstripMaxWidth)
         if (strip) {
             let next = swipe.transformStyle()
             strip.style.transform = next ?? ""
