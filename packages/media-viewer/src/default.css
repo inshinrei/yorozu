@@ -151,6 +151,10 @@
     bottom: var(--yorozu-media-filmstrip-thumb-h);
 }
 
+[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-pane] {
+    padding-bottom: calc(var(--yorozu-media-filmstrip-thumb-h) + var(--yorozu-media-filmstrip-stage-gap));
+}
+
 [data-yorozu-media-chrome] {
     inset: 0;
 }

@@ -122,6 +122,19 @@ describe("default media viewer styles", () => {
         expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
     })
 
+    it("tokens include filmstrip stage gap", () => {
+        let css = readFileSync(join(here, "tokens.css"), "utf8")
+        expect(css).toContain("--yorozu-media-filmstrip-stage-gap: 0.75rem")
+    })
+
+    it("filmstrip presence adds pane bottom padding above the strip", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain("[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-pane]")
+        expect(css).toContain(
+            "padding-bottom: calc(var(--yorozu-media-filmstrip-thumb-h) + var(--yorozu-media-filmstrip-stage-gap))",
+        )
+    })
+
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let viewportBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\s*\{[^}]*\}/)?.[0] ?? ""
