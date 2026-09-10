@@ -871,6 +871,45 @@ describe("attachMediaViewer", () => {
         scroller.remove()
     })
 
+    it("forceClose during swipe ghost close does not linger-lock the page scroller", async () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => resolve())
+            })
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay?.getAttribute("data-phase")).toBe("open")
+
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 400, clientY: 280 }))
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeTruthy()
+        expect(viewer.snapshot().open).toBe(true)
+
+        api!.forceClose()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+        expect(viewer.snapshot().open).toBe(false)
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let wheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(wheel)
+        expect(wheel.defaultPrevented).toBe(false)
+        scroller.remove()
+    })
+
     it("chrome footer wheel stopPropagates without preventDefault; overlay scrim still locks", () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({

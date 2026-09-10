@@ -416,7 +416,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function forceViewerClose(): void {
         clearScrollLockLinger()
         ghost.cancel()
-        tearDownOverlay()
+        tearDownOverlay({ linger: false })
+        clearScrollLockLinger()
         if (viewer.snapshot().open) viewer.forceClose()
     }
 
@@ -1033,8 +1034,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         startedOpen = false
     }
 
-    function tearDownOverlay(): void {
-        let shouldLinger = swipe.dismissing()
+    function tearDownOverlay(opts?: { linger?: boolean }): void {
+        let shouldLinger = opts?.linger !== false && swipe.dismissing()
         unbindKeys?.()
         unbindKeys = null
         unmountAllChrome()
