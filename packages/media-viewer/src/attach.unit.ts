@@ -624,7 +624,12 @@ describe("attachMediaViewer", () => {
     })
 
     it("centers the current thumb with scrollTo on open, goTo, and prev/next", () => {
-        let scrollTo = vi.fn()
+        let scrollReceivers: HTMLElement[] = []
+        let scrollArgs: ScrollToOptions[] = []
+        let scrollTo = function (this: HTMLElement, options?: ScrollToOptions | number): void {
+            scrollReceivers.push(this)
+            if (typeof options === "object" && options != null) scrollArgs.push(options)
+        }
         HTMLElement.prototype.scrollTo = scrollTo
         let layoutBox = {
             left: 0,
@@ -642,17 +647,18 @@ describe("attachMediaViewer", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 2 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("2")
-        expect(scrollTo).toHaveBeenCalled()
-        let openArg = scrollTo.mock.calls[0]![0] as ScrollToOptions
+        expect(scrollReceivers.length).toBeGreaterThan(0)
+        expect(scrollReceivers.some((el) => el.matches("[data-yorozu-media-filmstrip]"))).toBe(true)
+        let openArg = scrollArgs[0]!
         expect(openArg).toEqual(expect.objectContaining({ behavior: "instant", left: expect.any(Number) }))
-        scrollTo.mockClear()
+        scrollReceivers.length = 0
+        scrollArgs.length = 0
         viewer.goTo(0)
-        let goArg = scrollTo.mock.calls.at(-1)![0] as ScrollToOptions
-        expect(goArg).toEqual(expect.objectContaining({ behavior: "smooth", left: expect.any(Number) }))
+        expect(scrollArgs.at(-1)).toEqual(expect.objectContaining({ behavior: "smooth", left: expect.any(Number) }))
         viewer.next()
-        expect((scrollTo.mock.calls.at(-1)![0] as ScrollToOptions).behavior).toBe("smooth")
+        expect(scrollArgs.at(-1)!.behavior).toBe("smooth")
         viewer.prev("swipe")
-        expect((scrollTo.mock.calls.at(-1)![0] as ScrollToOptions).behavior).toBe("smooth")
+        expect(scrollArgs.at(-1)!.behavior).toBe("smooth")
     })
 
     it("centers with instant behavior when reduced motion is on", () => {

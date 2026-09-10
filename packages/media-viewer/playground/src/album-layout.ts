@@ -35,7 +35,6 @@ export type AlbumLayout = {
 export type CalculateAlbumLayoutOpts = {
     maxWidth?: number
     maxHeight?: number
-    minWidth?: number
     spacing?: number
 }
 
@@ -55,7 +54,6 @@ type LayoutParams = {
     ratios: number[]
     averageRatio: number
     maxWidth: number
-    minWidth: number
     maxHeight: number
     spacing: number
 }
@@ -133,13 +131,11 @@ export function calculateAlbumLayoutByRatios(ratios: number[], opts?: CalculateA
     let spacing = opts?.spacing ?? DEFAULT_ALBUM_SPACING
     let maxWidth = opts?.maxWidth ?? DEFAULT_ALBUM_MAX_WIDTH
     let maxHeight = opts?.maxHeight ?? maxWidth
-    let minWidth = opts?.minWidth ?? 100
 
     let params: LayoutParams = {
         ratios,
         averageRatio: getAverageRatio(ratios),
         maxWidth,
-        minWidth,
         maxHeight,
         spacing,
     }

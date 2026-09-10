@@ -27,6 +27,7 @@ let tokenNames = [
     "--yorozu-media-filmstrip-bg",
     "--yorozu-media-filmstrip-radius",
     "--yorozu-media-filmstrip-max-width",
+    "--yorozu-media-filmstrip-stage-gap",
 ]
 
 describe("default media viewer styles", () => {

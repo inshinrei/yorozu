@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { createMediaImageZoom } from "./zoom-controller"
-import { MEDIA_MAX_ZOOM_FACTOR, MEDIA_MIN_SCALE, MEDIA_ZOOM_STEP } from "./zoom"
+import { MEDIA_MAX_ZOOM_FACTOR, MEDIA_MIN_SCALE, MEDIA_ZOOM_SETTLE_MS, MEDIA_ZOOM_STEP } from "./zoom"
 
 describe("createMediaImageZoom", () => {
     afterEach(() => {
@@ -83,6 +83,10 @@ describe("createMediaImageZoom", () => {
         zoom.endDrag({ withInertia: false, pinchOrigin: { offsetX: 0, offsetY: 0 } })
         expect(zoom.isSettling()).toBe(true)
         expect(zoom.scale()).toBeLessThan(1)
+        // Fake rAF is 16ms; final apply lands on the tick at/after duration.
+        vi.advanceTimersByTime(MEDIA_ZOOM_SETTLE_MS + 16)
+        expect(zoom.scale()).toBe(1)
+        expect(zoom.isSettling()).toBe(false)
         zoom.destroy()
     })
 
