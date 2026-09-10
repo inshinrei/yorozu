@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./attach"
 import { MEDIA_GHOST_ANIMATING_CLASS } from "./ghost"
 import { createMediaViewer, type MediaViewer } from "./session"
+import { MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin } from "./types"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
@@ -821,6 +822,52 @@ describe("attachMediaViewer", () => {
         let leftoverWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         scroller.dispatchEvent(leftoverWheel)
         expect(leftoverWheel.defaultPrevented).toBe(false)
+        scroller.remove()
+    })
+
+    it("swipe-close leftover wheel on a page scroller is prevented until idle", () => {
+        vi.useFakeTimers()
+        viewer.open({ items: [img("a")] })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        expect(viewport).toBeTruthy()
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 400, clientY: 280 }))
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+        expect(viewer.snapshot().open).toBe(false)
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let leftoverWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(leftoverWheel)
+        expect(leftoverWheel.defaultPrevented).toBe(true)
+
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        let afterIdle = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(afterIdle)
+        expect(afterIdle.defaultPrevented).toBe(false)
+        scroller.remove()
+        vi.useRealTimers()
+    })
+
+    it("forceClose does not linger-lock the page scroller", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        api!.forceClose()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let wheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(wheel)
+        expect(wheel.defaultPrevented).toBe(false)
         scroller.remove()
     })
 

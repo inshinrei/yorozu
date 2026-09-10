@@ -8,6 +8,7 @@ import { fitContain, stageContentSize } from "./layout"
 import { captureOriginFromDom, queryMediaOriginEl } from "./origin"
 import { createMediaShell, type MediaShell } from "./shell"
 import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
+import { MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type {
     MediaViewer,
     MediaViewerChrome,
@@ -63,6 +64,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let lastContentId: string | null = null
     let rafId: number | null = null
     let abort: AbortController | null = null
+    let scrollLockLinger: AbortController | null = null
+    let scrollLockLingerTimer: ReturnType<typeof setTimeout> | null = null
     let resizeObserver: ResizeObserver | null = null
     let unbindKeys: (() => void) | null = null
 
@@ -361,8 +364,39 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
+    function clearScrollLockLinger(): void {
+        if (scrollLockLingerTimer != null) {
+            clearTimeout(scrollLockLingerTimer)
+            scrollLockLingerTimer = null
+        }
+        scrollLockLinger?.abort()
+        scrollLockLinger = null
+    }
+
+    function bumpScrollLockLingerTimer(): void {
+        if (scrollLockLingerTimer != null) clearTimeout(scrollLockLingerTimer)
+        scrollLockLingerTimer = setTimeout(() => {
+            scrollLockLingerTimer = null
+            clearScrollLockLinger()
+        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
+    }
+
+    function armScrollLockLinger(): void {
+        clearScrollLockLinger()
+        scrollLockLinger = new AbortController()
+        let signal = scrollLockLinger.signal
+        const onLingerScroll = (e: Event): void => {
+            e.preventDefault()
+            bumpScrollLockLingerTimer()
+        }
+        window.addEventListener("wheel", onLingerScroll, { capture: true, passive: false, signal })
+        window.addEventListener("touchmove", onLingerScroll, { capture: true, passive: false, signal })
+        bumpScrollLockLingerTimer()
+    }
+
     function requestViewerClose(closeOpts?: { ghost?: boolean }): void {
         if (!viewer.snapshot().open) return
+        if (!swipe.dismissing()) clearScrollLockLinger()
         let wants = viewer.beginClose(closeOpts)
         applyOverlayAttrs()
         if (!wants) {
@@ -380,6 +414,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function forceViewerClose(): void {
+        clearScrollLockLinger()
         ghost.cancel()
         tearDownOverlay()
         if (viewer.snapshot().open) viewer.forceClose()
@@ -900,6 +935,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function createOverlay(): void {
+        clearScrollLockLinger()
         abort = new AbortController()
         let signal = abort.signal
         overlay = document.createElement("div")
@@ -934,6 +970,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         const lockPageScroll = (e: Event): void => {
             let t = e.target
+            // Window/document are not Elements (jsdom also breaks `currentTarget === window`).
+            if (!(e.currentTarget instanceof Element)) {
+                if (overlay != null && t instanceof Node && overlay.contains(t)) return
+                e.preventDefault()
+                e.stopPropagation()
+                return
+            }
             if (t instanceof Element && t.closest("[data-yorozu-media-filmstrip]")) {
                 e.stopPropagation()
                 if (!isFilmstripPanX(e)) e.preventDefault()
@@ -970,6 +1013,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         overlay.addEventListener("wheel", lockPageScroll, { passive: false, signal })
         overlay.addEventListener("touchmove", lockPageScroll, { passive: false, signal })
+        window.addEventListener("wheel", lockPageScroll, { capture: true, passive: false, signal })
+        window.addEventListener("touchmove", lockPageScroll, { capture: true, passive: false, signal })
         overlay.addEventListener("touchend", clearFilmstripTouchSample, { signal })
         overlay.addEventListener("touchcancel", clearFilmstripTouchSample, { signal })
         overlay.addEventListener("pointerup", clearFilmstripTouchSample, { signal })
@@ -989,6 +1034,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function tearDownOverlay(): void {
+        let shouldLinger = swipe.dismissing()
         unbindKeys?.()
         unbindKeys = null
         unmountAllChrome()
@@ -1020,6 +1066,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         header = null
         footer = null
         chromeEl = null
+        if (shouldLinger) armScrollLockLinger()
     }
 
     function paintOpen(): void {
@@ -1087,6 +1134,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         viewer.open = innerOpen
         unsub()
         tearDownOverlay()
+        clearScrollLockLinger()
         swipe.destroy()
         zoom.destroy()
         ghost.cancel()
