@@ -145,6 +145,25 @@ describe("attachMediaViewer", () => {
         expect(viewer.lastNav()).toBe("next")
     })
 
+    it('chrome api next/prev set lastNav to "next"/"prev" for opaque ids', () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("aa"), img("bb")],
+            index: 0,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        api!.next()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(viewer.lastNav()).toBe("next")
+        api!.prev()
+        expect(viewer.snapshot().index).toBe(0)
+        expect(viewer.lastNav()).toBe("prev")
+    })
+
     it("open({ ghost: false, origin }) does not add yorozu-media-ghost-animating", () => {
         viewer.open({ items: [img("a")], origin, ghost: false })
         expect(root.querySelector("[data-yorozu-media-viewer]")).toBeTruthy()

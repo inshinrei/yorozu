@@ -397,10 +397,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             forceViewerClose()
         },
         prev: (): void => {
-            viewer.prev()
+            viewer.prev("prev")
         },
         next: (): void => {
-            viewer.next()
+            viewer.next("next")
         },
         goTo: (index: number): void => {
             viewer.goTo(index)

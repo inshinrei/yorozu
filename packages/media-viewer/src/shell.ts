@@ -26,11 +26,9 @@ export type MediaShell = {
     requestClose: () => Promise<void>
     forceClose: () => void
     trackContentKey: (contentKey: string) => void
-    markNav: (kind: MediaViewerNavFrom | "prev" | "next") => void
+    markNav: (kind: MediaViewerNavFrom) => void
     destroy: () => void
 }
-
-type MediaShellNav = MediaViewerNavFrom | "prev" | "next"
 
 /** Numeric `index:id` head used when lastNav is `"key"` or unset. */
 function contentIndex(key: string): number | null {
@@ -71,14 +69,14 @@ export function createMediaShell(opts: {
     runCloseGhost?: () => boolean | Promise<boolean>
     cancelGhost?: () => void
     onFinishClose: () => void
-    lastNav?: () => MediaViewerNavFrom | "prev" | "next" | null
+    lastNav?: () => MediaViewerNavFrom | null
 }): MediaShell {
     let alive = true
     let finished = false
     let openStarted = false
     let closeTimer: ReturnType<typeof setTimeout> | null = null
     let closeWait: (() => void) | null = null
-    let markedNav: MediaShellNav | null = null
+    let markedNav: MediaViewerNavFrom | null = null
     let lastKey: string | null = null
     let switchDirection: MediaSwitchDirection = "none"
     let switchKey = 0
@@ -87,14 +85,14 @@ export function createMediaShell(opts: {
             ? { kind: "ready" }
             : { kind: "open-flight", pinnedUrl: opts.getOpenPinnedUrl?.() ?? null, scrimSolid: false }
 
-    function consumeNav(): MediaShellNav | null {
+    function consumeNav(): MediaViewerNavFrom | null {
         let marked = markedNav
         let callback = opts.lastNav?.() ?? null
         markedNav = null
         return marked ?? callback
     }
 
-    function switchDirFromNav(nav: MediaShellNav | null, prevKey: string, nextKey: string): MediaSwitchDirection {
+    function switchDirFromNav(nav: MediaViewerNavFrom | null, prevKey: string, nextKey: string): MediaSwitchDirection {
         if (nav === "swipe") return "none"
         if (nav === "jump") return "jump"
         if (nav === "prev") return "older"
@@ -204,7 +202,7 @@ export function createMediaShell(opts: {
         switchDirection = switchDirFromNav(consumeNav(), prev, contentKey)
     }
 
-    function markNav(kind: MediaViewerNavFrom | "prev" | "next"): void {
+    function markNav(kind: MediaViewerNavFrom): void {
         markedNav = kind
     }
 
