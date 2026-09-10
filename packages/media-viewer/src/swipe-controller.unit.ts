@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
     MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
+    MEDIA_SWIPE_WHEEL_QUIET_PX,
     MEDIA_SWIPE_WHEEL_RELEASE_MS,
     MEDIA_SWIPE_X_THRESHOLD,
 } from "./swipe"
-import { createMediaSwipe } from "./swipe-controller"
+import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
 
 function pointer(type: string, init: Partial<PointerEventInit>): PointerEvent {
     return new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX: 0, clientY: 0, ...init })
@@ -27,6 +28,13 @@ function baseCbs(overrides: Partial<Parameters<typeof createMediaSwipe>[0]> = {}
         onNewer: () => {},
         onClose: () => {},
         ...overrides,
+    }
+}
+
+function playWheel(swipe: MediaSwipe, steps: { dt: number; deltaX: number; deltaY?: number }[]): void {
+    for (let step of steps) {
+        if (step.dt > 0) vi.advanceTimersByTime(step.dt)
+        swipe.onWheel(wheel({ deltaX: step.deltaX, deltaY: step.deltaY ?? 0 }))
     }
 }
 
@@ -203,6 +211,7 @@ describe("createMediaSwipe", () => {
     it("commits once per wheel session until cooldown idle", () => {
         vi.useFakeTimers()
         expect(MEDIA_SWIPE_WHEEL_COOLDOWN_MS).toBe(420)
+        expect(MEDIA_SWIPE_WHEEL_QUIET_PX).toBe(10)
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
@@ -218,7 +227,7 @@ describe("createMediaSwipe", () => {
         expect(onNewer).toHaveBeenCalledTimes(1)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(2)
+        expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
@@ -234,9 +243,81 @@ describe("createMediaSwipe", () => {
             expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         }
         expect(onNewer).toHaveBeenCalledTimes(1)
+        // One-shot cooldown from t=0 elapsed at 420; leftover must not have pushed it out.
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - 400)
         expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(2)
+        swipe.destroy()
+    })
+
+    it.each([
+        {
+            name: "one-flick leftover",
+            steps: (early: number) => [
+                { dt: 0, deltaX: early },
+                ...Array.from({ length: 12 }, () => ({ dt: 50, deltaX: early })),
+            ],
+            onNewer: 1,
+        },
+        {
+            name: "leftover after cooldown still large",
+            steps: (early: number) => [
+                { dt: 0, deltaX: early },
+                ...Array.from({ length: 16 }, () => ({ dt: 50, deltaX: early })),
+            ],
+            onNewer: 1,
+        },
+        {
+            name: "next flick after quiet",
+            steps: (early: number) => [
+                { dt: 0, deltaX: early },
+                ...Array.from({ length: 8 }, () => ({ dt: 50, deltaX: early })),
+                { dt: 50, deltaX: 0 },
+                { dt: 50, deltaX: early },
+            ],
+            onNewer: 2,
+        },
+        {
+            name: "second flick during cooldown",
+            steps: (early: number) => [
+                { dt: 0, deltaX: early },
+                { dt: 50, deltaX: 0 },
+                { dt: 50, deltaX: early },
+            ],
+            onNewer: 1,
+        },
+    ])("wheel flick harness: $name", ({ steps, onNewer: expected }) => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
+        playWheel(swipe, steps(early))
+        expect(onNewer).toHaveBeenCalledTimes(expected)
+        swipe.destroy()
+    })
+
+    it("wheel flick harness: bounce leftover", () => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
+        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).not.toHaveBeenCalled()
+        playWheel(
+            swipe,
+            Array.from({ length: 10 }, () => ({ dt: 50, deltaX: early })),
+        )
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
@@ -262,20 +343,25 @@ describe("createMediaSwipe", () => {
         vi.useFakeTimers()
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
         expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
         expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).not.toHaveBeenCalled()
         expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
         swipe.onPointerCancel(pointer("pointercancel", { clientX: 400, clientY: 200 }))
-        let leftover = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 })
+        let leftover = wheel({ deltaX: early, deltaY: 0 })
         expect(swipe.onWheel(leftover)).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(0)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(0)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
-        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })

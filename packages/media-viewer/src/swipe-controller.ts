@@ -6,6 +6,7 @@ import { easeOutCubic } from "@yorozu/animations"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
     MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
+    MEDIA_SWIPE_WHEEL_QUIET_PX,
     MEDIA_SWIPE_WHEEL_RELEASE_MS,
     clampSwipeOffsetX,
     clampSwipeOffsetY,
@@ -68,10 +69,12 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     let wheelTimer: ReturnType<typeof setTimeout> | null = null
     let settleRaf: number | null = null
     let wheelActive = false
-    /** After older/newer/close, ignore further wheel until cooldown idle. */
+    /** After older/newer/close, ignore further wheel until cooldown + quiet valley. */
     let sessionConsumed = false
-    /** After wheel bounce, ignore leftover wheel until idle. Does not block pointer. */
+    /** After wheel bounce, ignore leftover wheel until cooldown + quiet. Does not block pointer. */
     let wheelHoldoff = false
+    /** One-shot cooldown elapsed; gate clears only after a quiet wheel sample. */
+    let wheelGateCooldownElapsed = false
     let settleGen = 0
 
     function viewportSize(): { w: number; h: number } {
@@ -107,6 +110,31 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         prevRawX = rawX
     }
 
+    function wheelGated(): boolean {
+        return sessionConsumed || wheelHoldoff
+    }
+
+    function isQuietWheel(e: WheelEvent): boolean {
+        return Math.abs(e.deltaX) < MEDIA_SWIPE_WHEEL_QUIET_PX && Math.abs(e.deltaY) < MEDIA_SWIPE_WHEEL_QUIET_PX
+    }
+
+    function clearWheelGate(): void {
+        sessionConsumed = false
+        wheelHoldoff = false
+        wheelGateCooldownElapsed = false
+    }
+
+    /** One-shot gate cooldown; leftover wheel must not restart this timer. */
+    function startWheelGateCooldown(): void {
+        clearWheelTimer()
+        wheelGateCooldownElapsed = false
+        wheelTimer = setTimeout(() => {
+            wheelTimer = null
+            wheelGateCooldownElapsed = true
+            wheelActive = false
+        }, MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
+    }
+
     function resetOffsetsInstant(): void {
         settleGen++
         offsetX = 0
@@ -117,8 +145,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         dismissing = false
         pointerId = null
         wheelActive = false
-        sessionConsumed = false
-        wheelHoldoff = false
+        clearWheelGate()
         clearWheelTimer()
         cancelSettleRaf()
         clearLastDelta()
@@ -144,32 +171,25 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function refreshWheelIdleTimer(): void {
+        if (wheelGated()) return
         clearWheelTimer()
-        let delay = sessionConsumed || wheelHoldoff ? MEDIA_SWIPE_WHEEL_COOLDOWN_MS : MEDIA_SWIPE_WHEEL_RELEASE_MS
         wheelTimer = setTimeout(() => {
             wheelTimer = null
-            if (sessionConsumed || wheelHoldoff) {
-                sessionConsumed = false
-                wheelHoldoff = false
-                wheelActive = false
-                return
-            }
             if (!wheelActive) return
             finishGesture()
-        }, delay)
+        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
     }
 
     function markSessionConsumed(): void {
         sessionConsumed = true
-        refreshWheelIdleTimer()
+        startWheelGateCooldown()
     }
 
     function endPointerWheel(): void {
         gesturing = false
         pointerId = null
         wheelActive = false
-        if (sessionConsumed || wheelHoldoff) refreshWheelIdleTimer()
-        else clearWheelTimer()
+        if (!wheelGated()) clearWheelTimer()
     }
 
     function decideCommit(): MediaSwipeCommit {
@@ -285,7 +305,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             animateOffsetToZero()
             if (fromWheel) {
                 wheelHoldoff = true
-                refreshWheelIdleTimer()
+                startWheelGateCooldown()
             }
             return
         }
@@ -322,8 +342,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         startClientY = e.clientY
         gesturing = true
         wheelActive = false
-        if (sessionConsumed || wheelHoldoff) refreshWheelIdleTimer()
-        else clearWheelTimer()
+        if (!wheelGated()) clearWheelTimer()
         axis = "none"
         offsetX = 0
         offsetY = 0
@@ -363,7 +382,10 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
 
         if (pointerId != null) return true
 
-        if (sessionConsumed || wheelHoldoff) {
+        if (wheelGated()) {
+            if (wheelGateCooldownElapsed && isQuietWheel(e)) {
+                clearWheelGate()
+            }
             return true
         }
 

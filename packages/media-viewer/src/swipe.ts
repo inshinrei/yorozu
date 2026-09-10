@@ -13,6 +13,7 @@ export const MEDIA_SWIPE_DIRECTION_THRESHOLD: number = 10
 export const MEDIA_SWIPE_DIRECTION_TOLERANCE: number = 1.5
 export const MEDIA_SWIPE_WHEEL_RELEASE_MS: number = 90
 export const MEDIA_SWIPE_WHEEL_COOLDOWN_MS: number = 420
+export const MEDIA_SWIPE_WHEEL_QUIET_PX: number = 10
 export const MEDIA_SWIPE_SLIDE_GAP_PX: number = 40
 export const MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO: number = 1
 export const MEDIA_SWIPE_SETTLE_MS: number = 350
