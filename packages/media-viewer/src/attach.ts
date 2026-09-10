@@ -432,10 +432,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 requestViewerClose()
             },
             prev: (): void => {
-                viewer.prev()
+                viewer.prev("prev")
             },
             next: (): void => {
-                viewer.next()
+                viewer.next("next")
             },
             zoomIn: (): void => {
                 api.zoomIn()

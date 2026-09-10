@@ -25,7 +25,7 @@ export type MediaViewerOrigin = {
     naturalHeight?: number
 }
 
-export type MediaViewerNavFrom = "key" | "swipe" | "jump"
+export type MediaViewerNavFrom = "key" | "swipe" | "jump" | "prev" | "next"
 
 export type MediaViewerChromeApi = {
     close: (opts?: { ghost?: boolean }) => void

@@ -96,8 +96,7 @@
     box-sizing: border-box;
 }
 
-/* prettier-ignore */
-[data-yorozu-media-pane][data-side=older] {
+[data-yorozu-media-pane][data-side="older"] {
     transform: translateX(calc(-100% - var(--yorozu-media-slide-gap)));
 }
 

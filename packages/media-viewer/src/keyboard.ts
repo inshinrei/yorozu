@@ -22,7 +22,11 @@ export function bindMediaViewerKeys(handlers: MediaViewerKeyHandlers, target?: E
         }
         if (event.metaKey || event.ctrlKey) return
         let el = event.target
-        if (el instanceof Element && el.closest("input, textarea, select, [contenteditable]")) return
+        if (
+            el instanceof Element &&
+            el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+        )
+            return
         if (key === "ArrowLeft") {
             if (!handlers.getAllowSwitch()) return
             event.preventDefault()

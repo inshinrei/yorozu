@@ -138,6 +138,13 @@ describe("attachMediaViewer", () => {
         expect(viewer.snapshot().current?.id).toBe("b")
     })
 
+    it('ArrowRight sets lastNav to "next" for opaque ids', () => {
+        viewer.open({ items: [img("aa"), img("bb")], index: 0 })
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
+        expect(viewer.snapshot().index).toBe(1)
+        expect(viewer.lastNav()).toBe("next")
+    })
+
     it("open({ ghost: false, origin }) does not add yorozu-media-ghost-animating", () => {
         viewer.open({ items: [img("a")], origin, ghost: false })
         expect(root.querySelector("[data-yorozu-media-viewer]")).toBeTruthy()
