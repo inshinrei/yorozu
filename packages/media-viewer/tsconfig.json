@@ -1,0 +1,9 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "paths": {
+            "@yorozu/media-viewer": ["./src/index.ts"]
+        }
+    },
+    "include": ["src/**/*.ts"]
+}

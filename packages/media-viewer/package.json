@@ -1,0 +1,19 @@
+{
+    "name": "@yorozu/media-viewer",
+    "version": "0.5.3",
+    "type": "module",
+    "sideEffects": [
+        "*.css"
+    ],
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic media gallery viewer",
+    "exports": {
+        ".": "./src/index.ts",
+        "./tokens.css": "./src/tokens.css",
+        "./default.css": "./src/default.css"
+    },
+    "dependencies": {
+        "@yorozu/animations": "workspace:^"
+    }
+}
