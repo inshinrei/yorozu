@@ -236,7 +236,7 @@ describe("attachMediaViewer", () => {
         expect(api!.scale()).toBeLessThanOrEqual(20)
     })
 
-    it("trapWheel is bound on the viewport so chrome can scroll", () => {
+    it("trapWheel is bound on the viewport; overlay lock still prevents footer wheel", () => {
         viewer.open({
             items: [img("a")],
             chrome: {
@@ -250,7 +250,7 @@ describe("attachMediaViewer", () => {
         let footer = root.querySelector("[data-yorozu-media-footer]") as HTMLElement
         let chromeWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         footer.dispatchEvent(chromeWheel)
-        expect(chromeWheel.defaultPrevented).toBe(false)
+        expect(chromeWheel.defaultPrevented).toBe(true)
 
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         let stageWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
@@ -637,5 +637,41 @@ describe("attachMediaViewer", () => {
         let stageWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         viewport.dispatchEvent(stageWheel)
         expect(stageWheel.defaultPrevented).toBe(true)
+    })
+
+    it("overlay locks wheel and touchmove while open; listeners die after forceClose", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay).toBeTruthy()
+
+        let overlayWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        overlay.dispatchEvent(overlayWheel)
+        expect(overlayWheel.defaultPrevented).toBe(true)
+
+        let touch = new TouchEvent("touchmove", { bubbles: true, cancelable: true })
+        overlay.dispatchEvent(touch)
+        expect(touch.defaultPrevented).toBe(true)
+
+        api!.forceClose()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+
+        let bodyWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        document.body.dispatchEvent(bodyWheel)
+        expect(bodyWheel.defaultPrevented).toBe(false)
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let leftoverWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(leftoverWheel)
+        expect(leftoverWheel.defaultPrevented).toBe(false)
+        scroller.remove()
     })
 })

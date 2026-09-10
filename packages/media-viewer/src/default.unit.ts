@@ -101,6 +101,15 @@ describe("default media viewer styles", () => {
         expect(overlayBlock).toContain("touch-action: none")
     })
 
+    it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let closingBlock =
+            css.match(/(?:^|\n)\[data-yorozu-media-viewer\]\[data-phase="closing"\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(closingBlock.length).toBeGreaterThan(0)
+        expect(closingBlock).not.toContain("pointer-events: none")
+        expect(closingBlock).not.toContain("pointer-events:none")
+    })
+
     it("footer sits above the filmstrip when the strip is present and stays at bottom when not", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let footerBlock = css.match(/(?:^|\n)\[data-yorozu-media-footer\]\s*\{[^}]*\}/)?.[0] ?? ""

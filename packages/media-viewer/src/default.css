@@ -17,7 +17,6 @@
 
 [data-yorozu-media-viewer][data-phase="closing"] {
     background: transparent;
-    pointer-events: none;
 }
 
 [data-yorozu-media-viewer][data-swipe-dismiss] {
