@@ -193,13 +193,30 @@ describe("createMediaSwipe", () => {
         let leftover = wheel({ deltaX: early, deltaY: 0 })
         let preventLeftover = vi.spyOn(leftover, "preventDefault")
         expect(swipe.onWheel(leftover)).toBe(true)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(preventLeftover).toHaveBeenCalled()
         expect(onNewer).toHaveBeenCalledTimes(1)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(1)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(2)
+        swipe.destroy()
+    })
+
+    it("leftover wheel during cooldown does not restart the cooldown", () => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        for (let i = 0; i < 8; i++) {
+            vi.advanceTimersByTime(50)
+            expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        }
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - 400)
         expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(2)
         swipe.destroy()

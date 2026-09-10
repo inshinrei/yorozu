@@ -375,7 +375,6 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         if (pointerId != null) return true
 
         if (sessionConsumed || wheelHoldoff) {
-            refreshWheelIdleTimer()
             return true
         }
 
