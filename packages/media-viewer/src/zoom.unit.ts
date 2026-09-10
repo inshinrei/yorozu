@@ -3,6 +3,7 @@ import {
     MEDIA_MIN_SCALE,
     MEDIA_PAN_INERTIA_COAST_MS,
     MEDIA_PAN_INERTIA_MIN_SPEED_PX_MS,
+    MEDIA_WHEEL_ZOOM_RELEASE_MS,
     canZoomIn,
     canZoomOut,
     formatZoomPercent,
@@ -190,6 +191,10 @@ describe("media-viewer zoom math", () => {
             let soft = softScaleLimits(1, 20)
             expect(soft.min).toBeCloseTo(0.5, 5)
             expect(soft.max).toBeCloseTo(23, 5)
+        })
+
+        it("MEDIA_WHEEL_ZOOM_RELEASE_MS is 150", () => {
+            expect(MEDIA_WHEEL_ZOOM_RELEASE_MS).toBe(150)
         })
 
         it("legalizeZoomState clamps soft-overshot scale and bounds pan", () => {

@@ -19,7 +19,7 @@ import type {
     MediaViewerOpenOpts,
     MediaViewerSnapshot,
 } from "./types"
-import { wheelIntent, wheelPanDeltas, type MediaPoint } from "./zoom"
+import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "./zoom"
 import { createMediaImageZoom, type MediaImageZoom } from "./zoom-controller"
 
 export type AttachMediaViewerOpts = {
@@ -96,6 +96,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let pinching = false
     let pinchDist = 0
     let pinchOrigin: MediaPoint | null = null
+    let wheelZoomReleaseTimer: ReturnType<typeof setTimeout> | null = null
+    let lastWheelZoomOrigin: MediaPoint | null = null
     let openSeq = 0
     let paintedOpenSeq = -1
     let innerOpen = viewer.open
@@ -158,6 +160,22 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function needsLiveRender(): boolean {
         return swipe.gesturing() || swipe.settling() || swipe.dismissing() || zoom.isSettling() || zoom.isDragging()
+    }
+
+    function clearWheelZoomRelease(): void {
+        if (wheelZoomReleaseTimer == null) return
+        clearTimeout(wheelZoomReleaseTimer)
+        wheelZoomReleaseTimer = null
+    }
+
+    function armWheelZoomRelease(origin: MediaPoint): void {
+        lastWheelZoomOrigin = origin
+        clearWheelZoomRelease()
+        wheelZoomReleaseTimer = setTimeout(() => {
+            wheelZoomReleaseTimer = null
+            zoom.endDrag({ withInertia: false, pinchOrigin: lastWheelZoomOrigin })
+            scheduleRender()
+        }, MEDIA_WHEEL_ZOOM_RELEASE_MS)
     }
 
     function scheduleRender(): void {
@@ -941,7 +959,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (intent === "zoom") {
                 e.preventDefault()
                 e.stopPropagation()
-                zoom.applyWheel(e.deltaY, pointFromEvent(e))
+                let origin = pointFromEvent(e)
+                zoom.applyWheel(e.deltaY, origin)
+                armWheelZoomRelease(origin)
                 scheduleRender()
                 return
             }
@@ -1067,6 +1087,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         abort?.abort()
         abort = null
         cancelRaf()
+        clearWheelZoomRelease()
+        lastWheelZoomOrigin = null
         ghost.cancel()
         swipe.reset()
         zoom.reset()
@@ -1108,6 +1130,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         ensureShell()
         paintPanes(snap)
         if (snap.current?.id !== lastContentId) {
+            clearWheelZoomRelease()
             zoom.reset()
             lastContentId = snap.current?.id ?? null
         }

@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { createMediaImageZoom } from "./zoom-controller"
-import { MEDIA_MAX_ZOOM_FACTOR, MEDIA_MIN_SCALE, MEDIA_ZOOM_SETTLE_MS, MEDIA_ZOOM_STEP } from "./zoom"
+import {
+    MEDIA_MAX_ZOOM_FACTOR,
+    MEDIA_MIN_SCALE,
+    MEDIA_SOFT_SCALE_MAX_FACTOR,
+    MEDIA_ZOOM_SETTLE_MS,
+    MEDIA_ZOOM_STEP,
+} from "./zoom"
 
 describe("createMediaImageZoom", () => {
     afterEach(() => {
@@ -119,12 +125,49 @@ describe("createMediaImageZoom", () => {
         zoom.destroy()
     })
 
-    it("wheel hard-clamps without soft overshoot", () => {
+    it("wheel live-clamps soft min/max; endDrag settles toward legal", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let zoom = sizedZoom()
-        // Large wheel notches should still land ≤ max
-        for (let i = 0; i < 80; i++) zoom.applyWheel(-900, { offsetX: 0, offsetY: 0 })
-        expect(zoom.scale()).toBeLessThanOrEqual(MEDIA_MAX_ZOOM_FACTOR)
+        let origin = { offsetX: 0, offsetY: 0 }
+        // Positive deltaY → zoom out; soft min is 0.5× fit
+        for (let i = 0; i < 40; i++) zoom.applyWheel(900, origin)
+        expect(zoom.scale()).toBeGreaterThanOrEqual(0.5)
+        expect(zoom.scale()).toBeLessThan(1)
+
+        zoom.endDrag({ withInertia: false, pinchOrigin: origin })
+        expect(zoom.isSettling()).toBe(true)
+        expect(zoom.scale()).toBeLessThan(1)
+        vi.advanceTimersByTime(MEDIA_ZOOM_SETTLE_MS + 16)
+        expect(zoom.scale()).toBe(1)
+        expect(zoom.isSettling()).toBe(false)
+
+        // Soft max = hard max × 1.15 during live wheel zoom-in
+        for (let i = 0; i < 80; i++) zoom.applyWheel(-900, origin)
+        expect(zoom.scale()).toBeGreaterThan(MEDIA_MAX_ZOOM_FACTOR)
+        expect(zoom.scale()).toBeLessThanOrEqual(MEDIA_MAX_ZOOM_FACTOR * MEDIA_SOFT_SCALE_MAX_FACTOR)
+        zoom.endDrag({ withInertia: false, pinchOrigin: origin })
+        vi.advanceTimersByTime(MEDIA_ZOOM_SETTLE_MS + 16)
         expect(zoom.scale()).toBe(MEDIA_MAX_ZOOM_FACTOR)
+        zoom.destroy()
+    })
+
+    it("wheel undershoot mid-bounce is between undershoot and fit", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let zoom = sizedZoom()
+        let origin = { offsetX: 0, offsetY: 0 }
+        for (let i = 0; i < 40; i++) zoom.applyWheel(900, origin)
+        let undershoot = zoom.scale()
+        expect(undershoot).toBeLessThan(1)
+        expect(undershoot).toBeGreaterThanOrEqual(0.5)
+
+        zoom.endDrag({ withInertia: false, pinchOrigin: origin })
+        expect(zoom.isSettling()).toBe(true)
+        vi.advanceTimersByTime(175)
+        expect(zoom.scale()).toBeGreaterThan(undershoot)
+        expect(zoom.scale()).toBeLessThan(1)
+        vi.advanceTimersByTime(MEDIA_ZOOM_SETTLE_MS)
+        expect(zoom.scale()).toBe(1)
+        expect(zoom.isSettling()).toBe(false)
         zoom.destroy()
     })
 

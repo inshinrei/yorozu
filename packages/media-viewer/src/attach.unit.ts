@@ -5,6 +5,7 @@ import { MEDIA_GHOST_ANIMATING_CLASS } from "./ghost"
 import { createMediaViewer, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin } from "./types"
+import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
@@ -62,6 +63,7 @@ describe("attachMediaViewer", () => {
     })
 
     afterEach(() => {
+        vi.useRealTimers()
         stop?.()
         stop = undefined
         viewer.destroy()
@@ -321,6 +323,33 @@ describe("attachMediaViewer", () => {
         let zoomWheel = new WheelEvent("wheel", { deltaY: -90, ctrlKey: true, bubbles: true, cancelable: true })
         viewport.dispatchEvent(zoomWheel)
         expect(api!.scale()).toBeGreaterThan(1)
+    })
+
+    it("ctrl/meta wheel can undershoot fit then eases back after idle release", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "performance", "requestAnimationFrame"] })
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        for (let i = 0; i < 40; i++) {
+            viewport.dispatchEvent(
+                new WheelEvent("wheel", { deltaY: 900, ctrlKey: true, bubbles: true, cancelable: true }),
+            )
+        }
+        expect(api!.scale()).toBeLessThan(1)
+        expect(api!.scale()).toBeGreaterThanOrEqual(0.5)
+
+        vi.advanceTimersByTime(MEDIA_WHEEL_ZOOM_RELEASE_MS)
+        expect(api!.scale()).toBeLessThan(1)
+        vi.advanceTimersByTime(MEDIA_ZOOM_SETTLE_MS + 16)
+        expect(api!.scale()).toBe(1)
+        vi.useRealTimers()
     })
 
     it("measureZoom uses untransformed client box, not transformed bounding rect", () => {

@@ -17,6 +17,11 @@ export const MEDIA_ZOOM_STEP: number = 1.25
 export const MEDIA_WHEEL_DELTA_SCALE: number = 90
 /** Cap relative zoom amount per wheel event so mouse notches don't jump too hard. */
 export const MEDIA_WHEEL_AMOUNT_MAX: number = 0.55
+/**
+ * Idle after last ctrl/meta wheel zoom sample before legalize settle (ms).
+ * Pointer pinch legalizes on release instead.
+ */
+export const MEDIA_WHEEL_ZOOM_RELEASE_MS: number = 150
 
 /**
  * Trackpad two-finger pan multiplier (1 = raw wheel pixels; higher = snappier pan).
@@ -188,7 +193,7 @@ export function zoomSettleDurationMs(remainingPx: number, refPx: number = 600): 
 }
 
 /**
- * Soft min/max for live pinch. Toolbar / wheel / keyboard keep hard clamp.
+ * Soft min/max for live pinch and ctrl/meta wheel. Toolbar / keyboard keep hard clamp.
  */
 export function softScaleLimits(
     minScale: number = MEDIA_MIN_SCALE,

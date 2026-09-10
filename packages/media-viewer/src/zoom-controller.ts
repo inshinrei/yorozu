@@ -283,9 +283,16 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             viewportHeight = nextH
             setScaleToward(scale, null)
         },
+        /**
+         * Trackpad ctrl/meta wheel zoom with soft min/max overshoot (same as pinch).
+         * Host arms idle release → `endDrag({ pinchOrigin })` to legalize.
+         */
         applyWheel(deltaY: number, origin?: MediaPoint | null): void {
             let amount = wheelZoomAmount(deltaY)
-            if (amount !== 0) setScaleToward(scaleByRelativeAmount(scale, amount, currentMaxScale()), origin)
+            if (!amount) return
+            let soft = softScaleLimits(MEDIA_MIN_SCALE, currentMaxScale())
+            let nextScale = scale * (1 + amount)
+            setScaleToward(nextScale, origin, soft.min, soft.max)
         },
         applyRelativeZoom(amount: number, origin?: MediaPoint | null): void {
             if (amount) setScaleToward(scaleByRelativeAmount(scale, amount, currentMaxScale()), origin)
