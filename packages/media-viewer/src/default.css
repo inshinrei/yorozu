@@ -193,6 +193,7 @@ html.yorozu-media-ghost-animating [data-yorozu-media-filmstrip] {
     margin-inline: auto;
     pointer-events: auto;
     touch-action: pan-x;
+    overscroll-behavior: none;
     display: flex;
     justify-content: flex-start;
     overflow-x: auto;

@@ -298,6 +298,12 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             }
             return
         }
+        if (wheelHoldoff || sessionConsumed) {
+            endPointerWheel()
+            axis = "none"
+            clearLastDelta()
+            return
+        }
         resetOffsetsInstant()
     }
 

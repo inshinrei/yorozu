@@ -94,6 +94,7 @@ describe("default media viewer styles", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(filmstripBlock).toContain("touch-action: pan-x")
+        expect(filmstripBlock).toContain("overscroll-behavior: none")
         expect(filmstripBlock).toContain("overflow-x: auto")
         expect(filmstripBlock).toContain("width: min(100%, var(--yorozu-media-filmstrip-max-width))")
         expect(filmstripBlock).toContain("margin-inline: auto")

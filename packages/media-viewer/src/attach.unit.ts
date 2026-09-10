@@ -657,16 +657,57 @@ describe("attachMediaViewer", () => {
         expect(overlay.style.getPropertyValue("--yorozu-media-filmstrip-max-width")).toBe("24rem")
     })
 
-    it("wheel on the filmstrip is not trapped", () => {
-        viewer.open({ items: [img("a"), img("b")] })
+    it("horizontal filmstrip wheel pans; vertical strip wheel is locked off the page", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a"), img("b")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
-        let chromeWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
-        nav.dispatchEvent(chromeWheel)
-        expect(chromeWheel.defaultPrevented).toBe(false)
+        let leaked = 0
+        let onLeak = (): void => {
+            leaked += 1
+        }
+        document.body.addEventListener("wheel", onLeak)
+
+        let horizontal = new WheelEvent("wheel", { deltaX: 40, deltaY: 0, bubbles: true, cancelable: true })
+        let stopHorizontal = vi.spyOn(horizontal, "stopPropagation")
+        nav.dispatchEvent(horizontal)
+        expect(horizontal.defaultPrevented).toBe(false)
+        expect(stopHorizontal).toHaveBeenCalled()
+        expect(leaked).toBe(0)
+
+        let vertical = new WheelEvent("wheel", { deltaX: 0, deltaY: 40, bubbles: true, cancelable: true })
+        let stopVertical = vi.spyOn(vertical, "stopPropagation")
+        nav.dispatchEvent(vertical)
+        expect(vertical.defaultPrevented).toBe(true)
+        expect(stopVertical).toHaveBeenCalled()
+        expect(leaked).toBe(0)
+
+        document.body.removeEventListener("wheel", onLeak)
+
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         let stageWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         viewport.dispatchEvent(stageWheel)
         expect(stageWheel.defaultPrevented).toBe(true)
+
+        api!.forceClose()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+
+        let bodyWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        document.body.dispatchEvent(bodyWheel)
+        expect(bodyWheel.defaultPrevented).toBe(false)
+
+        let scroller = document.createElement("div")
+        document.body.append(scroller)
+        let leftoverWheel = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(leftoverWheel)
+        expect(leftoverWheel.defaultPrevented).toBe(false)
+        scroller.remove()
     })
 
     it("overlay locks wheel and touchmove while open; listeners die after forceClose", () => {

@@ -924,11 +924,37 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         overlay.append(viewport, header, footer, chromeEl)
         root.append(overlay)
 
+        let filmstripTouchX: number | null = null
+        let filmstripTouchY: number | null = null
         const lockPageScroll = (e: Event): void => {
             let t = e.target
-            if (t instanceof Element && t.closest("[data-yorozu-media-filmstrip]")) return
+            if (t instanceof Element && t.closest("[data-yorozu-media-filmstrip]")) {
+                e.stopPropagation()
+                if (!isFilmstripPanX(e)) e.preventDefault()
+                return
+            }
+            filmstripTouchX = null
+            filmstripTouchY = null
             e.preventDefault()
             e.stopPropagation()
+        }
+
+        function isFilmstripPanX(e: Event): boolean {
+            if (e instanceof WheelEvent) return Math.abs(e.deltaX) > Math.abs(e.deltaY)
+            if (!(e instanceof TouchEvent)) return false
+            let touch = e.touches[0] ?? e.changedTouches[0]
+            if (!touch) return false
+            let x = touch.clientX
+            let y = touch.clientY
+            if (filmstripTouchX == null || filmstripTouchY == null) {
+                filmstripTouchX = x
+                filmstripTouchY = y
+                return false
+            }
+            let panX = Math.abs(x - filmstripTouchX) > Math.abs(y - filmstripTouchY)
+            filmstripTouchX = x
+            filmstripTouchY = y
+            return panX
         }
         overlay.addEventListener("wheel", lockPageScroll, { passive: false, signal })
         overlay.addEventListener("touchmove", lockPageScroll, { passive: false, signal })
