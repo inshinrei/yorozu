@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./attach"
 import { MEDIA_GHOST_ANIMATING_CLASS } from "./ghost"
 import { createMediaViewer, type MediaViewer } from "./session"
-import { MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
+import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin } from "./types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
 
@@ -880,8 +880,9 @@ describe("attachMediaViewer", () => {
         scroller.remove()
     })
 
-    it("swipe-close leftover wheel on a page scroller is prevented until idle", () => {
+    it("swipe-close leftover wheel on a page scroller is prevented until linger elapses", () => {
         vi.useFakeTimers()
+        expect(MEDIA_SWIPE_WHEEL_COOLDOWN_MS).toBeGreaterThan(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         viewer.open({ items: [img("a")] })
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         expect(viewport).toBeTruthy()
@@ -898,9 +899,14 @@ describe("attachMediaViewer", () => {
         expect(leftoverWheel.defaultPrevented).toBe(true)
 
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        let afterIdle = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
-        scroller.dispatchEvent(afterIdle)
-        expect(afterIdle.defaultPrevented).toBe(false)
+        let stillLocked = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(stillLocked)
+        expect(stillLocked.defaultPrevented).toBe(true)
+
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        let afterLinger = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
+        scroller.dispatchEvent(afterLinger)
+        expect(afterLinger.defaultPrevented).toBe(false)
         scroller.remove()
         vi.useRealTimers()
     })
@@ -923,7 +929,7 @@ describe("attachMediaViewer", () => {
         let leftover = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         scroller.dispatchEvent(leftover)
         expect(leftover.defaultPrevented).toBe(true)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS - 50)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - 50)
         let after = new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true })
         scroller.dispatchEvent(after)
         expect(after.defaultPrevented).toBe(false)

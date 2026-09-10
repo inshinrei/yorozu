@@ -8,7 +8,7 @@ import { fitContain, stageContentSize } from "./layout"
 import { captureOriginFromDom, queryMediaOriginEl } from "./origin"
 import { createMediaShell, type MediaShell } from "./shell"
 import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
-import { MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
+import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "./swipe"
 import type {
     MediaViewer,
     MediaViewerChrome,
@@ -396,7 +396,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         scrollLockLingerTimer = setTimeout(() => {
             scrollLockLingerTimer = null
             clearScrollLockLinger()
-        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        }, MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
     }
 
     function armScrollLockLinger(): void {
