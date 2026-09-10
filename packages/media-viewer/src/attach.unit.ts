@@ -186,6 +186,32 @@ describe("attachMediaViewer", () => {
         expect(video.getAttribute("src")).toBe("v.mp4")
         expect(video.getAttribute("poster")).toBe("p.jpg")
         expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+        expect(root.querySelector('[data-side="active"] [data-yorozu-media-loading]')).toBeTruthy()
+        video.dispatchEvent(new Event("loadeddata"))
+        expect(root.querySelector('[data-side="active"] [data-yorozu-media-loading]')).toBeNull()
+    })
+
+    it("video peek without poster paints loading, not img[src$=mp4]", () => {
+        viewer.open({
+            items: [img("a"), { id: "v", kind: "video", src: "v.mp4" }],
+            index: 0,
+        })
+        let newer = root.querySelector('[data-side="newer"]') as HTMLElement
+        expect(newer.querySelector("[data-yorozu-media-loading]")).toBeTruthy()
+        expect(newer.querySelector("img[src$='.mp4']")).toBeNull()
+        expect(newer.querySelector("[data-yorozu-media-peek]")).toBeNull()
+    })
+
+    it("video peek with poster paints peek img from poster, not video src", () => {
+        viewer.open({
+            items: [img("a"), { id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
+            index: 0,
+        })
+        let peek = root.querySelector('[data-side="newer"] [data-yorozu-media-peek]') as HTMLImageElement
+        expect(peek).toBeInstanceOf(HTMLImageElement)
+        expect(peek.getAttribute("src")).toBe("p.jpg")
+        expect(root.querySelector('[data-side="newer"] img[src$=".mp4"]')).toBeNull()
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeNull()
     })
 
     it("detach removes overlay and stops keys", () => {

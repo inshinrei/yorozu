@@ -36,7 +36,9 @@ function clampIndex(index: number, length: number): number {
 
 function toNeighbor(item: MediaViewerItem | undefined): MediaViewerNeighbor | null {
     if (item == null) return null
-    return { id: item.id, kind: item.kind, src: item.src ?? null }
+    let neighbor: MediaViewerNeighbor = { id: item.id, kind: item.kind, src: item.src ?? null }
+    if (item.poster) neighbor.poster = item.poster
+    return neighbor
 }
 
 export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {

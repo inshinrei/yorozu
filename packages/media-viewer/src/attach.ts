@@ -549,6 +549,22 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function fillPeek(pane: HTMLElement, item: MediaViewerNeighbor): void {
+        if (item.kind === "video") {
+            let poster = item.poster
+            if (typeof poster === "string" && poster.length > 0) {
+                let image = document.createElement("img")
+                image.setAttribute("data-yorozu-media-peek", "")
+                image.src = poster
+                image.alt = ""
+                image.draggable = false
+                pane.append(image)
+                return
+            }
+            let loading = document.createElement("div")
+            loading.setAttribute("data-yorozu-media-loading", "")
+            pane.append(loading)
+            return
+        }
         if (item.src) {
             let image = document.createElement("img")
             image.setAttribute("data-yorozu-media-peek", "")
@@ -573,7 +589,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             video.setAttribute("playsinline", "")
             if (item.src) video.src = item.src
             if ("poster" in item && item.poster) video.poster = item.poster
-            pane.append(video)
+            let loading = document.createElement("div")
+            loading.setAttribute("data-yorozu-media-loading", "")
+            pane.append(video, loading)
+            let clearLoading = (): void => {
+                loading.remove()
+                video.removeEventListener("loadeddata", clearLoading)
+            }
+            video.addEventListener("loadeddata", clearLoading)
             return
         }
         if (!item.src) {

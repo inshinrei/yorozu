@@ -65,13 +65,13 @@ export async function loadMediaManifest(url: string = "/media/manifest.json"): P
     }
 }
 
-function toViewerItem(entry: ManifestMedia, kind: MediaViewerItem["kind"]): MediaViewerItem {
+/** Viewer items omit playground video posters — those stills belong to other gallery entries. */
+export function toGalleryViewerItem(entry: ManifestMedia, kind: MediaViewerItem["kind"]): MediaViewerItem {
     let item: MediaViewerItem = {
         id: entry.id,
         kind,
         src: entry.src,
     }
-    if (kind === "video" && entry.poster) item.poster = entry.poster
     if (entry.width && entry.width > 0) item.naturalWidth = entry.width
     if (entry.height && entry.height > 0) item.naturalHeight = entry.height
     return item
@@ -184,8 +184,8 @@ export function mountGallery(host: HTMLElement, opts: MountGalleryOpts): () => v
     let videos = opts.videos ?? []
     let entries: ManifestMedia[] = [...images, ...videos]
     let items: MediaViewerItem[] = [
-        ...images.map((entry) => toViewerItem(entry, "image")),
-        ...videos.map((entry) => toViewerItem(entry, "video")),
+        ...images.map((entry) => toGalleryViewerItem(entry, "image")),
+        ...videos.map((entry) => toGalleryViewerItem(entry, "video")),
     ]
 
     function paint(): void {

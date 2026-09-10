@@ -14,6 +14,7 @@ export type MediaViewerNeighbor = {
     id: string
     kind: MediaKind
     src?: string | null
+    poster?: string | null
 }
 
 export type MediaViewerOrigin = {

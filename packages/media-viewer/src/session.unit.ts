@@ -70,6 +70,30 @@ describe("createMediaViewer", () => {
         expect(viewer!.snapshot().index).toBe(0)
     })
 
+    it("derived neighbors copy poster when present on the item", () => {
+        viewer!.open({
+            items: [
+                img("a"),
+                { id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" },
+                { id: "w", kind: "video", src: "w.mp4" },
+            ],
+            index: 0,
+        })
+        expect(viewer!.snapshot().neighbors.newer).toEqual({
+            id: "v",
+            kind: "video",
+            src: "v.mp4",
+            poster: "p.jpg",
+        })
+        viewer!.goTo(1)
+        expect(viewer!.snapshot().neighbors.newer).toEqual({
+            id: "w",
+            kind: "video",
+            src: "w.mp4",
+        })
+        expect(viewer!.snapshot().neighbors.newer).not.toHaveProperty("poster")
+    })
+
     it("open with origin enables ghost unless ghost:false or reduced motion", () => {
         let origin = {
             id: "a",
