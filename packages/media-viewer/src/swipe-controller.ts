@@ -5,7 +5,6 @@
 import { easeOutCubic } from "@yorozu/animations"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
-    MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
     MEDIA_SWIPE_WHEEL_RELEASE_MS,
     clampSwipeOffsetX,
     clampSwipeOffsetY,
@@ -68,7 +67,8 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     let wheelTimer: ReturnType<typeof setTimeout> | null = null
     let settleRaf: number | null = null
     let wheelActive = false
-    let wheelCooldownUntil = 0
+    /** After older/newer/close, ignore further wheel until idle release. */
+    let sessionConsumed = false
     let settleGen = 0
 
     function viewportSize(): { w: number; h: number } {
@@ -114,6 +114,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         dismissing = false
         pointerId = null
         wheelActive = false
+        sessionConsumed = false
         clearWheelTimer()
         cancelSettleRaf()
         clearLastDelta()
@@ -138,15 +139,31 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         offsetY = projected.y
     }
 
-    function armWheelCooldown(): void {
-        wheelCooldownUntil = Date.now() + MEDIA_SWIPE_WHEEL_COOLDOWN_MS
+    function refreshWheelIdleTimer(): void {
+        clearWheelTimer()
+        wheelTimer = setTimeout(() => {
+            wheelTimer = null
+            if (sessionConsumed) {
+                sessionConsumed = false
+                wheelActive = false
+                return
+            }
+            if (!wheelActive) return
+            finishGesture()
+        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
+    }
+
+    function markSessionConsumed(): void {
+        sessionConsumed = true
+        refreshWheelIdleTimer()
     }
 
     function endPointerWheel(): void {
         gesturing = false
         pointerId = null
         wheelActive = false
-        clearWheelTimer()
+        if (sessionConsumed) refreshWheelIdleTimer()
+        else clearWheelTimer()
     }
 
     function decideCommit(): MediaSwipeCommit {
@@ -221,7 +238,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         clearLastDelta()
         cancelSettleRaf()
         offsetX = rebase ? rebased : fromOffset
-        armWheelCooldown()
+        markSessionConsumed()
         if (dir === "older") cbs.onOlder()
         else cbs.onNewer()
 
@@ -248,7 +265,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         dismissing = true
         clearLastDelta()
         cancelSettleRaf()
-        armWheelCooldown()
+        markSessionConsumed()
         cbs.onClose()
     }
 
@@ -283,7 +300,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
 
     function onPointerDown(e: PointerEvent): boolean {
         if (dismissing) return false
-        if (!cbs.getEnabled() || cbs.getPrefersReducedMotion()) return false
+        if (!cbs.getEnabled()) return false
         if (e.button !== 0) return false
         if (pointerId != null) return false
         let t = e.target
@@ -299,7 +316,8 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         startClientY = e.clientY
         gesturing = true
         wheelActive = false
-        clearWheelTimer()
+        if (sessionConsumed) refreshWheelIdleTimer()
+        else clearWheelTimer()
         axis = "none"
         offsetX = 0
         offsetY = 0
@@ -331,23 +349,34 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function onWheel(e: WheelEvent): boolean {
-        if (dismissing) return false
         if (!cbs.getEnabled()) return false
         if (e.ctrlKey || e.metaKey) return false
-        if (cbs.getPrefersReducedMotion()) return false
 
         e.preventDefault()
         e.stopPropagation()
 
         if (pointerId != null) return true
 
-        if (Date.now() < wheelCooldownUntil) return true
+        if (sessionConsumed) {
+            refreshWheelIdleTimer()
+            return true
+        }
 
+        if (dismissing) return true
+
+        let starting = !wheelActive
         settleGen++
         cancelSettleRaf()
         settling = false
         wheelActive = true
         gesturing = true
+
+        if (starting) {
+            offsetX = 0
+            offsetY = 0
+            axis = "none"
+            clearLastDelta()
+        }
 
         let nextX = offsetX - e.deltaX
         let nextY = offsetY - e.deltaY
@@ -355,23 +384,16 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         applyProjected(nextX, nextY)
 
         if (shouldEarlyCommitWheel(axis, offsetX, offsetY)) {
-            clearWheelTimer()
             finishGesture()
             return true
         }
 
-        clearWheelTimer()
-        wheelTimer = setTimeout(() => {
-            wheelTimer = null
-            if (!wheelActive) return
-            finishGesture()
-        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
-
+        refreshWheelIdleTimer()
         return true
     }
 
     function trapWheel(e: WheelEvent): boolean {
-        if (!cbs.getEnabled() || cbs.getPrefersReducedMotion() || e.ctrlKey || e.metaKey) return false
+        if (!cbs.getEnabled() || e.ctrlKey || e.metaKey) return false
         e.preventDefault()
         e.stopPropagation()
         onWheel(e)

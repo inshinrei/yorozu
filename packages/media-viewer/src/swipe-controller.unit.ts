@@ -79,7 +79,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("ignores pointer when prefers reduced motion", () => {
+    it("commits newer on pointer swipe when prefers reduced motion", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(
             baseCbs({
@@ -87,8 +87,10 @@ describe("createMediaSwipe", () => {
                 onNewer,
             }),
         )
-        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(false)
-        expect(onNewer).not.toHaveBeenCalled()
+        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
+        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
@@ -139,20 +141,13 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("trapWheel skips preventDefault when disabled, reduced motion, or modifier", () => {
+    it("trapWheel skips preventDefault when disabled or modifier", () => {
         let disabled = createMediaSwipe(baseCbs({ getEnabled: () => false }))
         let blocked = wheel({ deltaX: 80 })
         let preventBlocked = vi.spyOn(blocked, "preventDefault")
         expect(disabled.trapWheel(blocked)).toBe(false)
         expect(preventBlocked).not.toHaveBeenCalled()
         disabled.destroy()
-
-        let reduced = createMediaSwipe(baseCbs({ getPrefersReducedMotion: () => true }))
-        let reducedEv = wheel({ deltaX: 80 })
-        let preventReduced = vi.spyOn(reducedEv, "preventDefault")
-        expect(reduced.trapWheel(reducedEv)).toBe(false)
-        expect(preventReduced).not.toHaveBeenCalled()
-        reduced.destroy()
 
         let mods = createMediaSwipe(baseCbs())
         let ctrl = wheel({ deltaX: 80, ctrlKey: true })
@@ -164,6 +159,57 @@ describe("createMediaSwipe", () => {
         expect(preventCtrl).not.toHaveBeenCalled()
         expect(preventMeta).not.toHaveBeenCalled()
         mods.destroy()
+    })
+
+    it("trapWheel preventDefault and early-commits when prefers reduced motion", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(
+            baseCbs({
+                getPrefersReducedMotion: () => true,
+                onNewer,
+            }),
+        )
+        let ev = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1 })
+        let prevent = vi.spyOn(ev, "preventDefault")
+        expect(swipe.trapWheel(ev)).toBe(true)
+        expect(prevent).toHaveBeenCalled()
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("commits once per wheel session until idle release", () => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        let leftover = wheel({ deltaX: early, deltaY: 0 })
+        let preventLeftover = vi.spyOn(leftover, "preventDefault")
+        expect(swipe.onWheel(leftover)).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(preventLeftover).toHaveBeenCalled()
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(2)
+        swipe.destroy()
+    })
+
+    it("does not commit leftover wheel after pointer nav before idle", () => {
+        vi.useFakeTimers()
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        let leftover = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 })
+        let preventLeftover = vi.spyOn(leftover, "preventDefault")
+        expect(swipe.onWheel(leftover)).toBe(true)
+        expect(preventLeftover).toHaveBeenCalled()
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
     })
 
     it("trapWheel preventDefault then onWheel when enabled", () => {
