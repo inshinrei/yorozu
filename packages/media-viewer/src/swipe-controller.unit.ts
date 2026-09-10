@@ -99,6 +99,24 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
+    it("settles swipe offset when prefers reduced motion", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(
+            baseCbs({
+                getPrefersReducedMotion: () => true,
+                onNewer,
+            }),
+        )
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.offsetX()).not.toBe(0)
+        expect(swipe.settling()).toBe(true)
+        swipe.destroy()
+    })
+
     it("early-commits wheel past 2× threshold", () => {
         vi.useFakeTimers()
         let onNewer = vi.fn()

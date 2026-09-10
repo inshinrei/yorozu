@@ -191,12 +191,6 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             settling = false
             return
         }
-        if (cbs.getPrefersReducedMotion()) {
-            offsetX = 0
-            offsetY = 0
-            settling = false
-            return
-        }
 
         let { w, h } = viewportSize()
         let remaining = Math.max(Math.abs(fromX), Math.abs(fromY))
@@ -240,18 +234,13 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         endPointerWheel()
         axis = "none"
         offsetY = 0
-        settling = false
         clearLastDelta()
         cancelSettleRaf()
         offsetX = rebase ? rebased : fromOffset
+        settling = offsetX !== 0
         markSessionConsumed()
         if (dir === "older") cbs.onOlder()
         else cbs.onNewer()
-
-        if (cbs.getPrefersReducedMotion()) {
-            offsetX = 0
-            return
-        }
 
         let gen = settleGen
         let run = (): void => {
