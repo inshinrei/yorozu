@@ -27,3 +27,5 @@ export {
     paintedIndexRange,
     listSliceForViewport,
 } from "./range"
+export type { VirtualListRange, VirtualListOptions, VirtualList } from "./list"
+export { createVirtualList } from "./list"
