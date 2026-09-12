@@ -1,4 +1,4 @@
-import { queueMeasure, queueMutate } from "./dom-schedule"
+import { flushDomSchedule, queueMeasure, queueMutate } from "./dom-schedule"
 import type { HeavyAnimationLock } from "./heavy-lock"
 import { createPlayback } from "./playback"
 import { tween } from "./tween"
@@ -67,15 +67,23 @@ export function createLayoutSizeTween(opts: {
                 from,
                 to: toPx,
                 durationMs,
-                onUpdate: (px) => queueMutate(() => writePx(px)),
+                onUpdate: (px) =>
+                    queueMutate(() => {
+                        if (current !== run) return
+                        writePx(px)
+                    }),
             })
             run.inner = inner
             void inner.done.then((ran) => {
                 if (current !== run) return
-                current = null
-                applyRest()
-                run.release?.()
-                resolve(ran)
+                queueMutate(() => {
+                    if (current !== run) return
+                    current = null
+                    applyRest()
+                    run.release?.()
+                    resolve(ran)
+                })
+                flushDomSchedule()
             })
         })
 

@@ -79,4 +79,50 @@ describe("createLayoutSizeTween", () => {
         tween.snap()
         expect(rests).toBeGreaterThanOrEqual(2)
     })
+
+    it("timed play writes then applyRest with no write after rest", async () => {
+        let order: string[] = []
+        let lock = createHeavyAnimationLock({ timeoutMs: 0 })
+        let size = createLayoutSizeTween({
+            readPx: () => 0,
+            writePx: (px) => order.push(`write:${px}`),
+            applyRest: () => {
+                order.push("rest")
+            },
+            lock,
+        })
+        let playback = size.play(10, 32)
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(80)
+        flushDomSchedule()
+        expect(await playback.done).toBe(true)
+        let restAt = order.indexOf("rest")
+        expect(restAt).toBeGreaterThan(0)
+        expect(order[restAt - 1]?.startsWith("write:")).toBe(true)
+        expect(order.slice(restAt + 1).some((item) => item.startsWith("write:"))).toBe(false)
+        expect(order.at(-1)).toBe("rest")
+    })
+
+    it("cancel does not write after applyRest", async () => {
+        let order: string[] = []
+        let lock = createHeavyAnimationLock({ timeoutMs: 0 })
+        let size = createLayoutSizeTween({
+            readPx: () => 0,
+            writePx: (px) => order.push(`write:${px}`),
+            applyRest: () => {
+                order.push("rest")
+            },
+            lock,
+        })
+        let playback = size.play(100, 200)
+        flushDomSchedule()
+        // one frame so onUpdate queues a write before cancel
+        await vi.advanceTimersByTimeAsync(16)
+        playback.cancel()
+        flushDomSchedule()
+        expect(await playback.done).toBe(false)
+        let restAt = order.indexOf("rest")
+        expect(restAt).toBeGreaterThanOrEqual(0)
+        expect(order.slice(restAt + 1).some((item) => item.startsWith("write:"))).toBe(false)
+    })
 })
