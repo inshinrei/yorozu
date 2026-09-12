@@ -1,4 +1,4 @@
-import { flushDomSchedule, queueMeasure, queueMutate } from "./dom-schedule"
+import { queueMeasure, queueMutate } from "./dom-schedule"
 import type { HeavyAnimationLock } from "./heavy-lock"
 import { createPlayback } from "./playback"
 import { tween } from "./tween"
@@ -83,7 +83,6 @@ export function createLayoutSizeTween(opts: {
                     run.release?.()
                     resolve(ran)
                 })
-                flushDomSchedule()
             })
         })
 
