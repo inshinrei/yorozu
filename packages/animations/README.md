@@ -184,31 +184,31 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 
 ## Motion catalog
 
-| Name              | API                                     | Notes                                                |
-| ----------------- | --------------------------------------- | ---------------------------------------------------- |
-| Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                 |
-| Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                            |
-| Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                    |
-| Cover slide       | `createViewSlide` `cover`               | Scale-out leave + 200% enter (list-layer open/close) |
-| Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim        |
-| Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                          |
-| Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                     |
-| Reveal            | `createViewSlide` `reveal`              | `clip-path` inset wipe                               |
-| Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                 |
-| Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                            |
-| List reorder      | `createListReorder`                     | Index FLIP, fixed height                             |
-| Dock              | `createDock`                            | Edge open/close + backdrop fade                      |
-| Fade              | `createFade`                            | Opacity-only show/hide                               |
-| Popover           | `createPopover`                         | Scale + fade from an origin                          |
-| Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`                      |
-| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N                               |
-| Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                |
-| Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                       |
-| Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                   |
-| Ripple            | `playRipple`                            | Touch ink at pointer                                 |
-| Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1              |
-| Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                 |
-| Spoiler           | `createSpoiler`                         | Dot-field overlay; reveal fades it out               |
+| Name              | API                                     | Notes                                                                                      |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                                                       |
+| Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                                                                  |
+| Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                                                          |
+| Cover slide       | `createViewSlide` `cover`               | Scale-out leave + 200% enter (list-layer open/close)                                       |
+| Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim                                              |
+| Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                                                                |
+| Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                                                           |
+| Reveal            | `createViewSlide` `reveal`              | `clip-path` inset wipe                                                                     |
+| Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                                                       |
+| Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                                                                  |
+| List reorder      | `createListReorder`                     | Index FLIP, fixed height                                                                   |
+| Dock              | `createDock`                            | Edge open/close + backdrop fade                                                            |
+| Fade              | `createFade`                            | Opacity-only show/hide                                                                     |
+| Popover           | `createPopover`                         | Scale + fade from an origin                                                                |
+| Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`; budget resets per shared frame; skip when heavy lock held |
+| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N                                                                     |
+| Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                                                      |
+| Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                                                             |
+| Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                                                         |
+| Ripple            | `playRipple`                            | Touch ink at pointer                                                                       |
+| Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1                                                    |
+| Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                                                       |
+| Spoiler           | `createSpoiler`                         | Dot-field overlay; reveal fades it out                                                     |
 
 ## Reduced motion
 
@@ -234,3 +234,4 @@ Wire `getMode`, `isReduced`, and `enabled` from the stored intensity so every pr
 - **First layout is a baseline:** first indicator measure and first reorder `sync` establish state without animating.
 - **Heavy-motion lock:** the host holds one `createHeavyAnimationLock` instance and `acquire`s around slides / docks / list-reorder / layout-size work. Level `any` pauses observers/decode; `blocking` also defers store fan-out. This is not list-reorder `isSuppressed`, and it does not read an OS reduced-motion media query.
 - **Layout size writer:** scheduled `readPx` / `writePx` under the heavy lock; not a height WAAPI helper; prefer compositor substitutes (`scaleY` / clip) for chrome; do not height-tween a scrolling column.
+- **Digit-flip budget:** `scheduleDigitFlip` caps at 10 per shared animation frame (`onAnimationFrame`); skips (no budget consumed) while an optional heavy lock is held.

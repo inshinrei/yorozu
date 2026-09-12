@@ -77,15 +77,21 @@ describe("shouldPresencePop", () => {
 describe("scheduleDigitFlip", () => {
     beforeEach(() => {
         vi.useFakeTimers()
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0) as unknown as number,
+        )
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id))
         vi.runAllTimers()
     })
 
     afterEach(() => {
         vi.runAllTimers()
         vi.useRealTimers()
+        vi.unstubAllGlobals()
     })
 
-    it("allows 10 flips per macrotask and no more", () => {
+    it("allows 10 flips per animation frame and no more", () => {
         expect(MAX_SIMULTANEOUS_DIGIT_FLIPS).toBe(10)
         for (let i = 0; i < 10; i++) {
             expect(scheduleDigitFlip(true)).toBe(true)
@@ -102,5 +108,12 @@ describe("scheduleDigitFlip", () => {
             expect(scheduleDigitFlip(true)).toBe(true)
         }
         expect(scheduleDigitFlip(true)).toBe(false)
+    })
+
+    it("skips scheduling while a heavy lock is held", () => {
+        let held = true
+        expect(scheduleDigitFlip(true, { isHeld: () => held })).toBe(false)
+        held = false
+        expect(scheduleDigitFlip(true, { isHeld: () => held })).toBe(true)
     })
 })

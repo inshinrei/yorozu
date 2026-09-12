@@ -1,9 +1,9 @@
+import { onAnimationFrame } from "../core/frame"
+
 export const DIGIT_FLIP_MS: number = 200
 export const MAX_SIMULTANEOUS_DIGIT_FLIPS: number = 10
 
-export type DigitSlot =
-    | { kind: "static"; char: string }
-    | { kind: "flip"; char: string; prevChar: string }
+export type DigitSlot = { kind: "static"; char: string } | { kind: "flip"; char: string; prevChar: string }
 
 export function buildDigitSlots(text: string, prevText: string | undefined, shouldAnimate: boolean): DigitSlot[] {
     if (!shouldAnimate || prevText === undefined || prevText === text) {
@@ -35,16 +35,16 @@ export function shouldPresencePop(prev: number | undefined, next: number): boole
 }
 
 let scheduled = 0
-let resetQueued = false
+let stopReset: (() => void) | null = null
 
-export function scheduleDigitFlip(condition: boolean): boolean {
-    if (!condition || scheduled >= MAX_SIMULTANEOUS_DIGIT_FLIPS) return false
-    if (!resetQueued) {
-        resetQueued = true
-        setTimeout(() => {
+export function scheduleDigitFlip(condition: boolean, lock?: { isHeld(): boolean }): boolean {
+    if (!condition || lock?.isHeld() || scheduled >= MAX_SIMULTANEOUS_DIGIT_FLIPS) return false
+    if (!stopReset) {
+        stopReset = onAnimationFrame(() => {
             scheduled = 0
-            resetQueued = false
-        }, 0)
+            stopReset?.()
+            stopReset = null
+        })
     }
     scheduled += 1
     return true
