@@ -546,7 +546,7 @@ describe("attachMediaViewer", () => {
             chrome: {
                 header: (_el, chromeApi) => {
                     api = chromeApi
-                    chromeApi.onZoomChange(() => {
+                    return chromeApi.onZoomChange(() => {
                         zoomTicks += 1
                     })
                 },
@@ -557,6 +557,42 @@ describe("attachMediaViewer", () => {
         expect(api!.scale()).toBe(1.25)
         expect(zoomTicks).toBeGreaterThanOrEqual(1)
         expect(sessionTicks).toBe(afterOpen)
+    })
+
+    it("chrome onZoomChange from a closed overlay does not fire after reopen", () => {
+        let api: MediaViewerChromeApi | undefined
+        let firstTicks = 0
+        let secondTicks = 0
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                    chromeApi.onZoomChange(() => {
+                        firstTicks += 1
+                    })
+                },
+            },
+        })
+        api!.zoomIn()
+        expect(firstTicks).toBeGreaterThanOrEqual(1)
+        let afterFirstZoom = firstTicks
+        api!.close({ ghost: false })
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                    chromeApi.onZoomChange(() => {
+                        secondTicks += 1
+                    })
+                },
+            },
+        })
+        api!.zoomIn()
+        expect(firstTicks).toBe(afterFirstZoom)
+        expect(secondTicks).toBeGreaterThanOrEqual(1)
     })
 
     it("tap without drag does not change scale", () => {
@@ -1613,6 +1649,32 @@ describe("attachMediaViewer", () => {
         expect(last.thumbs.length).toBeGreaterThan(0)
         expect(last.thumbs.length).toBeLessThan(40)
         expect(last.thumbs).toContain("id-20")
+    })
+
+    it("onVisible virtualized open at index 20 does not emit a prefix-only thumbs window", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        expect(seen.length).toBeGreaterThan(0)
+        let first = seen[0]!
+        expect(first.stage).toBe("id-20")
+        expect(first.thumbs).toContain("id-20")
+        expect(first.thumbs.length).toBeGreaterThan(0)
+        expect(first.thumbs.length).toBeLessThan(40)
+        const prefixOnly = (ids: string[]): boolean => ids.length > 0 && ids[0] === "id-0" && !ids.includes("id-20")
+        expect(seen.some((s) => prefixOnly(s.thumbs))).toBe(false)
     })
 
     it("onVisible coalesces swipe settle that does not change ids", () => {

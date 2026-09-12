@@ -13,7 +13,7 @@ pnpm add @yorozu/media-viewer
 Chrome reads `percentLabel()` / `scale()` and subscribes with `onZoomChange`. Do not run a perpetual overlay `requestAnimationFrame` to poll zoom. `formatZoomPercent` is the percent formatter.
 
 ```ts
-chromeApi.onZoomChange(() => {
+return chromeApi.onZoomChange(() => {
     label.textContent = chromeApi.percentLabel()
 })
 ```

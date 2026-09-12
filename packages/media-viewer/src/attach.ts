@@ -91,6 +91,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
     let unmounts: { header?: () => void; footer?: () => void; overlay?: () => void } = {}
+    // Zoom lives for attach; chrome remounts each open. Track overlay-scoped unsubs.
+    let chromeZoomUnsubs: (() => void)[] = []
     let paneKeys = new WeakMap<HTMLElement, string>()
     let paneIds: { older?: string; active?: string; newer?: string } = {}
     let thumbDecodeKeys = new WeakMap<HTMLElement, string>()
@@ -523,7 +525,15 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         },
         percentLabel: (): string => zoom.percentLabel(),
         scale: (): number => zoom.scale(),
-        onZoomChange: (listener: () => void): (() => void) => zoom.onChange(listener),
+        onZoomChange: (listener: () => void): (() => void) => {
+            let unsub = zoom.onChange(listener)
+            chromeZoomUnsubs.push(unsub)
+            return (): void => {
+                unsub()
+                let i = chromeZoomUnsubs.indexOf(unsub)
+                if (i >= 0) chromeZoomUnsubs.splice(i, 1)
+            }
+        },
         isGesturing: (): boolean => viewer.isGesturing(),
         snapshot: (): MediaViewerSnapshot => viewer.snapshot(),
     }
@@ -579,7 +589,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (typeof cleanup === "function") unmounts[name] = cleanup
     }
 
+    function flushChromeZoomUnsubs(): void {
+        let pending = chromeZoomUnsubs
+        chromeZoomUnsubs = []
+        for (let unsub of pending) unsub()
+    }
+
     function unmountAllChrome(): void {
+        flushChromeZoomUnsubs()
         syncSlot("header", undefined)
         syncSlot("footer", undefined)
         syncSlot("overlay", undefined)
@@ -1138,8 +1155,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let indexChanged = filmstripCenteredIndex !== snap.index
             let shouldReanchor = idsChanged || indexChanged || filmstripCenteredIndex == null
             let list = ensureFilmstripList()
+            // First sync windows from sourceIds[0]; reanchor before that emit.
+            if (shouldReanchor || list.viewportIds() === undefined) list.reanchor(snap.index)
             list.sync()
-            if (shouldReanchor) list.reanchor(snap.index)
             rebuildVirtualThumbs(track, snap)
             filmstripIds = ids
             if (shouldReanchor) filmstripCenteredIndex = snap.index
