@@ -15,6 +15,7 @@ import type {
     MediaViewerOrigin,
     MediaViewerSessionOpts,
     MediaViewerSnapshot,
+    MediaVisibleIds,
 } from "./types"
 
 export const MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT: string = "36%"
@@ -35,7 +36,22 @@ export type {
     MediaViewerOrigin,
     MediaViewerSessionOpts,
     MediaViewerSnapshot,
+    MediaVisibleIds,
 } from "./types"
+
+function areIdArraysEqual(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
+    if (a === b) return true
+    if (a === undefined || b === undefined) return false
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false
+    }
+    return true
+}
+
+function visibleSignature(ids: MediaVisibleIds): string[] {
+    return [ids.stage, ...ids.peeks, "|", ...ids.thumbs]
+}
 
 function clampIndex(index: number, length: number): number {
     if (length <= 0) return 0
@@ -71,6 +87,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let filmstripThumbSrcFn: ((item: MediaViewerItem) => string | null) | undefined
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
     let gesturingFlag = false
+    let lastVisible: string[] | undefined
     let listeners = new Set<() => void>()
     let decodeBudgetValue: MediaDecodeBudget = {
         active: opts?.decodeBudget?.active ?? DEFAULT_DECODE_BUDGET_ACTIVE,
@@ -173,6 +190,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         if (typeof openOpts.filmstripMaxWidth === "string" && openOpts.filmstripMaxWidth.trim() !== "") {
             filmstripMaxWidth = openOpts.filmstripMaxWidth.trim()
         }
+        lastVisible = undefined
         openFlag = true
         notify()
     }
@@ -342,6 +360,19 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         gesturingFlag = on
     }
 
+    function notifyVisible(ids: MediaVisibleIds): void {
+        if (!alive) return
+        let next: MediaVisibleIds = {
+            stage: ids.stage,
+            peeks: ids.peeks.slice(),
+            thumbs: ids.thumbs.slice(),
+        }
+        let sig = visibleSignature(next)
+        if (areIdArraysEqual(lastVisible, sig)) return
+        lastVisible = sig
+        opts?.onVisible?.(next)
+    }
+
     function subscribe(listener: () => void): () => void {
         if (!alive) return () => {}
         listeners.add(listener)
@@ -355,6 +386,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         alive = false
         openFlag = false
         navFrom = null
+        lastVisible = undefined
         notify()
         listeners.clear()
     }
@@ -385,6 +417,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         decodeBudget,
         isGesturing,
         setGesturing,
+        notifyVisible,
         destroy,
     }
 }

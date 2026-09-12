@@ -89,6 +89,12 @@ export type MediaViewerSnapshot = {
     filmstripMaxWidth: string
 }
 
+export type MediaVisibleIds = {
+    stage: string
+    peeks: string[]
+    thumbs: string[]
+}
+
 export type MediaViewerSessionOpts = {
     onClose?: () => void
     onIndexChange?: (index: number, item: MediaViewerItem) => void
@@ -97,6 +103,7 @@ export type MediaViewerSessionOpts = {
     prefersReducedMotion?: () => boolean
     decode?: (req: MediaDecodeRequest) => Promise<CanvasImageSource | null>
     decodeBudget?: Partial<MediaDecodeBudget>
+    onVisible?: (ids: MediaVisibleIds) => void
 }
 
 export type MediaViewer = {
@@ -125,5 +132,6 @@ export type MediaViewer = {
     decodeBudget: () => MediaDecodeBudget
     isGesturing: () => boolean
     setGesturing: (on: boolean) => void
+    notifyVisible: (ids: MediaVisibleIds) => void
     destroy: () => void
 }

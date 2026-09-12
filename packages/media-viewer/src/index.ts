@@ -18,6 +18,7 @@ export type {
     MediaViewerOrigin,
     MediaViewerSessionOpts,
     MediaViewerSnapshot,
+    MediaVisibleIds,
 } from "./types"
 export {
     MEDIA_SWIPE_X_THRESHOLD,

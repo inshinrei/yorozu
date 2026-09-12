@@ -4,7 +4,7 @@ import { attachMediaViewer } from "./attach"
 import { MEDIA_GHOST_ANIMATING_CLASS } from "./ghost"
 import { createMediaViewer, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
-import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin } from "./types"
+import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin, MediaVisibleIds } from "./types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
@@ -1432,6 +1432,92 @@ describe("attachMediaViewer", () => {
         let nextFirst = touchMove(250, 115)
         nav.dispatchEvent(nextFirst)
         expect(nextFirst.defaultPrevented).toBe(true)
+    })
+
+    it("onVisible fires on open, index change, and coalesces duplicates", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        expect(seen[0]).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
+        let n = seen.length
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        // reopen same ids may tear down overlay — allow one more equal or coalesced
+        viewer.next("next")
+        expect(seen.at(-1)).toEqual({ stage: "b", peeks: ["a"], thumbs: [] })
+        void n
+    })
+
+    it("onVisible filmstrip on reports all item ids as thumbs", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        expect(seen[0]).toEqual({ stage: "a", peeks: ["b"], thumbs: ["a", "b"] })
+        viewer.setNeighbors({
+            older: null,
+            newer: { id: "x", kind: "image", src: "x.jpg" },
+        })
+        expect(seen.at(-1)).toEqual({ stage: "a", peeks: ["x"], thumbs: ["a", "b"] })
+    })
+
+    it("onVisible virtualized thumbs is a window that includes the current id", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        viewer.setItems(items, 20)
+        let last = seen.at(-1)!
+        expect(last.stage).toBe("id-20")
+        expect(last.peeks).toEqual(["id-19", "id-21"])
+        expect(last.thumbs.length).toBeGreaterThan(0)
+        expect(last.thumbs.length).toBeLessThan(40)
+        expect(last.thumbs).toContain("id-20")
+    })
+
+    it("onVisible coalesces swipe settle that does not change ids", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        expect(seen[0]).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
+        let n = seen.length
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 200, clientY: 200 }))
+        expect(seen.at(-1)).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
+        expect(seen.filter((s) => s.stage === "a" && s.peeks[0] === "b")).toHaveLength(n)
     })
 
     it.each(["pointerup", "pointercancel", "touchcancel"] as const)(

@@ -7,6 +7,7 @@ import {
     MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
     type MediaViewer,
     type MediaViewerItem,
+    type MediaVisibleIds,
 } from "./session"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
@@ -443,5 +444,36 @@ describe("createMediaViewer", () => {
         viewer!.setGesturing(false)
         expect(viewer!.isGesturing()).toBe(false)
         expect(n).toBe(0)
+    })
+
+    it("session does not auto-call onVisible; notifyVisible coalesces and re-fires after open", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer!.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        viewer.next("next")
+        viewer.setNeighbors({
+            older: { id: "a", kind: "image", src: "a.jpg" },
+            newer: null,
+        })
+        viewer.setItems([img("a"), img("b")], 1)
+        expect(seen).toEqual([])
+        let first: MediaVisibleIds = { stage: "a", peeks: ["b"], thumbs: [] }
+        viewer.notifyVisible(first)
+        expect(seen).toEqual([first])
+        viewer.notifyVisible({ stage: "a", peeks: ["b"], thumbs: [] })
+        expect(seen).toHaveLength(1)
+        viewer.notifyVisible({ stage: "b", peeks: ["a"], thumbs: [] })
+        expect(seen.at(-1)).toEqual({ stage: "b", peeks: ["a"], thumbs: [] })
+        expect(seen).toHaveLength(2)
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        expect(seen).toHaveLength(2)
+        viewer.notifyVisible({ stage: "a", peeks: ["b"], thumbs: [] })
+        expect(seen).toHaveLength(3)
+        expect(seen.at(-1)).toEqual(first)
     })
 })

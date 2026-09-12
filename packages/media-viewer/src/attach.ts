@@ -20,6 +20,7 @@ import type {
     MediaViewerNeighbor,
     MediaViewerOpenOpts,
     MediaViewerSnapshot,
+    MediaVisibleIds,
 } from "./types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "./zoom"
 import { createMediaImageZoom, type MediaImageZoom } from "./zoom-controller"
@@ -788,19 +789,47 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function afterSwipeSettle(): void {
         syncSwipeGesturing()
-        if (detached || viewer.isGesturing() || overlay == null || abort == null) return
-        if (!viewer.decodeFn()) return
-        let snap = viewer.snapshot()
-        paintPanes(snap)
-        if (!filmstripEl || !snap.filmstrip) return
-        let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
-        if (!track) return
-        for (let el of track.querySelectorAll("[data-yorozu-media-thumb]")) {
-            if (!(el instanceof HTMLElement)) continue
-            if (el.querySelector("img, canvas")) continue
-            thumbDecodeKeys.delete(el)
+        if (detached || overlay == null || abort == null) return
+        if (viewer.isGesturing()) return
+        if (viewer.decodeFn()) {
+            let snap = viewer.snapshot()
+            paintPanes(snap)
+            if (filmstripEl && snap.filmstrip) {
+                let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+                if (track) {
+                    for (let el of track.querySelectorAll("[data-yorozu-media-thumb]")) {
+                        if (!(el instanceof HTMLElement)) continue
+                        if (el.querySelector("img, canvas")) continue
+                        thumbDecodeKeys.delete(el)
+                    }
+                    syncThumbs(track, snap)
+                }
+            }
         }
-        syncThumbs(track, snap)
+        emitVisible()
+    }
+
+    function paintedThumbIds(snap: MediaViewerSnapshot): string[] {
+        if (!snap.filmstrip) return []
+        if (viewer.filmstripVirtualize()) return filmstripList?.viewportIds() ?? []
+        return snap.items.map((item) => item.id)
+    }
+
+    function visibleIds(): MediaVisibleIds {
+        let snap = viewer.snapshot()
+        let peeks: string[] = []
+        if (snap.neighbors.older) peeks.push(snap.neighbors.older.id)
+        if (snap.neighbors.newer) peeks.push(snap.neighbors.newer.id)
+        return {
+            stage: snap.current?.id ?? "",
+            peeks,
+            thumbs: paintedThumbIds(snap),
+        }
+    }
+
+    function emitVisible(): void {
+        if (detached || overlay == null) return
+        viewer.notifyVisible(visibleIds())
     }
 
     function itemIdKey(list: readonly MediaViewerItem[]): string {
@@ -900,6 +929,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
         if (!track) return
         rebuildVirtualThumbs(track, viewer.snapshot())
+        emitVisible()
     }
 
     function ensureFilmstripList(): VirtualList<string> {
@@ -1477,6 +1507,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             })
             overlay.focus({ preventScroll: true })
         }
+        emitVisible()
     }
 
     function paint(): void {

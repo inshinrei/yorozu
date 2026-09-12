@@ -32,6 +32,18 @@ While a swipe is gesturing, settling, or dismissing, attach calls `pausePeeksAnd
 
 Hosts that warm their own bitmaps should `pause()` that work while `viewer.isGesturing()` is true (chrome `api.isGesturing()` reads the same flag). `setGesturing` does not notify session `subscribe`.
 
+## Visible
+
+`onVisible` is a host port. The package does not warm bitmaps and does not call `decode` from it.
+
+Attach emits `{ stage, peeks, thumbs }` after overlay paint: open, index change, neighbor change, virtualized strip window shift, and swipe settle. Session `open` / `next` / `setNeighbors` / `setItems` do not fire it. Identical structs are coalesced.
+
+- `stage` — current item id, or `""` if none
+- `peeks` — older then newer neighbor ids that exist
+- `thumbs` — painted filmstrip ids (`list.viewportIds()` when virtualized, all item ids when the strip is on, else `[]`)
+
+Map `stage` to `pri: "visible"` and peeks/thumbs to `"preload"`. Abort ids that left the set.
+
 ## Ghost
 
 `createMediaGhost` keeps one dest-sized clone (`cloneCount()` is 1 in flight, else 0). `maxClones` is accepted and ignored. Attach passes the active pane's `[data-yorozu-media-stage]` image or canvas (or an img/canvas in that pane) as `bitmap` so the flight skips the origin URL. Neighbor peeks are not used. Do not `cloneNode` the live stage.
