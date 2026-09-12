@@ -326,6 +326,31 @@ describe("attachMediaViewer", () => {
         ghostHost.remove()
     })
 
+    it("video open ghost does not use a neighbor peek as bitmap", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        viewer.open({
+            items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }, img("b", "neighbor-b.jpg")],
+            index: 0,
+            origin: { ...origin, id: "v", imageUrl: "https://cdn.example/video-thumb.jpg" },
+            ghost: true,
+            neighbors: {
+                older: null,
+                newer: { id: "b", kind: "image", src: "neighbor-b.jpg" },
+            },
+        })
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-peek]')).toBeTruthy()
+        await vi.waitFor(() => {
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost] img")).toBeTruthy()
+        })
+        let cloneImg = ghostHost.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+        expect(cloneImg.src).not.toContain("neighbor-b")
+        expect(cloneImg.src).toContain("video-thumb")
+        ghostHost.remove()
+    })
+
     it("video paints <video controls>", () => {
         viewer.open({
             items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],

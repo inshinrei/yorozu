@@ -225,13 +225,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function ghostBitmap(): CanvasImageSource | undefined {
         let scope = overlay ?? viewport
         if (!scope) return undefined
-        let stage =
-            scope.querySelector("[data-side=active] [data-yorozu-media-stage]") ??
-            scope.querySelector("[data-yorozu-media-stage]")
+        let active = scope.querySelector('[data-side="active"]')
+        if (!(active instanceof HTMLElement)) return undefined
+        let stage = active.querySelector("[data-yorozu-media-stage]")
         if (stage instanceof HTMLImageElement || stage instanceof HTMLCanvasElement) return stage
-        let peek =
-            scope.querySelector("[data-side=active] [data-yorozu-media-peek]") ??
-            scope.querySelector("[data-yorozu-media-peek]")
+        let peek = active.querySelector("[data-yorozu-media-peek]")
         if (peek instanceof HTMLImageElement || peek instanceof HTMLCanvasElement) return peek
         return undefined
     }
