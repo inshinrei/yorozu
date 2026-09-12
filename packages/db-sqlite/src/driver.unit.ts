@@ -611,6 +611,93 @@ describe("createSqliteDriver", () => {
         }
     })
 
+    it("autoFlush idle does not flush while a read transact is in flight", async () => {
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let sql: string[] = []
+            let driver = createSqliteDriver({
+                filename: ":memory:",
+                native: nativeWithLog(sql),
+                autoFlush: { pendingPuts: 50, idleMs: 20 },
+            })
+            let db = await driver.open(schema)
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            sql.length = 0
+
+            let started!: () => void
+            let startedP = new Promise<void>((resolve) => {
+                started = resolve
+            })
+            let release!: () => void
+            let hold = new Promise<void>((resolve) => {
+                release = resolve
+            })
+            let txP = db.transact(["files"], "r", async (tx) => {
+                started()
+                await hold
+                return tx.collection<FileRow>("files").get("a")
+            })
+            await startedP
+
+            await new Promise((r) => setTimeout(r, 40))
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(false)
+
+            release()
+            await txP
+            expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+            await db.flush()
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(true)
+            await db.close()
+        } finally {
+            vi.unstubAllGlobals()
+        }
+    })
+
+    it("autoFlush idle does not drop pending when an rw transact rolls back", async () => {
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let sql: string[] = []
+            let driver = createSqliteDriver({
+                filename: ":memory:",
+                native: nativeWithLog(sql),
+                autoFlush: { pendingPuts: 50, idleMs: 20 },
+            })
+            let db = await driver.open(schema)
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            sql.length = 0
+
+            let started!: () => void
+            let startedP = new Promise<void>((resolve) => {
+                started = resolve
+            })
+            let release!: () => void
+            let hold = new Promise<void>((resolve) => {
+                release = resolve
+            })
+            let txP = db.transact(["files"], "rw", async () => {
+                started()
+                await hold
+                throw new Error("boom")
+            })
+            await startedP
+
+            await new Promise((r) => setTimeout(r, 40))
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(false)
+
+            release()
+            await expect(txP).rejects.toThrow("boom")
+            expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+            await db.flush()
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(true)
+            expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+            await db.close()
+        } finally {
+            vi.unstubAllGlobals()
+        }
+    })
+
     it("omitted autoFlush does not persist until flush", async () => {
         vi.useFakeTimers()
         vi.stubGlobal("requestIdleCallback", undefined)

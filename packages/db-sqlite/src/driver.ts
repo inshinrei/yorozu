@@ -348,6 +348,11 @@ class SerialQueue {
         )
         return run
     }
+
+    /** Run fn without the reentrant store so timers/idle do not inherit the lock. */
+    detached<R>(fn: () => R): R {
+        return this._held.exit(fn)
+    }
 }
 
 class WriteGuardCollection<T extends Row> implements Collection<T> {
@@ -894,11 +899,13 @@ class SqliteDb implements Db {
 
     protected _armIdle(timeout: number): void {
         this._cancelIdle()
-        this._idleHandle = scheduleIdle(() => {
-            this._idleHandle = null
-            if (this._closed) return
-            void this.flush({ reason: "idle" })
-        }, timeout)
+        this._idleHandle = this._lock.detached(() =>
+            scheduleIdle(() => {
+                this._idleHandle = null
+                if (this._closed) return
+                void this.flush({ reason: "idle" })
+            }, timeout),
+        )
     }
 
     protected _onBatchQueued(): void {
