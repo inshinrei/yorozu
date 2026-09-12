@@ -1,6 +1,7 @@
 export type { AttachHandle, Key, Playback } from "./core/types"
 export { prefersReducedMotion } from "./core/reduced-motion"
 export { dualRaf } from "./core/raf"
+export { queueMeasure, queueMutate, queueMeasureAfterMutate, flushDomSchedule } from "./core/dom-schedule"
 export type { AnimationLevel } from "./core/level"
 export {
     ANIMATION_LEVELS,
