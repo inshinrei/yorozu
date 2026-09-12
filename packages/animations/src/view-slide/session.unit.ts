@@ -395,4 +395,45 @@ describe("createViewSlide", () => {
         slide.destroy()
         expect(ticks).toBeGreaterThan(afterFinish)
     })
+
+    it("idle cancel does not fire onChange when keys are unchanged", () => {
+        let ticks = 0
+        let slide = makeSlide({
+            mountPolicy: "active-plus-leaving",
+            onChange: () => {
+                ticks += 1
+            },
+        })
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        expect(slide.animating).toBe(false)
+        let afterIdle = ticks
+        slide.cancel()
+        expect(slide.mountedKeys).toEqual(["a"])
+        expect(ticks).toBe(afterIdle)
+    })
+
+    it("second finish after settle does not fire onChange", async () => {
+        let ticks = 0
+        let slide = makeSlide({
+            mountPolicy: "active-plus-leaving",
+            onChange: () => {
+                ticks += 1
+            },
+        })
+        let toEl = createFakeEl()
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(toEl as unknown as HTMLElement, "b")
+        await flushFrames()
+        await vi.advanceTimersByTimeAsync(VIEW_SLIDE_MS + VIEW_SLIDE_SETTLE_SLACK_MS + 1)
+        expect(slide.animating).toBe(false)
+        let afterFinish = ticks
+        let onEnd = toEl.addEventListener.mock.calls.find((call) => call[0] === "transitionend")?.[1] as
+            | ((event: Event) => void)
+            | undefined
+        onEnd?.({ target: toEl, propertyName: "transform" } as unknown as Event)
+        expect(ticks).toBe(afterFinish)
+    })
 })
