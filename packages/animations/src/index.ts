@@ -1,4 +1,6 @@
 export type { AttachHandle, Key, Playback } from "./core/types"
+export type { CancelGroup } from "./core/cancel-group"
+export { createCancelGroup } from "./core/cancel-group"
 export { prefersReducedMotion } from "./core/reduced-motion"
 export { dualRaf } from "./core/raf"
 export { onAnimationFrame } from "./core/frame"

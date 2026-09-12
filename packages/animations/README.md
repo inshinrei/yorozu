@@ -31,7 +31,7 @@ The package is framework-agnostic: factories return plain controllers; you own t
 
 ## Shared element
 
-Use a one-shot flight with `playSharedElement`, or a reusable controller with `createSharedElement` when open/close need to cancel each other.
+Prefer `createSharedElement` for gallery open/close — it owns cancel of the previous flight. `playSharedElement` is a module singleton and is not the gallery path.
 
 ```ts
 import { createSharedElement, type Rect } from "@yorozu/animations"
@@ -51,9 +51,23 @@ const playback = se.play({
 // se.cancel() aborts an in-flight clone
 ```
 
-`playSharedElement(opts)` is the same one-shot path without a retained controller (still returns `Playback | null`).
+`playSharedElement(opts)` remains exported for one-shot use without a retained controller (still returns `Playback | null`).
 
 `playOpen` / `playClose` accept seeds and viewport insets when the host does not already have both rects. Math helpers (`computeFlight`, `computeOpenFlight`, …) are exported for custom layouts.
+
+## Cancel groups
+
+One `createCancelGroup()` per shell. `take(slot, playback)` owns the slot: a new occupant cancels the previous one. Use named slots (`"inbox-layer"`, `"dock"`, …) instead of `element.getAnimations()` as ownership.
+
+```ts
+import { createCancelGroup, createFade } from "@yorozu/animations"
+
+const group = createCancelGroup()
+const fade = createFade(overlayEl)
+group.take("overlay-fade", fade.setVisible(true))
+// later: group.cancel("overlay-fade") or group.cancelAll()
+// fade.destroy() cancels the in-flight fade without throwing when idle
+```
 
 ## Intensity
 

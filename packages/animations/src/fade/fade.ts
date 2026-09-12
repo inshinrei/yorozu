@@ -14,6 +14,7 @@ export type FadeOptions = {
 
 export type Fade = {
     setVisible: (visible: boolean) => Playback
+    destroy: () => void
 }
 
 export function createFade(el: HTMLElement, options?: FadeOptions): Fade {
@@ -92,5 +93,9 @@ export function createFade(el: HTMLElement, options?: FadeOptions): Fade {
         return playback
     }
 
-    return { setVisible }
+    let destroy = (): void => {
+        stopCurrent()
+    }
+
+    return { setVisible, destroy }
 }

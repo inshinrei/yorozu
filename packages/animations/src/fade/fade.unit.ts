@@ -129,4 +129,19 @@ describe("createFade", () => {
         second.cancel()
         expect(await second.done).toBe(false)
     })
+
+    it("destroy cancels an in-flight fade", async () => {
+        let cancel = vi.fn()
+        animate = createFakeAnimate(() => ({
+            finished: new Promise<void>(() => undefined),
+            cancel,
+        }))
+        let el = createFakeEl()
+        let fade = createFade(el as unknown as HTMLElement)
+        let playback = fade.setVisible(true)
+        fade.destroy()
+        expect(cancel).toHaveBeenCalled()
+        expect(await playback.done).toBe(false)
+        fade.destroy()
+    })
 })
