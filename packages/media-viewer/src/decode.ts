@@ -197,6 +197,7 @@ export function createMediaDecodePort(opts?: { budget?: Partial<MediaDecodeBudge
                 settle,
             }
             enqueueOrStart(job)
+            pump()
         })
     }
 

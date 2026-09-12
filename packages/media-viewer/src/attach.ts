@@ -1216,6 +1216,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripEl = null
         filmstripIds = null
         paneIds = {}
+        if (viewer.decodeFn()) decodePort.abortExcept([])
         let currentShell = shell
         shell = null
         currentShell?.destroy()

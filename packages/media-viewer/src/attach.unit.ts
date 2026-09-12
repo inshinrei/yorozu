@@ -130,6 +130,35 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector('[data-side="newer"] img[src="b.jpg"]')).toBeNull()
     })
 
+    it("close aborts leftover decode so a later open is not stuck behind it", async () => {
+        let started: string[] = []
+        let decode = vi.fn((req: { id: string; role: string; signal: AbortSignal }) => {
+            started.push(`${req.role}:${req.id}`)
+            return new Promise<CanvasImageSource | null>((resolve) => {
+                req.signal.addEventListener("abort", () => resolve(null))
+            })
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await vi.waitFor(() => expect(started).toContain("active:a"))
+        api!.forceClose()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+        started.length = 0
+        viewer.open({ items: [img("z")] })
+        await vi.waitFor(() => expect(started).toContain("active:z"))
+    })
+
     it("chrome header mount receives api and api.close({ ghost: false }) removes overlay", () => {
         let api: MediaViewerChromeApi | undefined
         let headerEl: HTMLElement | undefined

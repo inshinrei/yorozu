@@ -133,6 +133,40 @@ describe("createMediaDecodePort", () => {
         port.destroy()
     })
 
+    it("cross-bucket re-request pumps queued active without waiting for another finish", async () => {
+        let port = createMediaDecodePort({ budget: { peek: 2, active: 1 } })
+        let hang = (req: MediaDecodeRequest) =>
+            new Promise<CanvasImageSource | null>((resolve) => {
+                req.signal.addEventListener("abort", () => resolve(null))
+            })
+        let started: string[] = []
+        let decode = (req: MediaDecodeRequest) => {
+            started.push(`${req.role}:${req.id}`)
+            return hang(req)
+        }
+        port.request({ id: "a", role: "peek-older", src: "a.jpg", decode })
+        port.request({ id: "x", role: "active", src: "x.jpg", decode })
+        port.request({ id: "b", role: "peek-newer", src: "b.jpg", decode })
+        port.request({ id: "c", role: "peek-older", src: "c.jpg", decode })
+        expect(started).toEqual(["peek-older:a", "active:x", "peek-newer:b"])
+        let aActiveStarted = 0
+        let aActive = port.request({
+            id: "a",
+            role: "active",
+            src: "a.jpg",
+            decode: (req) => {
+                aActiveStarted += 1
+                return decode(req)
+            },
+        })
+        expect(aActiveStarted).toBe(0)
+        port.request({ id: "x", role: "peek-newer", src: "x.jpg", decode })
+        expect(aActiveStarted).toBe(1)
+        expect(port.inflight().some((job) => job.id === "a" && job.role === "active")).toBe(true)
+        port.destroy()
+        expect(await aActive).toBeNull()
+    })
+
     it("abort of a running id starts the next queued job of that bucket", async () => {
         let port = createMediaDecodePort({ budget: { peek: 1 } })
         let started: string[] = []
