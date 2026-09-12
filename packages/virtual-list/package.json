@@ -1,0 +1,12 @@
+{
+    "name": "@yorozu/virtual-list",
+    "version": "0.5.6",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "framework-agnostic absolute-row virtual list engine",
+    "exports": {
+        ".": "./src/index.ts"
+    }
+}

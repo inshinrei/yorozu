@@ -264,6 +264,8 @@ importers:
 
   packages/utils: {}
 
+  packages/virtual-list: {}
+
 packages:
 
   '@asamuzakjp/css-color@6.0.7':
