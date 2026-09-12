@@ -91,6 +91,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
     }
 
     function applyState(next: MediaZoomState): void {
+        if (next.scale === scale && next.translateX === translateX && next.translateY === translateY) return
         scale = next.scale
         translateX = next.translateX
         translateY = next.translateY
@@ -359,6 +360,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         },
         endDrag(endOpts?: { withInertia?: boolean; pinchOrigin?: MediaPoint | null }): void {
             dragging = false
+            notify()
             settleAfterRelease(endOpts)
         },
         getDragStartTranslate(): { translateX: number; translateY: number } {

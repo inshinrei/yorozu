@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
     DEFAULT_DECODE_BUDGET_ACTIVE,
     DEFAULT_DECODE_BUDGET_PEEK,
@@ -16,16 +16,30 @@ describe("createMediaDecodePort", () => {
         expect(DEFAULT_DECODE_BUDGET_THUMB).toBe(4)
     })
 
-    it("resolves a bitmap and abort of another id does not cancel it", async () => {
+    it("abort of another id does not cancel a running job", async () => {
         let port = createMediaDecodePort()
-        let img = document.createElement("img")
-        let out = await port.request({
+        let releaseA!: (v: CanvasImageSource | null) => void
+        let a = port.request({
             id: "a",
             role: "active",
             src: "a.jpg",
-            decode: async () => img,
+            decode: ({ signal }) =>
+                new Promise((resolve) => {
+                    signal.addEventListener("abort", () => resolve(null))
+                    releaseA = resolve
+                }),
         })
-        expect(out).toBe(img)
+        let b = port.request({
+            id: "b",
+            role: "peek-newer",
+            src: "b.jpg",
+            decode: async () => document.createElement("img"),
+        })
+        port.abort("b")
+        expect(await b).toBeNull()
+        let img = document.createElement("img")
+        releaseA(img)
+        expect(await a).toBe(img)
         port.destroy()
     })
 

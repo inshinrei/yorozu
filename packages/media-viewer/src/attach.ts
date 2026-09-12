@@ -1491,6 +1491,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         currentShell?.destroy()
         overlay?.remove()
         overlay = null
+        // zoom.reset may have scheduled a frame while overlay was still set.
+        cancelRaf()
         viewport = null
         strip = null
         header = null

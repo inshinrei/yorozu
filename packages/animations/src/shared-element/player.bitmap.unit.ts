@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { createSharedElement } from "./player"
 
 describe("createSharedElement bitmap clone", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        Reflect.deleteProperty(HTMLElement.prototype, "animate")
+        document.body.replaceChildren()
+    })
+
     it("uses image and cloneCount is 1 then 0; second play does not stack clones", async () => {
         vi.stubGlobal(
             "requestAnimationFrame",

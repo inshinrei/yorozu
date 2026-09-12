@@ -1441,6 +1441,30 @@ describe("attachMediaViewer", () => {
         scroller.remove()
     })
 
+    it("forceClose cancels leftover rAF queued by zoom.reset", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        api!.zoomIn()
+        expect(api!.scale()).toBeGreaterThan(1)
+        let raf = vi.fn((_cb: FrameRequestCallback) => 77)
+        let cancel = vi.fn()
+        vi.stubGlobal("requestAnimationFrame", raf)
+        vi.stubGlobal("cancelAnimationFrame", cancel)
+        // Session forceClose paints once: zoom.reset can queue a frame after the first cancelRaf.
+        expect(() => viewer.forceClose()).not.toThrow()
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+        expect(raf).toHaveBeenCalled()
+        expect(cancel).toHaveBeenCalledWith(77)
+        vi.unstubAllGlobals()
+    })
+
     it("forceClose during swipe ghost close does not linger-lock the page scroller", async () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({

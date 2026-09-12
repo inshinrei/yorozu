@@ -247,4 +247,33 @@ describe("createMediaImageZoom", () => {
         vi.unstubAllGlobals()
         vi.useRealTimers()
     })
+
+    it("applyState does not notify when scale and translate are unchanged", () => {
+        let zoom = sizedZoom()
+        let n = 0
+        zoom.onChange(() => {
+            n += 1
+        })
+        zoom.zoomIn()
+        let after = n
+        zoom.setLayoutSize(400, 300)
+        expect(n).toBe(after)
+        zoom.destroy()
+    })
+
+    it("beginDrag then endDrag without motion notifies isDragging false", () => {
+        let zoom = sizedZoom()
+        zoom.zoomIn()
+        let dragging: boolean[] = []
+        zoom.onChange(() => {
+            dragging.push(zoom.isDragging())
+        })
+        zoom.beginDrag()
+        expect(zoom.isDragging()).toBe(true)
+        zoom.endDrag({ withInertia: false })
+        expect(zoom.isDragging()).toBe(false)
+        expect(dragging).toContain(true)
+        expect(dragging[dragging.length - 1]).toBe(false)
+        zoom.destroy()
+    })
 })
