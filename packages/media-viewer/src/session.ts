@@ -18,8 +18,11 @@ import type {
 } from "./types"
 
 export const MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT: string = "36%"
+export const DEFAULT_FILMSTRIP_ITEM_SIZE_PX: number = 44
+export const DEFAULT_FILMSTRIP_OVERSCAN: number = 4
 
 export type {
+    MediaFilmstripOpts,
     MediaKind,
     MediaViewer,
     MediaViewerChrome,
@@ -62,6 +65,10 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let chromeSlots: MediaViewerChromeSlots | null = null
     let navFrom: MediaViewerNavFrom | null = null
     let filmstripWanted = true
+    let filmstripVirtualizeFlag = false
+    let filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+    let filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
+    let filmstripThumbSrcFn: ((item: MediaViewerItem) => string | null) | undefined
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
     let gesturingFlag = false
     let listeners = new Set<() => void>()
@@ -96,6 +103,34 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
 
     function resolveFilmstrip(): boolean {
         return filmstripWanted && items.length >= 2
+    }
+
+    function applyFilmstripOpenOpts(openOpts: MediaViewerOpenOpts): void {
+        filmstripThumbSrcFn = openOpts.filmstripThumbSrc
+        let f = openOpts.filmstrip
+        if (f === false) {
+            filmstripWanted = false
+            filmstripVirtualizeFlag = false
+            filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+            filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
+            return
+        }
+        filmstripWanted = true
+        if (f === true || f === undefined) {
+            filmstripVirtualizeFlag = false
+            filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+            filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
+            return
+        }
+        filmstripVirtualizeFlag = f.virtualize === true
+        filmstripItemSizePxValue =
+            typeof f.itemSizePx === "number" && Number.isFinite(f.itemSizePx) && f.itemSizePx > 0
+                ? f.itemSizePx
+                : DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+        filmstripOverscanValue =
+            typeof f.overscan === "number" && Number.isFinite(f.overscan) && f.overscan >= 0
+                ? f.overscan
+                : DEFAULT_FILMSTRIP_OVERSCAN
     }
 
     function snapshot(): MediaViewerSnapshot {
@@ -134,7 +169,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         newerFlag = openOpts.canNewer === true
         chromeSlots = openOpts.chrome ?? null
         navFrom = null
-        filmstripWanted = openOpts.filmstrip !== false
+        applyFilmstripOpenOpts(openOpts)
         if (typeof openOpts.filmstripMaxWidth === "string" && openOpts.filmstripMaxWidth.trim() !== "") {
             filmstripMaxWidth = openOpts.filmstripMaxWidth.trim()
         }
@@ -262,6 +297,22 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         notify()
     }
 
+    function filmstripVirtualize(): boolean {
+        return filmstripVirtualizeFlag
+    }
+
+    function filmstripItemSizePx(): number {
+        return filmstripItemSizePxValue
+    }
+
+    function filmstripOverscan(): number {
+        return filmstripOverscanValue
+    }
+
+    function filmstripThumbSrc(): ((item: MediaViewerItem) => string | null) | undefined {
+        return filmstripThumbSrcFn
+    }
+
     function chrome(): MediaViewerChromeSlots | null {
         return chromeSlots
     }
@@ -321,6 +372,10 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         goTo,
         setFilmstrip,
         setFilmstripMaxWidth,
+        filmstripVirtualize,
+        filmstripItemSizePx,
+        filmstripOverscan,
+        filmstripThumbSrc,
         chrome,
         lastNav,
         wantsGhost,

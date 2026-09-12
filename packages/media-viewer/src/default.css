@@ -246,6 +246,25 @@ html.yorozu-media-ghost-animating [data-yorozu-media-filmstrip] {
     opacity: 1;
 }
 
+[data-yorozu-media-filmstrip][data-virtualized] [role="list"] {
+    position: relative;
+    display: block;
+    margin-inline: 0;
+    gap: 0;
+}
+
+[data-yorozu-media-filmstrip][data-virtualized] [data-yorozu-media-thumb] {
+    position: absolute;
+    bottom: 0;
+    width: var(--yorozu-media-filmstrip-item-size, var(--yorozu-media-filmstrip-thumb-w));
+    height: var(--yorozu-media-filmstrip-thumb-h);
+}
+
+[data-yorozu-media-filmstrip][data-virtualized] [data-yorozu-media-thumb][data-current] {
+    width: var(--yorozu-media-filmstrip-item-size, var(--yorozu-media-filmstrip-thumb-w));
+    height: var(--yorozu-media-filmstrip-thumb-h);
+}
+
 [data-yorozu-media-thumb] img,
 [data-yorozu-media-thumb] [data-yorozu-media-loading] {
     display: block;

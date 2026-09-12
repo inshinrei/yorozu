@@ -1012,6 +1012,68 @@ describe("attachMediaViewer", () => {
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: expectedLeft, behavior: "smooth" }))
     })
 
+    it("virtualized filmstrip mounts a window of thumbs with absolute left, not N nodes", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        expect(nav.getAttribute("data-virtualized")).toBe("")
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        viewer.setItems(items, 20)
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
+        expect(thumbs.length).toBeGreaterThan(0)
+        expect(thumbs.length).toBeLessThan(40)
+        for (let el of thumbs) {
+            expect((el as HTMLElement).style.position).toBe("absolute")
+            expect((el as HTMLElement).style.left).toMatch(/px$/)
+        }
+        let current = nav.querySelector("[data-current]") as HTMLElement
+        expect(current.getAttribute("data-index")).toBe("20")
+    })
+
+    it("virtualized centerCurrentThumb scrolls by index geometry, not getBoundingClientRect", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        let scrollTo = vi.fn()
+        nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
+        viewer.setItems(items, 20)
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 20 * 40 + 20 - 100 }))
+    })
+
+    it("virtualized filmstrip reuses buttons by data-id when they stay in the window", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let kept = nav.querySelector('[data-id="id-20"]') as HTMLButtonElement
+        expect(kept).toBeTruthy()
+        viewer.goTo(21)
+        expect(nav.querySelector('[data-id="id-20"]')).toBe(kept)
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("21")
+    })
+
+    it("virtualized filmstrip uses filmstripThumbSrc for thumb images", () => {
+        viewer.open({
+            items: [img("a"), img("b"), img("c")],
+            filmstrip: { virtualize: true },
+            filmstripThumbSrc: (item) => `thumb:${item.id}`,
+        })
+        let thumbImg = root.querySelector("[data-yorozu-media-thumb] img")
+        expect(thumbImg?.getAttribute("src")).toBe("thumb:a")
+    })
+
     it("applies compact filmstrip max-width by default and full width when set", () => {
         viewer.open({ items: [img("a"), img("b")] })
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement

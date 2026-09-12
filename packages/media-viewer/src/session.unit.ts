@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DEFAULT_DECODE_BUDGET_ACTIVE, DEFAULT_DECODE_BUDGET_PEEK, DEFAULT_DECODE_BUDGET_THUMB } from "./decode"
-import { createMediaViewer, MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT, type MediaViewer, type MediaViewerItem } from "./session"
+import {
+    createMediaViewer,
+    DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+    DEFAULT_FILMSTRIP_OVERSCAN,
+    MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
+    type MediaViewer,
+    type MediaViewerItem,
+} from "./session"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
@@ -341,6 +348,49 @@ describe("createMediaViewer", () => {
         viewer!.setFilmstrip(true)
         expect(viewer!.snapshot().filmstrip).toBe(true)
         expect(ticks).toBe(1)
+    })
+
+    it("filmstrip object enables strip; thumb src helper is stored", () => {
+        let srcOf = (item: MediaViewerItem) => item.poster ?? `thumb:${item.id}`
+        viewer!.open({
+            items: [img("a"), img("b"), img("c")],
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+            filmstripThumbSrc: srcOf,
+        })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        expect(viewer!.filmstripVirtualize()).toBe(true)
+        expect(viewer!.filmstripItemSizePx()).toBe(40)
+        expect(viewer!.filmstripThumbSrc()?.(img("a"))).toBe("thumb:a")
+    })
+
+    it("filmstrip object defaults and boolean paths do not virtualize", () => {
+        expect(viewer!.filmstripVirtualize()).toBe(false)
+        expect(viewer!.filmstripItemSizePx()).toBe(DEFAULT_FILMSTRIP_ITEM_SIZE_PX)
+        expect(viewer!.filmstripOverscan()).toBe(DEFAULT_FILMSTRIP_OVERSCAN)
+        expect(viewer!.filmstripThumbSrc()).toBeUndefined()
+        viewer!.open({ items: [img("a"), img("b")] })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        expect(viewer!.filmstripVirtualize()).toBe(false)
+        expect(viewer!.filmstripItemSizePx()).toBe(DEFAULT_FILMSTRIP_ITEM_SIZE_PX)
+        expect(viewer!.filmstripOverscan()).toBe(DEFAULT_FILMSTRIP_OVERSCAN)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: { itemSizePx: 32, overscan: 1 } })
+        expect(viewer!.snapshot().filmstrip).toBe(true)
+        expect(viewer!.filmstripVirtualize()).toBe(false)
+        expect(viewer!.filmstripItemSizePx()).toBe(32)
+        expect(viewer!.filmstripOverscan()).toBe(1)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: false })
+        expect(viewer!.snapshot().filmstrip).toBe(false)
+        expect(viewer!.filmstripVirtualize()).toBe(false)
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        expect(viewer!.filmstripVirtualize()).toBe(true)
+        expect(viewer!.filmstripOverscan()).toBe(2)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: true })
+        expect(viewer!.filmstripVirtualize()).toBe(false)
+        expect(viewer!.filmstripItemSizePx()).toBe(DEFAULT_FILMSTRIP_ITEM_SIZE_PX)
+        expect(viewer!.filmstripThumbSrc()).toBeUndefined()
     })
 
     it("filmstripMaxWidth defaults compact and can be set to full width", () => {

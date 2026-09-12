@@ -2,6 +2,7 @@
  * Overlay + stage + optional filmstrip + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
  */
 import { dualRaf, isRectFullyVisibleIn, prefersReducedMotion } from "@yorozu/animations"
+import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
 import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
 import { computeStageFitRectFromElement, createMediaGhost, DEFAULT_MEDIA_INSETS, type MediaGhost } from "./ghost"
 import { bindMediaViewerKeys } from "./keyboard"
@@ -78,6 +79,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let chromeEl: HTMLElement | null = null
     let filmstripEl: HTMLElement | null = null
     let filmstripIds: string | null = null
+    let filmstripList: VirtualList<string> | null = null
+    let filmstripListItemSize: number | null = null
     let shell: MediaShell | null = null
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
@@ -804,8 +807,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function thumbSrc(item: MediaViewerItem): string | null {
-        if (item.kind === "video") return item.poster || item.src || null
-        return item.src ?? null
+        let helper = viewer.filmstripThumbSrc()
+        if (helper) return helper(item)
+        return item.poster ?? item.src ?? null
     }
 
     function markThumbCurrent(btn: HTMLButtonElement, current: boolean): void {
@@ -875,6 +879,59 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         btn.append(placeholder)
     }
 
+    function destroyFilmstripList(): void {
+        filmstripList?.destroy()
+        filmstripList = null
+        filmstripListItemSize = null
+    }
+
+    function filmstripSlice(viewportWidth: number): number {
+        let itemSizePx = viewer.filmstripItemSizePx()
+        let overscan = viewer.filmstripOverscan()
+        return listSliceForViewport(viewportWidth, itemSizePx, {
+            overscanRows: overscan,
+            min: Math.max(4, overscan + 2),
+        })
+    }
+
+    function onFilmstripWindowChange(): void {
+        if (detached || !filmstripEl || !filmstripList) return
+        let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+        if (!track) return
+        rebuildVirtualThumbs(track, viewer.snapshot())
+    }
+
+    function ensureFilmstripList(): VirtualList<string> {
+        let itemSizePx = viewer.filmstripItemSizePx()
+        if (filmstripList && filmstripListItemSize === itemSizePx) {
+            filmstripList.setListSlice(filmstripSlice(filmstripEl?.clientWidth ?? 0))
+            return filmstripList
+        }
+        destroyFilmstripList()
+        filmstripListItemSize = itemSizePx
+        filmstripList = createVirtualList({
+            getItems: (): readonly string[] => viewer.snapshot().items.map((item) => item.id),
+            itemSize: itemSizePx,
+            listSlice: filmstripSlice(filmstripEl?.clientWidth ?? 0),
+            onChange: onFilmstripWindowChange,
+            // Idle trim re-slices with LIST_SLICE_MIN (16); skip so a compact strip can stay smaller.
+            scheduleIdle: (): { cancel(): void } => ({
+                cancel(): void {},
+            }),
+        })
+        return filmstripList
+    }
+
+    function onFilmstripScroll(): void {
+        if (!filmstripList || !filmstripEl) return
+        filmstripList.setListSlice(filmstripSlice(filmstripEl.clientWidth))
+        // Engine is vertical: map strip scrollLeft → scrollTop, clientWidth → viewportHeight.
+        filmstripList.onScroll({
+            scrollTop: filmstripEl.scrollLeft,
+            viewportHeight: filmstripEl.clientWidth,
+        })
+    }
+
     function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
         track.replaceChildren()
         for (let i = 0; i < snap.items.length; i++) {
@@ -889,7 +946,50 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
+    function rebuildVirtualThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
+        if (!filmstripList) return
+        let ids = filmstripList.viewportIds() ?? []
+        let from = filmstripList.fromOffset()
+        let prev = new Map<string, HTMLButtonElement>()
+        for (let el of track.querySelectorAll("[data-yorozu-media-thumb]")) {
+            if (!(el instanceof HTMLButtonElement)) continue
+            let id = el.getAttribute("data-id")
+            if (id) prev.set(id, el)
+        }
+        let next: HTMLButtonElement[] = []
+        for (let i = 0; i < ids.length; i++) {
+            let id = ids[i]!
+            let index = from + i
+            let item = snap.items[index]
+            if (item == null || item.id !== id) {
+                let found = snap.items.findIndex((it) => it.id === id)
+                if (found < 0) continue
+                index = found
+                item = snap.items[found]!
+            }
+            let btn = prev.get(id)
+            if (!btn) {
+                btn = document.createElement("button")
+                btn.type = "button"
+                btn.setAttribute("data-yorozu-media-thumb", "")
+                btn.setAttribute("data-id", id)
+            }
+            btn.setAttribute("data-index", String(index))
+            btn.style.position = "absolute"
+            btn.style.left = `${filmstripList.rowTop(index)}px`
+            markThumbCurrent(btn, index === snap.index)
+            fillThumb(btn, item)
+            next.push(btn)
+        }
+        track.style.width = `${filmstripList.totalSize()}px`
+        track.replaceChildren(...next)
+    }
+
     function syncThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
+        if (filmstripList) {
+            rebuildVirtualThumbs(track, snap)
+            return
+        }
         let thumbs = track.querySelectorAll("[data-yorozu-media-thumb]")
         for (let i = 0; i < snap.items.length; i++) {
             let el = thumbs[i]
@@ -901,6 +1001,20 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function centerCurrentThumb(behavior: ScrollBehavior): void {
         if (!filmstripEl) return
+        if (viewer.filmstripVirtualize()) {
+            let index = viewer.snapshot().index
+            let itemSizePx = viewer.filmstripItemSizePx()
+            let viewportWidth = filmstripEl.clientWidth
+            let left = index * itemSizePx + itemSizePx / 2 - viewportWidth / 2
+            if (left < 0) left = 0
+            if (typeof filmstripEl.scrollTo === "function") {
+                filmstripEl.scrollTo({ left, behavior })
+            } else {
+                filmstripEl.scrollLeft = left
+            }
+            onFilmstripScroll()
+            return
+        }
         let current = filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]")
         if (!(current instanceof HTMLElement)) return
         let stripBox = filmstripEl.getBoundingClientRect()
@@ -925,6 +1039,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function removeFilmstrip(): void {
+        destroyFilmstripList()
         filmstripEl?.remove()
         filmstripEl = null
         filmstripIds = null
@@ -936,7 +1051,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             removeFilmstrip()
             return
         }
-        let ids = itemIdKey(snap.items)
+        let virtualize = viewer.filmstripVirtualize()
+        let itemSizePx = viewer.filmstripItemSizePx()
         let createdThisPaint = false
         if (!filmstripEl) {
             createdThisPaint = true
@@ -948,16 +1064,35 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             track.setAttribute("role", "list")
             filmstripEl.append(track)
             filmstripEl.addEventListener("click", onFilmstripClick, abort ? { signal: abort.signal } : undefined)
+            filmstripEl.addEventListener("scroll", onFilmstripScroll, abort ? { signal: abort.signal } : undefined)
             overlay.append(filmstripEl)
             filmstripIds = null
         }
+        if (virtualize) {
+            filmstripEl.setAttribute("data-virtualized", "")
+            filmstripEl.style.setProperty("--yorozu-media-filmstrip-item-size", `${itemSizePx}px`)
+        } else {
+            filmstripEl.removeAttribute("data-virtualized")
+            filmstripEl.style.removeProperty("--yorozu-media-filmstrip-item-size")
+            destroyFilmstripList()
+        }
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
         if (!track) return
-        if (filmstripIds !== ids) {
-            rebuildThumbs(track, snap)
-            filmstripIds = ids
+        if (virtualize) {
+            let list = ensureFilmstripList()
+            list.sync()
+            list.reanchor(snap.index)
+            rebuildVirtualThumbs(track, snap)
+            filmstripIds = itemIdKey(snap.items)
         } else {
-            syncThumbs(track, snap)
+            track.style.width = ""
+            let ids = itemIdKey(snap.items)
+            if (filmstripIds !== ids) {
+                rebuildThumbs(track, snap)
+                filmstripIds = ids
+            } else {
+                syncThumbs(track, snap)
+            }
         }
         let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
         let behavior: ScrollBehavior = instant ? "instant" : "smooth"
@@ -1263,6 +1398,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         pinchDist = 0
         lastContentId = null
         startedOpen = false
+        destroyFilmstripList()
         filmstripEl = null
         filmstripIds = null
         paneIds = {}

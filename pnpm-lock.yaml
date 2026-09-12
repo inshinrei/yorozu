@@ -238,6 +238,9 @@ importers:
       '@yorozu/animations':
         specifier: workspace:^
         version: link:../animations
+      '@yorozu/virtual-list':
+        specifier: workspace:^
+        version: link:../virtual-list
 
   packages/outbox:
     dependencies:

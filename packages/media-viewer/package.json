@@ -14,6 +14,7 @@
         "./default.css": "./src/default.css"
     },
     "dependencies": {
-        "@yorozu/animations": "workspace:^"
+        "@yorozu/animations": "workspace:^",
+        "@yorozu/virtual-list": "workspace:^"
     }
 }

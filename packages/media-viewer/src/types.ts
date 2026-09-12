@@ -54,12 +54,19 @@ export type MediaViewerChromeSlots = {
     overlay?: MediaViewerChrome
 }
 
+export type MediaFilmstripOpts = {
+    virtualize?: boolean
+    itemSizePx?: number
+    overscan?: number
+}
+
 export type MediaViewerOpenOpts = {
     items: readonly MediaViewerItem[]
     index?: number
     origin?: MediaViewerOrigin | null
     ghost?: boolean
-    filmstrip?: boolean
+    filmstrip?: boolean | MediaFilmstripOpts
+    filmstripThumbSrc?: (item: MediaViewerItem) => string | null
     /** CSS length for strip max width (`36%`, `100%`, `24rem`). Default compact. */
     filmstripMaxWidth?: string
     neighbors?: { older: MediaViewerNeighbor | null; newer: MediaViewerNeighbor | null }
@@ -105,6 +112,10 @@ export type MediaViewer = {
     goTo: (index: number) => void
     setFilmstrip: (on: boolean) => void
     setFilmstripMaxWidth: (width: string) => void
+    filmstripVirtualize: () => boolean
+    filmstripItemSizePx: () => number
+    filmstripOverscan: () => number
+    filmstripThumbSrc: () => ((item: MediaViewerItem) => string | null) | undefined
     chrome: () => MediaViewerChromeSlots | null
     lastNav: () => MediaViewerNavFrom | null
     wantsGhost: (kind: "open" | "close") => boolean

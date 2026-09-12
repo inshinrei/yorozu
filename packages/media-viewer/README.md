@@ -35,3 +35,11 @@ Hosts that warm their own bitmaps should `pause()` that work while `viewer.isGes
 ## Ghost
 
 `createMediaGhost` keeps one dest-sized clone (`cloneCount()` is 1 in flight, else 0). `maxClones` is accepted and ignored. Attach passes the active pane's `[data-yorozu-media-stage]` image or canvas (or an img/canvas in that pane) as `bitmap` so the flight skips the origin URL. Neighbor peeks are not used. Do not `cloneNode` the live stage.
+
+## Filmstrip
+
+`filmstrip: false` turns the package strip off. `true` or omit paints today's full in-flow strip. `{ virtualize: true }` windows thumbs with `@yorozu/virtual-list` using absolute `left` (not a `translateX` window). Virtualized current thumbs stay the same size as the rest.
+
+Host either virtualizes the package strip **or** keeps `filmstrip: false` and virtualizes its own strip — not both.
+
+`filmstripThumbSrc` defaults to `poster ?? src`.

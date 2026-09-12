@@ -1,5 +1,11 @@
-export { createMediaViewer, MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT } from "./session"
+export {
+    createMediaViewer,
+    MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
+    DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+    DEFAULT_FILMSTRIP_OVERSCAN,
+} from "./session"
 export type {
+    MediaFilmstripOpts,
     MediaKind,
     MediaViewer,
     MediaViewerChrome,
