@@ -71,6 +71,8 @@ Worker drains on `start` / `resume` / `wake()` / store `subscribe` (enqueue, ret
 
 `pollIntervalMs` is a watchdog fuse, default 30s — not a 2s claim loop. After an empty drain, one timeout is armed for `nextDueAt` (backoff and lease reclaim).
 
+`yieldEvery` defaults to 1 (await idle after each handled entry so a long drain yields the event loop). `0` disables. Claim/lease stays in-process; this is not a Web Worker.
+
 Cross-tab: this package does not open `BroadcastChannel`. Host should `bc.onmessage → worker.wake()` and post on local enqueue. Without that, other-tab enqueue waits up to the watchdog. Lease steal on **this** tab is the due timer (not worse than the old 2s poll).
 
 Offline: pass `subscribeOnline` (e.g. `window` `online`) or call `wake()` when connectivity returns; otherwise the watchdog is the fuse.

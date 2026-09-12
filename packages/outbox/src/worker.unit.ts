@@ -23,6 +23,13 @@ async function flushMicrotasks(times: number = 40): Promise<void> {
     for (let i = 0; i < times; i++) await Promise.resolve()
 }
 
+async function drainWorker(times: number = 40): Promise<void> {
+    for (let i = 0; i < times; i++) {
+        await Promise.resolve()
+        await vi.advanceTimersByTimeAsync(0)
+    }
+}
+
 type RepoHarness = {
     store: OutboxStore
     state: { items: OutboxEntry[] }
@@ -167,6 +174,7 @@ describe("OutboxWorker", () => {
 
     afterEach(() => {
         for (let w of workers) w.stop()
+        vi.unstubAllGlobals()
         vi.useRealTimers()
         vi.restoreAllMocks()
     })
@@ -178,7 +186,7 @@ describe("OutboxWorker", () => {
 
     async function startUntilIdle(w: OutboxWorker): Promise<void> {
         w.start()
-        await flushMicrotasks()
+        await drainWorker()
     }
 
     it("start processes claimed entry and deletes on success", async () => {
@@ -420,7 +428,7 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         expect(deleteSpy).not.toHaveBeenCalled()
         w.resume()
-        await flushMicrotasks()
+        await drainWorker()
         expect(deleteSpy).toHaveBeenCalledWith("e1")
     })
 
@@ -460,7 +468,7 @@ describe("OutboxWorker", () => {
         await startUntilIdle(w)
         expect(processSpy).toHaveBeenCalledTimes(0)
         await store.enqueue({ type: "test/msg", payload: {} })
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(1)
         expect(await store.count()).toBe(0)
     })
@@ -499,7 +507,7 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(1)
         await vi.advanceTimersByTimeAsync(1)
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -509,7 +517,7 @@ describe("OutboxWorker", () => {
         await startUntilIdle(w)
         state.items.push(makeEntry())
         w.wake()
-        await flushMicrotasks()
+        await drainWorker()
         expect(deleteSpy).toHaveBeenCalledWith("e1")
     })
 
@@ -532,7 +540,7 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(0)
         await vi.advanceTimersByTimeAsync(1)
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -583,7 +591,7 @@ describe("OutboxWorker", () => {
         processSpy.mockResolvedValue(undefined)
         online = true
         for (let cb of onlineListeners) cb()
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -601,7 +609,7 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         await store.enqueue({ type: "test/msg", payload: { n: 2 } })
         release()
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -621,7 +629,7 @@ describe("OutboxWorker", () => {
         await store.enqueue({ type: "test/msg", payload: {} })
         expect(processSpy).toHaveBeenCalledTimes(0)
         releaseDue()
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -634,7 +642,7 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(0)
         w.resume()
-        await flushMicrotasks()
+        await drainWorker()
         expect(processSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -654,5 +662,32 @@ describe("OutboxWorker", () => {
         let w = track(new OutboxWorker(store, handlers, { log: createTestLog() }))
         await startUntilIdle(w)
         expect(spy).toHaveBeenCalledWith(expect.any(Function), 30_000)
+    })
+
+    it("yields via requestIdle between entries by default", async () => {
+        vi.stubGlobal("requestIdleCallback", undefined)
+        let { store } = makeRepo([makeEntry({ id: "e1" }), makeEntry({ id: "e2", createdAt: 1_000_001 })])
+        let order: string[] = []
+        processSpy.mockImplementation(async (entry) => {
+            order.push(entry.id)
+        })
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        w.start()
+        await flushMicrotasks()
+        expect(order).toEqual(["e1"])
+        await vi.advanceTimersByTimeAsync(0)
+        await flushMicrotasks()
+        expect(order).toEqual(["e1", "e2"])
+    })
+
+    it("yieldEvery 0 drains without waiting for idle", async () => {
+        vi.stubGlobal("requestIdleCallback", undefined)
+        let { store } = makeRepo([makeEntry({ id: "e1" }), makeEntry({ id: "e2", createdAt: 1_000_001 })])
+        let w = track(
+            new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000, yieldEvery: 0 }),
+        )
+        w.start()
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(2)
     })
 })

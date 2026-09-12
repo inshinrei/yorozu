@@ -1,5 +1,5 @@
 import { makeLog, makeSilentLog, reportFlowFailure, type Logger } from "@yorozu/log"
-import { timers } from "@yorozu/utils"
+import { requestIdle, timers } from "@yorozu/utils"
 import { resolveClock } from "./ids"
 import { OUTBOX_MAX_FAILED, OUTBOX_MAX_FAILED_AGE_MS, pruneOutboxFailed } from "./prune"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
@@ -49,6 +49,10 @@ export type OutboxWorkerOptions = {
     onActivity?: () => void
     /** Failed-entry hygiene. Default 90d / 200. `false` disables. */
     prune?: { maxAgeMs: number; maxCount: number } | false
+    /**
+     * Yield to idle every N handled entries. Default 1. `<= 0` disables. Non-finite is treated as 1.
+     */
+    yieldEvery?: number
 }
 
 export class OutboxWorker {
@@ -195,6 +199,7 @@ export class OutboxWorker {
             let lease = this.options.leaseDurationMs ?? 30_000
             let max = this.options.maxAttempts ?? 5
             this.log.trace("outbox: tick start")
+            let processed = 0
             while (this._running && !this._paused) {
                 let entry = await this.store.claim(lease)
                 if (!entry) {
@@ -211,6 +216,7 @@ export class OutboxWorker {
                     flow.warn("never-happen", { reason: "no-handler", type: entry.type })
                     this.log.trace("outbox: no handler for type, deleting", { type: entry.type })
                     await this.store.delete(entry.id)
+                    await this._yieldAfterHandled(++processed)
                     continue
                 }
 
@@ -251,6 +257,7 @@ export class OutboxWorker {
                             },
                         )
                     }
+                    await this._yieldAfterHandled(++processed)
                     continue
                 }
                 try {
@@ -259,6 +266,7 @@ export class OutboxWorker {
                     this._report(err)
                 }
                 flow.info("done", { id: entry.id, type: entry.type })
+                await this._yieldAfterHandled(++processed)
             }
             await this._prune()
             this.log.trace("outbox: tick end")
@@ -281,6 +289,16 @@ export class OutboxWorker {
                 let online = this.options.isOnline ? this.options.isOnline() : true
                 if (online) this.wake()
             }
+        }
+    }
+
+    protected async _yieldAfterHandled(processed: number): Promise<void> {
+        let every = this.options.yieldEvery ?? 1
+        if (!Number.isFinite(every)) every = 1
+        if (every > 0 && processed % every === 0) {
+            await new Promise<void>((resolve) => {
+                requestIdle(() => resolve())
+            })
         }
     }
 
