@@ -13,7 +13,8 @@ export { estimateAxisSnapshots } from "./virtual"
 export type { EdgeRange, ViewportRect } from "./auto-scroll-geometry"
 export { computeAutoScrollDelta1d, computeAutoScrollDelta, computeAutoScrollDeltaX } from "./auto-scroll-geometry"
 
-export { AUTO_SCROLL_ZONE_PX, AUTO_SCROLL_MAX_PX_PER_FRAME } from "./auto-scroll"
+export type { SortableAutoScroll } from "./auto-scroll"
+export { AUTO_SCROLL_ZONE_PX, AUTO_SCROLL_MAX_PX_PER_FRAME, createSortableAutoScroll } from "./auto-scroll"
 
 export type { SortableActivation, SortableFeel } from "./feel"
 export { POINTER_ACTIVATION, HOLD_ACTIVATION, SORTABLE_FEEL } from "./feel"

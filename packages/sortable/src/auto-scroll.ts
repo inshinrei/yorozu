@@ -2,7 +2,7 @@ import { computeAutoScrollDelta, computeAutoScrollDeltaX } from "./auto-scroll-g
 import type { SortableAxis } from "./geometry"
 
 export const AUTO_SCROLL_ZONE_PX: number = 60
-export const AUTO_SCROLL_MAX_PX_PER_FRAME: number = 18
+export const AUTO_SCROLL_MAX_PX_PER_FRAME: number = 8
 
 export function pointerOnAxis(axis: SortableAxis, clientX: number, clientY: number): number {
     return axis === "y" ? clientY : clientX

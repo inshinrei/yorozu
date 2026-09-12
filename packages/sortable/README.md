@@ -58,11 +58,12 @@ Pass `activation` on `createSortableSession`. `pointerDown` is the threshold / h
 
 ## Auto-scroll
 
-While dragging, the session scrolls the nearest overflow parent (or `getViewport()`) when the pointer enters a **60px** edge zone on **both axes** (`AUTO_SCROLL_ZONE_PX`). Step size is quadratic in penetration, capped at **18px per frame** (`AUTO_SCROLL_MAX_PX_PER_FRAME`).
+While dragging, the session scrolls the nearest overflow parent (or `getViewport()`) when the pointer enters a **60px** edge zone on **both axes** (`AUTO_SCROLL_ZONE_PX`). Step size is quadratic in penetration, capped at **8px per frame** (`AUTO_SCROLL_MAX_PX_PER_FRAME`).
 
 - Viewport: `getViewport()` override, else `findScrollParent` from a registered node (overflow `auto` / `scroll` / `overlay` and content overflowing on that axis).
 - Scroll-max is frozen at drag begin so a lifted transform cannot grow the range.
 - Math helpers `computeAutoScrollDelta` / `computeAutoScrollDeltaX` / `computeAutoScrollDelta1d` are exported for hosts that drive their own loop.
+- `createSortableAutoScroll` is exported for hosts that drive a gesture without a session (the session still constructs it internally). Hosts may pass `maxStep: 18` (or `autoScrollMaxPxPerFrame: 18`) to keep the old cap.
 
 ## Virtual lists
 

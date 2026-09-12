@@ -439,12 +439,12 @@ describe("createSortableSession auto-scroll", () => {
         session.pointerDown("a", pointer("pointerdown", 20, 0))
         moveTo(250, 0)
         raf.flush(1)
-        let expectedX = computeAutoScrollDeltaX(250, { left: 100, right: 260 }, 60, 18)
+        let expectedX = computeAutoScrollDeltaX(250, { left: 100, right: 260 }, 60, 8)
         expect(expectedX).toBeGreaterThan(0)
         expect(getScroll()).toBe(expectedX)
     })
 
-    it("defaults to zone 60 and max step 18", () => {
+    it("defaults to zone 60 and max step 8", () => {
         let { vp, getScroll } = makeViewport("y")
         let raf = mockRaf()
         rafRestore = raf.restore
@@ -458,9 +458,9 @@ describe("createSortableSession auto-scroll", () => {
 
         moveTo(0, 250)
         raf.flush(1)
-        let expected = computeAutoScrollDelta(250, { top: 100, bottom: 260 }, 60, 18)
+        let expected = computeAutoScrollDelta(250, { top: 100, bottom: 260 }, 60, 8)
         expect(expected).toBeGreaterThan(0)
-        expect(expected).toBeLessThanOrEqual(18)
+        expect(expected).toBeLessThanOrEqual(8)
         expect(getScroll()).toBe(expected)
     })
 
