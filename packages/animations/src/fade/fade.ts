@@ -31,6 +31,7 @@ export function createFade(el: HTMLElement, options?: FadeOptions): Fade {
         current.anim?.cancel()
         current.resolve(false)
         current = null
+        clearStyles(el, STYLE_KEYS)
     }
 
     let setVisible = (visible: boolean): Playback => {
