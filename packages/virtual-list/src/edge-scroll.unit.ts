@@ -27,6 +27,14 @@ describe("leadingDebounce", () => {
         d()
         expect(fn).toHaveBeenCalledTimes(2)
     })
+
+    it("runs the first call even when Date.now is 0", () => {
+        vi.setSystemTime(0)
+        let fn = vi.fn()
+        let d = leadingDebounce(fn, 1000)
+        d()
+        expect(fn).toHaveBeenCalledTimes(1)
+    })
 })
 
 describe("createEdgeDebouncedLoaders", () => {
@@ -190,6 +198,58 @@ describe("handleEdgeScroll (fixed-height math)", () => {
                 loadMoreBackwards: vi.fn(),
             }),
         ).toBe(false)
+        expect(state.lastScrollTop).toBe(20)
+
+        state = { lastScrollTop: 10 }
+        expect(
+            handleEdgeScroll({
+                scrollTop: 20,
+                viewportHeight: 300,
+                itemHeight: 72,
+                fromOffset: 0,
+                mountedCount: 0,
+                sensitiveArea: 100,
+                state,
+                loadMoreForwards: vi.fn(),
+                loadMoreBackwards: vi.fn(),
+            }),
+        ).toBe(false)
+        expect(state.lastScrollTop).toBe(20)
+
+        state = { lastScrollTop: 10 }
+        expect(
+            handleEdgeScroll({
+                scrollTop: 20,
+                viewportHeight: 0,
+                itemHeight: 72,
+                fromOffset: 0,
+                mountedCount: 10,
+                sensitiveArea: 100,
+                state,
+                loadMoreForwards: vi.fn(),
+                loadMoreBackwards: vi.fn(),
+            }),
+        ).toBe(false)
+        expect(state.lastScrollTop).toBe(20)
+    })
+
+    it("does not treat itemHeight 0 as invalid when mounted px are provided", () => {
+        let forwards = vi.fn()
+        let state: EdgeScrollState = { lastScrollTop: 2800 }
+        handleEdgeScroll({
+            scrollTop: 2700,
+            viewportHeight: 100,
+            itemHeight: 0,
+            fromOffset: 0,
+            mountedCount: 4,
+            sensitiveArea: 800,
+            state,
+            loadMoreForwards: forwards,
+            loadMoreBackwards: vi.fn(),
+            mountedTopPx: 2000,
+            mountedBottomPx: 2500,
+        })
+        expect(forwards).toHaveBeenCalled()
     })
 
     it("uses mountedTopPx/mountedBottomPx when provided", () => {

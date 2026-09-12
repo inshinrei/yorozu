@@ -26,6 +26,8 @@ describe("package barrel", () => {
         expect(vl.LIST_SLICE_OVERSCAN_ROWS).toBe(4)
         expect(vl).not.toHaveProperty("firstVisibleIndex")
         expect(vl).not.toHaveProperty("computeVirtualRange")
+        expect(vl).not.toHaveProperty("offsetY")
+        expect(vl).not.toHaveProperty("computeVirtualRangeFixed")
         expect(typeof vl.createVirtualList).toBe("function")
     })
 })

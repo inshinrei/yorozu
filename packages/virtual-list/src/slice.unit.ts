@@ -209,6 +209,17 @@ describe("ViewportIdSliceController", () => {
         expect(c.viewportIds?.[14]).toBe("c19")
     })
 
+    it("getMore records the observed spine so equal-content sync does not re-slice", () => {
+        let c = new ViewportIdSliceController<string>({ listSlice: 5 })
+        c.sync(full.slice(0, 20))
+        c.getMore(full, { direction: "backwards" })
+        c.getMore(full, { direction: "backwards" })
+        let expanded = [...(c.viewportIds ?? [])]
+        expect(expanded.length).toBeGreaterThan(5)
+        expect(c.sync([...full])).toBe(false)
+        expect(c.viewportIds).toEqual(expanded)
+    })
+
     it("trimToSlice recenters to ~2×listSlice around firstVisible", () => {
         let c = new ViewportIdSliceController<string>({ listSlice: 5 })
         c.sync(full)

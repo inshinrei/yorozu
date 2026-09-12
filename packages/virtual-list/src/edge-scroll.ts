@@ -10,10 +10,10 @@ export type EdgeScrollState = {
 }
 
 export function leadingDebounce<A extends unknown[]>(fn: (...args: A) => void, ms: number): (...args: A) => void {
-    let lastCall = 0
+    let lastCall: number | undefined
     return (...args: A) => {
         let now = Date.now()
-        if (now - lastCall < ms) return
+        if (lastCall !== undefined && now - lastCall < ms) return
         lastCall = now
         fn(...args)
     }
@@ -68,7 +68,8 @@ export function handleEdgeScroll(args: {
         return false
     }
 
-    if (itemHeight <= 0 || mountedCount <= 0 || viewportHeight <= 0) {
+    let hasMountedSpan = mountedTopPx !== undefined && mountedBottomPx !== undefined
+    if (mountedCount <= 0 || viewportHeight <= 0 || (!hasMountedSpan && itemHeight <= 0)) {
         state.lastScrollTop = scrollTop
         return false
     }

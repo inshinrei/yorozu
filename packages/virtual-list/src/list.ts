@@ -99,6 +99,8 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
     })
 
     let slots = new Map<Id, number>()
+    let freeSlots: number[] = []
+    let nextSlot = 0
     let prefix: number[] | undefined
     let lastScrollTop = 0
     let lastViewportHeight: number | undefined
@@ -177,19 +179,21 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
         let ids = controller.viewportIds
         if (ids === undefined) {
             slots.clear()
+            freeSlots = []
+            nextSlot = 0
             return
         }
         let mounted = new Set(ids)
-        for (let id of [...slots.keys()]) {
-            if (!mounted.has(id)) slots.delete(id)
+        for (let [id, slot] of [...slots.entries()]) {
+            if (mounted.has(id)) continue
+            slots.delete(id)
+            freeSlots.push(slot)
         }
-        let used = new Set(slots.values())
+        if (freeSlots.length > 1) freeSlots.sort((a, b) => a - b)
         for (let id of ids) {
             if (slots.has(id)) continue
-            let slot = 0
-            while (used.has(slot)) slot++
+            let slot = freeSlots.length > 0 ? freeSlots.shift()! : nextSlot++
             slots.set(id, slot)
-            used.add(slot)
         }
     }
 
