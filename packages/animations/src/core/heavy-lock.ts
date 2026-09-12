@@ -27,13 +27,15 @@ export function createHeavyAnimationLock(opts?: {
     let listeners = new Set<() => void>()
     let watchdog: ReturnType<typeof setTimeout> | null = null
 
-    let liveTokens = (): Token[] => tokens.filter((t) => !t.released)
-
     let currentLevel = (): HeavyLockLevel | null => {
-        let live = liveTokens()
-        if (live.length === 0) return null
-        if (live.some((t) => t.level === "blocking")) return "blocking"
+        if (tokens.length === 0) return null
+        if (tokens.some((t) => t.level === "blocking")) return "blocking"
         return "any"
+    }
+
+    let dropToken = (token: Token): void => {
+        let i = tokens.indexOf(token)
+        if (i >= 0) tokens.splice(i, 1)
     }
 
     let notify = (): void => {
@@ -50,18 +52,16 @@ export function createHeavyAnimationLock(opts?: {
         if (timeoutMs <= 0 || watchdog !== null) return
         watchdog = setTimeout(() => {
             watchdog = null
-            let hadLive = false
+            let hadLive = tokens.length > 0
             for (let token of tokens) {
-                if (token.released) continue
-                hadLive = true
                 token.released = true
                 if (token.timer !== null) {
                     clearTimeout(token.timer)
                     token.timer = null
                 }
             }
-            if (!hadLive) return
             tokens.length = 0
+            if (!hadLive) return
             onUnlock?.()
             notify()
         }, timeoutMs)
@@ -75,6 +75,7 @@ export function createHeavyAnimationLock(opts?: {
             clearTimeout(token.timer)
             token.timer = null
         }
+        dropToken(token)
         let after = currentLevel()
         if (before === after) return
         if (after === null) {
@@ -99,7 +100,7 @@ export function createHeavyAnimationLock(opts?: {
         let token: Token = { level, released: false, timer: null }
         tokens.push(token)
 
-        if (liveTokens().length === 1) {
+        if (tokens.length === 1) {
             startWatchdog()
         }
 
@@ -125,7 +126,7 @@ export function createHeavyAnimationLock(opts?: {
 
     return {
         acquire,
-        isHeld: (): boolean => liveTokens().length > 0,
+        isHeld: (): boolean => tokens.length > 0,
         level: (): HeavyLockLevel | null => currentLevel(),
         subscribe: (listener: () => void): (() => void) => {
             listeners.add(listener)

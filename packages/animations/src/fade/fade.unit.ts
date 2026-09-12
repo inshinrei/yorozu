@@ -144,6 +144,6 @@ describe("createFade", () => {
         expect(cancel).toHaveBeenCalled()
         expect(await playback.done).toBe(false)
         expect(el.style.getPropertyValue("will-change")).toBe("")
-        fade.destroy()
+        expect(() => fade.destroy()).not.toThrow()
     })
 })

@@ -62,6 +62,8 @@ describe("viewSlideTransforms", () => {
 
     it("cover forward fades the leaving panel and slides the entering one from 200%", () => {
         let t = viewSlideTransforms("forward", "cover")
+        let explicit = viewSlideTransforms("forward", "cover", "fade")
+        expect(t).toEqual(explicit)
         expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
         expect(t.fromEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "0" })
         expect(t.toStart).toEqual({ transform: "translateX(200%)", opacity: "1" })

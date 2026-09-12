@@ -17,7 +17,10 @@ describe("dom schedule", () => {
         stubRaf()
     })
     afterEach(() => {
-        flushDomSchedule()
+        for (let i = 0; i < 8; i++) {
+            flushDomSchedule()
+            vi.runOnlyPendingTimers()
+        }
         vi.useRealTimers()
         vi.unstubAllGlobals()
     })
@@ -89,5 +92,49 @@ describe("dom schedule", () => {
         })
         flushDomSchedule()
         expect(ran).toBe(true)
+    })
+
+    it("runs nested queueMeasure from a measure in the same tick", async () => {
+        let order: string[] = []
+        queueMeasure(() => {
+            order.push("r")
+            queueMeasure(() => order.push("r-nested"))
+        })
+        await vi.advanceTimersByTimeAsync(1)
+        expect(order).toEqual(["r", "r-nested"])
+    })
+
+    it("runs nested queueMutate from a mutate in the same tick", async () => {
+        let order: string[] = []
+        queueMutate(() => {
+            order.push("w")
+            queueMutate(() => order.push("w-nested"))
+        })
+        await vi.advanceTimersByTimeAsync(1)
+        expect(order).toEqual(["w", "w-nested"])
+    })
+
+    it("after-mutate queueMutate runs in the follow-up drain of the same tick", async () => {
+        let order: string[] = []
+        queueMutate(() => order.push("w"))
+        queueMeasureAfterMutate(() => {
+            order.push("r2")
+            queueMutate(() => order.push("w2"))
+        })
+        await vi.advanceTimersByTimeAsync(1)
+        expect(order).toEqual(["w", "r2", "w2"])
+    })
+
+    it("after-mutate queueMeasure waits for the next tick", async () => {
+        let order: string[] = []
+        queueMutate(() => order.push("w"))
+        queueMeasureAfterMutate(() => {
+            order.push("r2")
+            queueMeasure(() => order.push("r-next"))
+        })
+        await vi.advanceTimersByTimeAsync(1)
+        expect(order).toEqual(["w", "r2"])
+        await vi.advanceTimersByTimeAsync(1)
+        expect(order).toEqual(["w", "r2", "r-next"])
     })
 })

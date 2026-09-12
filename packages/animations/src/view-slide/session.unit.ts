@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createFakeAnimate } from "../_test/fake-animate"
 import type { AttachHandle, Key } from "../core/types"
 import { createViewSlide, VIEW_SLIDE_MS, VIEW_SLIDE_SETTLE_SLACK_MS } from "./session"
-import type { SlideDirection, ViewSlideMode } from "./transforms"
+import type { CoverMotion, SlideDirection, ViewSlideMode } from "./transforms"
 
 type FakeNode = {
     style: CSSStyleDeclaration
@@ -60,12 +60,14 @@ function makeSlide(opts?: {
     mountPolicy?: "keep-visited" | "active-plus-leaving"
     getDirection?: (from: Key, to: Key) => SlideDirection | null
     onChange?: () => void
+    coverMotion?: CoverMotion
 }) {
     return createViewSlide({
         getMode: () => opts?.mode ?? "push",
         getDirection: opts?.getDirection ?? directionByKey,
         mountPolicy: opts?.mountPolicy,
         onChange: opts?.onChange,
+        coverMotion: opts?.coverMotion,
     })
 }
 
@@ -322,6 +324,20 @@ describe("createViewSlide", () => {
         expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
     })
 
+    it("coverMotion scale reaches animateElement frames", async () => {
+        let slide = makeSlide({ mode: "cover", coverMotion: "scale" })
+        slide.setActive("a")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "b")
+        await flushFrames()
+        let fromFrames = animate.mock.calls[0]![0]
+        expect(fromFrames[0]).toMatchObject({ transform: "scale(1)", opacity: "1" })
+        expect(fromFrames[1]).toMatchObject({ transform: "scale(0.7)", opacity: "0" })
+        let toFrames = animate.mock.calls[1]![0]
+        expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
+    })
+
     it("peek uses 300ms stack easing", async () => {
         let slide = makeSlide({ mode: "peek" })
         slide.setActive("a")
@@ -387,10 +403,11 @@ describe("createViewSlide", () => {
         slide.setActive("b")
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         expect(ticks).toBeGreaterThan(afterMount)
+        let afterStart = ticks
         await flushFrames()
         await vi.advanceTimersByTimeAsync(VIEW_SLIDE_MS + VIEW_SLIDE_SETTLE_SLACK_MS + 1)
         expect(slide.animating).toBe(false)
-        expect(ticks).toBeGreaterThan(afterMount)
+        expect(ticks).toBeGreaterThan(afterStart)
         let afterFinish = ticks
         slide.destroy()
         expect(ticks).toBeGreaterThan(afterFinish)

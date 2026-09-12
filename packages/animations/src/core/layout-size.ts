@@ -28,13 +28,7 @@ export function createLayoutSizeTween(opts: {
     let current: Run | null = null
 
     let stop = (): void => {
-        if (!current) return
-        let run = current
-        current = null
-        run.inner?.cancel()
-        applyRest()
-        run.release?.()
-        run.playback.cancel()
+        current?.playback.cancel()
     }
 
     let play = (toPx: number, durationMs: number): Playback => {
@@ -43,10 +37,15 @@ export function createLayoutSizeTween(opts: {
         let run: Run = { playback, inner: null, release: null }
         current = run
 
-        let cancel = playback.cancel
+        let settle = playback.cancel
         playback.cancel = () => {
-            if (current === run) stop()
-            else cancel()
+            if (current === run) {
+                current = null
+                run.inner?.cancel()
+                applyRest()
+                run.release?.()
+            }
+            settle()
         }
 
         queueMeasure(() => {

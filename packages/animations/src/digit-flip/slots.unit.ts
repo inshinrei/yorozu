@@ -116,4 +116,14 @@ describe("scheduleDigitFlip", () => {
         held = false
         expect(scheduleDigitFlip(true, { isHeld: () => held })).toBe(true)
     })
+
+    it("does not consume budget while a lock is held", () => {
+        for (let i = 0; i < 10; i++) {
+            expect(scheduleDigitFlip(true, { isHeld: () => true })).toBe(false)
+        }
+        for (let i = 0; i < 10; i++) {
+            expect(scheduleDigitFlip(true, { isHeld: () => false })).toBe(true)
+        }
+        expect(scheduleDigitFlip(true, { isHeld: () => false })).toBe(false)
+    })
 })

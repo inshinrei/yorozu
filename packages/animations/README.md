@@ -84,8 +84,9 @@ const size = createLayoutSizeTween({
     lock,
 })
 size.play(240, 200)
-size.snap()
 ```
+
+`snap()` applies rest immediately and cancels an in-flight play — call it to interrupt, not on the next line after `play`.
 
 ## Intensity
 
@@ -154,7 +155,7 @@ dock.attachBackdrop(backdropEl)
 dock.setOpen(true)
 ```
 
-Optional `onChange` fires on animation start, finish (including mode `"none"` instant settle), and whenever `mounted` / `animating` / `leaving` flip — including playback `cancel` / `destroy` when state actually changed. Drive host state from the callback, not a poller. Keep `Playback.done` as-is.
+Optional `onChange` fires on animation start, finish (including mode `"none"` instant settle), and whenever `mounted` / `animating` / `leaving` flip — including playback `cancel` / `destroy` when state actually changed. Drive host state from the callback, not a poller.
 
 ## Sliding indicator
 

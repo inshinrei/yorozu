@@ -52,8 +52,10 @@ describe("createHeavyAnimationLock", () => {
         expect(levels).toEqual(["any", "blocking"])
         blocking()
         expect(lock.level()).toBe("any")
+        expect(levels).toEqual(["any", "blocking"])
         any()
         expect(lock.level()).toBeNull()
+        expect(levels).toEqual(["any", "blocking"])
     })
 
     it("subscribe fires on hold, level change, and unlock", () => {
@@ -114,5 +116,41 @@ describe("createHeavyAnimationLock", () => {
         lock.acquire("forever")
         vi.advanceTimersByTime(10_000)
         expect(lock.isHeld()).toBe(true)
+    })
+
+    it("durationMs <= 0 is a no-op hold", () => {
+        let levels: HeavyLockLevel[] = []
+        let ticks = 0
+        let lock = createHeavyAnimationLock({
+            timeoutMs: 0,
+            onLock: (level) => levels.push(level),
+        })
+        lock.subscribe(() => {
+            ticks += 1
+        })
+        let release = lock.acquire("skip", { durationMs: 0 })
+        expect(lock.isHeld()).toBe(false)
+        expect(lock.level()).toBeNull()
+        expect(levels).toEqual([])
+        expect(ticks).toBe(0)
+        release()
+        expect(lock.isHeld()).toBe(false)
+        expect(ticks).toBe(0)
+    })
+
+    it("omitted timeoutMs force-unlocks at the default 1000ms", () => {
+        let unlocks = 0
+        let lock = createHeavyAnimationLock({
+            onUnlock: () => {
+                unlocks += 1
+            },
+        })
+        lock.acquire("one")
+        vi.advanceTimersByTime(999)
+        expect(lock.isHeld()).toBe(true)
+        vi.advanceTimersByTime(1)
+        expect(lock.isHeld()).toBe(false)
+        expect(lock.level()).toBeNull()
+        expect(unlocks).toBe(1)
     })
 })
