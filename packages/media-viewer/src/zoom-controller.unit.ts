@@ -183,4 +183,68 @@ describe("createMediaImageZoom", () => {
         expect(zoom.translateY()).toBe(0)
         expect(zoom.transformStyle()).toBe("translate3d(0px, 0px, 0) scale(1)")
     })
+
+    it("onChange fires on zoomIn and unsubscribe is idempotent", () => {
+        let zoom = sizedZoom()
+        let n = 0
+        let stop = zoom.onChange(() => {
+            n += 1
+        })
+        zoom.zoomIn()
+        expect(n).toBeGreaterThanOrEqual(1)
+        let after = n
+        stop()
+        stop()
+        zoom.zoomIn()
+        expect(n).toBe(after)
+        zoom.destroy()
+    })
+
+    it("idle 100% does not subscribe to requestAnimationFrame", () => {
+        let raf = vi.fn((cb: FrameRequestCallback) => {
+            cb(0)
+            return 1
+        })
+        vi.stubGlobal("requestAnimationFrame", raf)
+        vi.stubGlobal("cancelAnimationFrame", vi.fn())
+        let zoom = sizedZoom()
+        zoom.onChange(() => {})
+        expect(raf).not.toHaveBeenCalled()
+        zoom.destroy()
+        vi.unstubAllGlobals()
+    })
+
+    it("settle notifies on the shared pump and once at rest, then drops the pump", () => {
+        vi.useFakeTimers()
+        let frames: FrameRequestCallback[] = []
+        vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+            frames.push(cb)
+            return frames.length
+        })
+        vi.stubGlobal("cancelAnimationFrame", vi.fn())
+        let zoom = sizedZoom()
+        let scales: number[] = []
+        zoom.onChange(() => {
+            scales.push(zoom.scale())
+        })
+        zoom.applyRelativeZoomSoft(MEDIA_MAX_ZOOM_FACTOR + 2, { offsetX: 0, offsetY: 0 })
+        zoom.endDrag({ withInertia: false, pinchOrigin: { offsetX: 0, offsetY: 0 } })
+        expect(zoom.isSettling()).toBe(true)
+        expect(frames.length).toBeGreaterThan(0)
+        let guard = 0
+        while (zoom.isSettling() && frames.length && guard < 40) {
+            let cb = frames.shift()!
+            cb(performance.now() + MEDIA_ZOOM_SETTLE_MS)
+            guard += 1
+        }
+        expect(zoom.isSettling()).toBe(false)
+        expect(zoom.scale()).toBe(MEDIA_MAX_ZOOM_FACTOR)
+        expect(scales[scales.length - 1]).toBe(MEDIA_MAX_ZOOM_FACTOR)
+        let leftover = frames.length
+        zoom.onChange(() => {})
+        expect(frames.length).toBe(leftover)
+        zoom.destroy()
+        vi.unstubAllGlobals()
+        vi.useRealTimers()
+    })
 })

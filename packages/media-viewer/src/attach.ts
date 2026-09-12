@@ -116,6 +116,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     let ghost: MediaGhost = createMediaGhost()
     let zoom: MediaImageZoom = createMediaImageZoom({ prefersReducedMotion: reducedMotion })
+    zoom.onChange(() => scheduleRender())
     let swipe: MediaSwipe = createMediaSwipe({
         getEnabled: (): boolean => {
             if (!overlay || !viewer.snapshot().open) return false
@@ -159,7 +160,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function needsLiveRender(): boolean {
-        return swipe.gesturing() || swipe.settling() || swipe.dismissing() || zoom.isSettling() || zoom.isDragging()
+        return swipe.gesturing() || swipe.settling() || swipe.dismissing()
     }
 
     function clearWheelZoomRelease(): void {
@@ -475,6 +476,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         },
         percentLabel: (): string => zoom.percentLabel(),
         scale: (): number => zoom.scale(),
+        onZoomChange: (listener: () => void): (() => void) => zoom.onChange(listener),
         snapshot: (): MediaViewerSnapshot => viewer.snapshot(),
     }
 

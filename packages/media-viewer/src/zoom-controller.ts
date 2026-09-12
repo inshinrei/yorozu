@@ -3,7 +3,7 @@
  * Owns scale/translate, pointer pan inertia settle, and pinch soft-overshoot bounce.
  * Plain let + getters — no Svelte $state.
  */
-import { easeOutCubic, zoomAtOrigin } from "@yorozu/animations"
+import { easeOutCubic, onAnimationFrame, zoomAtOrigin } from "@yorozu/animations"
 import {
     MEDIA_MIN_SCALE,
     MEDIA_ZOOM_SETTLE_MS,
@@ -57,6 +57,7 @@ export type MediaImageZoom = {
     panBy: (deltaX: number, deltaY: number) => void
     endDrag: (opts?: { withInertia?: boolean; pinchOrigin?: MediaPoint | null }) => void
     getDragStartTranslate: () => { translateX: number; translateY: number }
+    onChange: (listener: () => void) => () => void
     destroy: () => void
 }
 
@@ -73,8 +74,13 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
     let settling = false
 
     let motionSamples: MediaZoomSample[] = []
-    let settleRaf: number | null = null
+    let stopPump: (() => void) | null = null
     let settleGen = 0
+    let listeners = new Set<() => void>()
+
+    function notify(): void {
+        for (let listener of [...listeners]) listener()
+    }
 
     function reducedMotion(): boolean {
         return opts?.prefersReducedMotion?.() === true
@@ -88,6 +94,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         scale = next.scale
         translateX = next.translateX
         translateY = next.translateY
+        notify()
     }
 
     function current(): MediaZoomState {
@@ -104,17 +111,13 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         if (motionSamples.length > 24) motionSamples = motionSamples.slice(-16)
     }
 
-    function cancelSettleRaf(): void {
-        if (settleRaf != null && typeof cancelAnimationFrame === "function") {
-            cancelAnimationFrame(settleRaf)
-            settleRaf = null
-        }
-    }
-
     function stopSettle(): void {
         settleGen++
-        cancelSettleRaf()
+        stopPump?.()
+        stopPump = null
+        if (!settling) return
         settling = false
+        notify()
     }
 
     function setScaleToward(
@@ -155,6 +158,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         let duration = durationMs ?? zoomSettleDurationMs(remaining)
         let gen = ++settleGen
         settling = true
+        notify()
         let start = typeof performance !== "undefined" ? performance.now() : Date.now()
 
         const frame = (now: number): void => {
@@ -166,19 +170,22 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             translateX = next.translateX
             translateY = next.translateY
             if (t < 1) {
-                settleRaf = requestAnimationFrame(frame)
+                notify()
                 return
             }
             applyState(target)
             settling = false
-            settleRaf = null
+            stopPump?.()
+            stopPump = null
+            notify()
         }
 
         if (typeof requestAnimationFrame === "function") {
-            settleRaf = requestAnimationFrame(frame)
+            stopPump = onAnimationFrame(frame)
         } else {
             applyState(target)
             settling = false
+            notify()
         }
     }
 
@@ -312,6 +319,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             dragging = true
             clearMotionSamples()
             noteMotionSample()
+            notify()
         },
         moveDrag(deltaX: number, deltaY: number, startTranslateX: number, startTranslateY: number): void {
             let next = zoomAtOrigin(
@@ -328,6 +336,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             translateX = next.translateX
             translateY = next.translateY
             noteMotionSample()
+            notify()
         },
         /** Relative pan (e.g. trackpad two-finger scroll when zoomed). No inertia. */
         panBy(deltaX: number, deltaY: number): void {
@@ -346,6 +355,7 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
             )
             translateX = next.translateX
             translateY = next.translateY
+            notify()
         },
         endDrag(endOpts?: { withInertia?: boolean; pinchOrigin?: MediaPoint | null }): void {
             dragging = false
@@ -354,10 +364,17 @@ export function createMediaImageZoom(opts?: { prefersReducedMotion?: () => boole
         getDragStartTranslate(): { translateX: number; translateY: number } {
             return { translateX, translateY }
         },
+        onChange(listener: () => void): () => void {
+            listeners.add(listener)
+            return (): void => {
+                listeners.delete(listener)
+            }
+        },
         destroy(): void {
             stopSettle()
             clearMotionSamples()
             dragging = false
+            listeners.clear()
             applyState(resetZoom())
         },
     }

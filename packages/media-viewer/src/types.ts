@@ -39,6 +39,7 @@ export type MediaViewerChromeApi = {
     resetZoom: () => void
     percentLabel: () => string
     scale: () => number
+    onZoomChange: (listener: () => void) => () => void
     snapshot: () => MediaViewerSnapshot
 }
 

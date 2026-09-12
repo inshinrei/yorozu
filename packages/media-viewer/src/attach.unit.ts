@@ -245,6 +245,31 @@ describe("attachMediaViewer", () => {
         expect(api!.percentLabel()).toBe("125%")
     })
 
+    it("chrome onZoomChange fires on zoomIn and not on session identity", () => {
+        let api: MediaViewerChromeApi | undefined
+        let zoomTicks = 0
+        let sessionTicks = 0
+        viewer.subscribe(() => {
+            sessionTicks += 1
+        })
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                    chromeApi.onZoomChange(() => {
+                        zoomTicks += 1
+                    })
+                },
+            },
+        })
+        let afterOpen = sessionTicks
+        api!.zoomIn()
+        expect(api!.scale()).toBe(1.25)
+        expect(zoomTicks).toBeGreaterThanOrEqual(1)
+        expect(sessionTicks).toBe(afterOpen)
+    })
+
     it("tap without drag does not change scale", () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({
