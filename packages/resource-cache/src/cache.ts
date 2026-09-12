@@ -4,7 +4,7 @@ import { pickOldestOverBytesCapOrdered } from "./bytes-cap"
 import type { BytesLruMap } from "./bytes-lru-map"
 import { attachBytesLedger, listEvictItems } from "./collection"
 import type { DropHandler, DropReason } from "./drop"
-import type { ResourceRow } from "./row"
+import type { ResourceClass, ResourceRow } from "./row"
 
 const ISSUE_KEY: string = "yorozu-resource-cache"
 
@@ -33,6 +33,7 @@ export function createResourceCache<Meta = unknown>(opts: {
     onDropped?(keys: string[], reason: DropReason): void
     evictMetaEveryNPuts?: number
     log?: Logger
+    preferDrop?: ResourceClass[]
 }): ResourceCache<Meta> {
     let log = makeLog(opts.log ?? makeSilentLog(), ISSUE_KEY)
     let caps: ResourceCacheCaps = opts.caps ?? {}
@@ -42,6 +43,8 @@ export function createResourceCache<Meta = unknown>(opts: {
     let drop = opts.drop
     let onDropped = opts.onDropped
     let evictMetaEveryNPuts = opts.evictMetaEveryNPuts
+    let preferDrop = opts.preferDrop
+    let usePreferDrop = preferDrop != null && preferDrop.length > 0
 
     async function applyDrop(keys: string[], reason: DropReason): Promise<void> {
         if (keys.length === 0) return
@@ -85,8 +88,12 @@ export function createResourceCache<Meta = unknown>(opts: {
                     flow.info("skip", { capBytes: maxBytes, totalBytes: total })
                     return
                 }
-                let listed = await listEvictItems(items)
-                let keys = pickOldestOverBytesCapOrdered(listed, total, maxBytes)
+                let listed = usePreferDrop
+                    ? await listEvictItems(items, { includeClass: true })
+                    : await listEvictItems(items)
+                let keys = usePreferDrop
+                    ? pickOldestOverBytesCapOrdered(listed, total, maxBytes, { preferDrop })
+                    : pickOldestOverBytesCapOrdered(listed, total, maxBytes)
                 if (!keys.length) {
                     flow.info("skip", { capBytes: maxBytes, totalBytes: total })
                     return

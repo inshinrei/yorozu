@@ -2,11 +2,14 @@ import type { CollectionDef, DbSchema } from "@yorozu/db"
 
 export const BY_EVICT_INDEX: string = "by-evict"
 
+export type ResourceClass = "thumb" | "original" | (string & {})
+
 export type ResourceRow<Meta = unknown> = {
     key: string
     storedAt: number
     bytes: number
     blob?: Blob
+    class?: ResourceClass
     meta: Meta
 }
 

@@ -3,7 +3,7 @@ export { pickOldestOverBytesCap, pickOldestOverBytesCapOrdered } from "./bytes-c
 export { BytesLruMap } from "./bytes-lru-map"
 export type { BlobBytesLedgerItem } from "./blob-bytes-ledger"
 export { BlobBytesLedger } from "./blob-bytes-ledger"
-export type { ResourceRow } from "./row"
+export type { ResourceRow, ResourceClass } from "./row"
 export { BY_EVICT_INDEX, resourceCollectionDef, resourceSchema } from "./row"
 export { listEvictItems, attachBytesLedger } from "./collection"
 export type { DropReason, DropPlan, DropHandler } from "./drop"

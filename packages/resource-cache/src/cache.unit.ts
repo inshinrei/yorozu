@@ -277,4 +277,31 @@ describe("createResourceCache", () => {
         expect(cache.peekL1("b")?.key).toBe("b")
         expect(cache.peekL1("c")?.key).toBe("c")
     })
+
+    it("preferDrop drops thumbs before same-age originals on bytes trim", async () => {
+        let col = await filesCol()
+        let cache = createResourceCache({
+            collection: col,
+            drop: dropDelete,
+            caps: { maxBytes: 10 },
+            preferDrop: ["thumb"],
+        })
+        await cache.put({ key: "orig", storedAt: 1, blob: blobOf(10), class: "original", meta: {} })
+        await cache.put({ key: "thumb", storedAt: 2, blob: blobOf(10), class: "thumb", meta: {} })
+        expect(await col.get("thumb")).toBeNull()
+        expect(await col.get("orig")).not.toBeNull()
+    })
+
+    it("without preferDrop, oldest storedAt still wins even if it is original", async () => {
+        let col = await filesCol()
+        let cache = createResourceCache({
+            collection: col,
+            drop: dropDelete,
+            caps: { maxBytes: 10 },
+        })
+        await cache.put({ key: "orig", storedAt: 1, blob: blobOf(10), class: "original", meta: {} })
+        await cache.put({ key: "thumb", storedAt: 2, blob: blobOf(10), class: "thumb", meta: {} })
+        expect(await col.get("orig")).toBeNull()
+        expect(await col.get("thumb")).not.toBeNull()
+    })
 })

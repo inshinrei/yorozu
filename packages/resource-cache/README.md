@@ -60,6 +60,10 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-re
 
 Omitted caps turn that policy off. `dropDelete` removes rows. `dropStripBlob()` keeps the row, `bytes === 0`, no blob. A host that wants strip on bytes and delete on TTL/count composes `plan.reason` in its own `DropHandler`.
 
+## Classed bytes trim
+
+Optional `class` on put (`"thumb"` | `"original"` | any string). Pass `preferDrop: ["thumb"]` so bytes trim drops matching classes first (in array order, oldest within each class), then the rest by age. Two collections (blobs + thumbs) remain valid and are not required. When `preferDrop` is set, bytes trim reads row values (`includeClass`) so it can see `class`; omit / empty `preferDrop` keeps the keysOnly path.
+
 ## Musts
 
 - Port is `Collection`. Host opens memory / IDB / SQLite via a `DbDriver` and passes `db.collection(...)`.

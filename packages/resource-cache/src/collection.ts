@@ -5,9 +5,9 @@ import { BY_EVICT_INDEX, type ResourceRow } from "./row"
 
 export async function listEvictItems<Meta = unknown>(
     col: Collection<ResourceRow<Meta>>,
-    opts?: { beforeStoredAt?: number; limit?: number },
+    opts?: { beforeStoredAt?: number; limit?: number; includeClass?: boolean },
 ): Promise<BytesCapItem[]> {
-    let bound: ScanBound = { keysOnly: true }
+    let bound: ScanBound = { keysOnly: opts?.includeClass !== true }
     if (opts?.beforeStoredAt != null) bound.lt = [opts.beforeStoredAt]
     if (opts?.limit != null) bound.limit = opts.limit
     let hits = await col.scan(BY_EVICT_INDEX, bound)
@@ -16,7 +16,12 @@ export async function listEvictItems<Meta = unknown>(
         let indexKey = hit.indexKey
         let storedAt = Array.isArray(indexKey) ? Number(indexKey[0]) : 0
         let bytes = Array.isArray(indexKey) ? Number(indexKey[1] ?? 0) : 0
-        out.push({ key: String(hit.primaryKey), storedAt, bytes })
+        let item: BytesCapItem = { key: String(hit.primaryKey), storedAt, bytes }
+        if (opts?.includeClass === true) {
+            let cls = hit.value?.class
+            if (cls != null) item.class = cls
+        }
+        out.push(item)
     }
     return out
 }

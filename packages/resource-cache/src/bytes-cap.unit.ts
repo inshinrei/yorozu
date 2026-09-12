@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { pickOldestOverBytesCap, pickOldestOverBytesCapOrdered } from "./bytes-cap"
 
-function item(key: string, storedAt: number, bytes: number) {
-    return { key, storedAt, bytes }
+function item(
+    key: string,
+    storedAt: number,
+    bytes: number,
+    cls?: "thumb" | "original",
+): { key: string; storedAt: number; bytes: number; class?: "thumb" | "original" } {
+    return cls ? { key, storedAt, bytes, class: cls } : { key, storedAt, bytes }
 }
 
 describe("pickOldestOverBytesCap", () => {
@@ -53,5 +58,30 @@ describe("pickOldestOverBytesCapOrdered", () => {
 
     it("capBytes <= 0 drops every positive-byte item in order", () => {
         expect(pickOldestOverBytesCapOrdered([item("a", 1, 5), item("z", 2, 0)], 5, 0)).toEqual(["a"])
+    })
+})
+
+describe("pickOldestOverBytesCapOrdered preferDrop", () => {
+    it("drops matching classes first in preferDrop order, then the rest", () => {
+        let listed = [
+            item("old-orig", 1, 8, "original"),
+            item("old-thumb", 2, 8, "thumb"),
+            item("new-thumb", 3, 8, "thumb"),
+            item("new-orig", 4, 8, "original"),
+        ]
+        expect(pickOldestOverBytesCapOrdered(listed, 32, 16, { preferDrop: ["thumb"] })).toEqual([
+            "old-thumb",
+            "new-thumb",
+        ])
+    })
+
+    it("falls through to unclassed / other classes when preferDrop is exhausted", () => {
+        let listed = [item("t", 1, 8, "thumb"), item("u", 2, 8), item("o", 3, 8, "original")]
+        expect(pickOldestOverBytesCapOrdered(listed, 24, 8, { preferDrop: ["thumb"] })).toEqual(["t", "u"])
+    })
+
+    it("omit preferDrop keeps given order (no class filter)", () => {
+        let listed = [item("orig", 1, 8, "original"), item("thumb", 2, 8, "thumb")]
+        expect(pickOldestOverBytesCapOrdered(listed, 16, 8)).toEqual(["orig"])
     })
 })

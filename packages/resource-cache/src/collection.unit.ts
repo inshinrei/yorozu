@@ -71,6 +71,15 @@ describe("listEvictItems", () => {
         expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: true, limit: 1 })
         expect(items).toEqual([{ key: "a", storedAt: 1, bytes: 1 }])
     })
+
+    it("includeClass scans values and copies row.class", async () => {
+        let col = await filesCol()
+        await col.put(rec({ key: "a", storedAt: 1, bytes: 4, class: "thumb" }))
+        let scan = vi.spyOn(col, "scan")
+        let items = await listEvictItems(col, { includeClass: true })
+        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: false })
+        expect(items).toEqual([{ key: "a", storedAt: 1, bytes: 4, class: "thumb" }])
+    })
 })
 
 describe("attachBytesLedger", () => {
