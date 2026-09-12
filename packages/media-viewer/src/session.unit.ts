@@ -476,4 +476,9 @@ describe("createMediaViewer", () => {
         expect(seen).toHaveLength(3)
         expect(seen.at(-1)).toEqual(first)
     })
+
+    it("gif is a valid item kind and snapshot preserves it", () => {
+        viewer!.open({ items: [{ id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }] })
+        expect(viewer!.snapshot().current?.kind).toBe("gif")
+    })
 })

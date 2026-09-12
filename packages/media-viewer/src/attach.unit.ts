@@ -390,6 +390,121 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeNull()
     })
 
+    it("gif paints img stage, does not zoom, and uses poster when motion is reduced", () => {
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [{ id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage.tagName).toBe("IMG")
+        expect(stage.getAttribute("src")).toBe("g.jpg")
+        api!.zoomIn()
+        expect(api!.scale()).toBe(1)
+    })
+
+    it("gif uses src when motion is on and chrome zoomIn is a no-op", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [{ id: "g", kind: "gif", src: "g.gif" }],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage.getAttribute("src")).toBe("g.gif")
+        api!.zoomIn()
+        expect(api!.scale()).toBe(1)
+    })
+
+    it("gif has no zoom wrap and reduced motion without poster still uses src", () => {
+        viewer.open({ items: [{ id: "g", kind: "gif", src: "g.gif" }] })
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-stage]")?.tagName).toBe("IMG")
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        viewer.open({ items: [{ id: "g", kind: "gif", src: "g.gif" }] })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage.tagName).toBe("IMG")
+        expect(stage.getAttribute("src")).toBe("g.gif")
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+    })
+
+    it("gif neighbor peeks like an image from src, not poster", () => {
+        viewer.open({
+            items: [img("a"), { id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }],
+            index: 0,
+        })
+        let peek = root.querySelector('[data-side="newer"] [data-yorozu-media-peek]') as HTMLImageElement
+        expect(peek).toBeInstanceOf(HTMLImageElement)
+        expect(peek.getAttribute("src")).toBe("g.gif")
+        expect(root.querySelector('[data-side="newer"] img[src="g.jpg"]')).toBeNull()
+    })
+
+    it("gif decode uses active role and does not wrap zoom", async () => {
+        let decoded = document.createElement("img")
+        decoded.src = "blob:gif"
+        let decode = vi.fn(async (req: { id: string; role: string; src: string }) => {
+            if (req.role === "active" && req.id === "g") return decoded
+            let other = document.createElement("img")
+            other.src = `blob:${req.role}:${req.id}`
+            return other
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [{ id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }] })
+        await vi.waitFor(() => {
+            expect(root.querySelector("[data-yorozu-media-stage]")).toBe(decoded)
+        })
+        let req = decode.mock.calls.find((call) => (call[0] as { role: string }).role === "active")![0] as {
+            id: string
+            role: string
+            src: string
+        }
+        expect(req).toMatchObject({ id: "g", role: "active", src: "g.gif" })
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+    })
+
+    it("gif decode under reduced motion uses poster", async () => {
+        let decoded = document.createElement("img")
+        decoded.src = "blob:gif-poster"
+        let decode = vi.fn(async () => decoded)
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        viewer.open({ items: [{ id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }] })
+        await vi.waitFor(() => {
+            expect(root.querySelector("[data-yorozu-media-stage]")).toBe(decoded)
+        })
+        expect(decode.mock.calls[0]![0]).toMatchObject({ id: "g", role: "active", src: "g.jpg" })
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+    })
+
+    it("gif swipe still navigates", () => {
+        viewer.open({
+            items: [{ id: "g", kind: "gif", src: "g.gif" }, img("b")],
+            index: 0,
+            filmstrip: false,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 300, clientY: 200 }))
+        expect(viewer.snapshot().index).toBe(1)
+        expect(viewer.lastNav()).toBe("swipe")
+    })
+
     it("detach removes overlay and stops keys", () => {
         viewer.open({ items: [img("a"), img("b")], index: 0 })
         expect(root.querySelector("[data-yorozu-media-viewer]")).toBeTruthy()

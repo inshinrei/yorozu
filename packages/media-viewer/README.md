@@ -20,6 +20,10 @@ chromeApi.onZoomChange(() => {
 
 Idle 100% view does not hold an animation-frame pump. Settle lerps through `@yorozu/animations` `onAnimationFrame` and unsubscribes at rest.
 
+## Gif
+
+`kind: "gif"` paints an `<img data-yorozu-media-stage>` (not `<video>`). It is not zoom-as-photo: pinch, wheel-zoom, and chrome `zoomIn` apply only to `"image"`. Swipe still navigates. Reduced motion uses `poster` when set, otherwise `src`. Motion on uses `src` (the browser loops the GIF). When `decode` is set, the active gif uses the same port path as an image (`role: "active"`). Neighbor peeks use `src` / decode like images.
+
 ## Decode
 
 Omit `decode` to keep today's `<img src>` / poster path. Attach does not call the port.

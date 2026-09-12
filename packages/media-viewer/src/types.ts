@@ -1,6 +1,6 @@
 import type { MediaDecodeBudget, MediaDecodeRequest } from "./decode"
 
-export type MediaKind = "image" | "video"
+export type MediaKind = "image" | "video" | "gif"
 
 export type MediaViewerItem = {
     id: string

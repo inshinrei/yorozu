@@ -36,6 +36,10 @@ const TAP_MOVE_PX: number = 10
 
 type SlotName = "header" | "footer" | "overlay"
 
+function isZoomable(item: MediaViewerItem | MediaViewerNeighbor | null | undefined): boolean {
+    return item?.kind === "image"
+}
+
 function paddingPx(raw: string | undefined, fallback: number): number {
     if (raw == null || raw === "") return fallback
     let n = parseFloat(raw)
@@ -131,7 +135,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (!overlay || !viewer.snapshot().open) return false
             if (shell && shell.openPhase() !== "open") return false
             let current = viewer.snapshot().current
-            if (current?.kind === "image" && zoom.isZoomed()) return false
+            if (isZoomable(current) && zoom.isZoomed()) return false
             return true
         },
         getCanOlder: (): boolean => viewer.snapshot().canOlder,
@@ -486,10 +490,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (viewer.snapshot().open) viewer.forceClose()
     }
 
-    function isImage(): boolean {
-        return viewer.snapshot().current?.kind === "image"
-    }
-
     let api: MediaViewerChromeApi = {
         close: (closeOpts?: { ghost?: boolean }): void => {
             requestViewerClose(closeOpts)
@@ -507,17 +507,17 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             viewer.goTo(index)
         },
         zoomIn: (): void => {
-            if (!isImage()) return
+            if (!isZoomable(viewer.snapshot().current)) return
             zoom.zoomIn()
             scheduleRender()
         },
         zoomOut: (): void => {
-            if (!isImage()) return
+            if (!isZoomable(viewer.snapshot().current)) return
             zoom.zoomOut()
             scheduleRender()
         },
         resetZoom: (): void => {
-            if (!isImage()) return
+            if (!isZoomable(viewer.snapshot().current)) return
             zoom.reset()
             scheduleRender()
         },
@@ -553,10 +553,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 if (!viewer.snapshot().open) return false
                 if (shell && shell.openPhase() !== "open") return false
                 let current = viewer.snapshot().current
-                if (current?.kind === "image" && zoom.isZoomed()) return false
+                if (isZoomable(current) && zoom.isZoomed()) return false
                 return true
             },
-            getAllowZoom: (): boolean => viewer.snapshot().current?.kind === "image",
+            getAllowZoom: (): boolean => isZoomable(viewer.snapshot().current),
         })
     }
 
@@ -670,6 +670,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         pane.append(loading)
     }
 
+    function activeBitmapSrc(item: MediaViewerItem | MediaViewerNeighbor): string | null {
+        if (item.kind === "gif" && reducedMotion()) {
+            return item.poster || item.src || null
+        }
+        return item.src || null
+    }
+
     function fillActive(pane: HTMLElement, item: MediaViewerItem | MediaViewerNeighbor): void {
         if (item.kind === "video") {
             let video = document.createElement("video")
@@ -690,48 +697,53 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             video.addEventListener("loadeddata", clearLoading)
             return
         }
-        if (!item.src) {
+        let src = activeBitmapSrc(item)
+        if (!src) {
             let loading = document.createElement("div")
             loading.setAttribute("data-yorozu-media-loading", "")
             pane.append(loading)
             return
         }
         let hostDecode = viewer.decodeFn()
-        let wrap = document.createElement("div")
-        wrap.setAttribute("data-yorozu-media-zoom", "")
+        let zoomable = isZoomable(item)
+        let host: HTMLElement = pane
+        if (zoomable) {
+            let wrap = document.createElement("div")
+            wrap.setAttribute("data-yorozu-media-zoom", "")
+            pane.append(wrap)
+            host = wrap
+        }
         if (hostDecode) {
             let loading = document.createElement("div")
             loading.setAttribute("data-yorozu-media-loading", "")
-            wrap.append(loading)
-            pane.append(wrap)
+            host.append(loading)
             let key = paneKeys.get(pane)
             let alt = "alt" in item && item.alt ? item.alt : ""
             void decodePort
-                .request({ id: item.id, role: "active", src: item.src, decode: hostDecode })
+                .request({ id: item.id, role: "active", src, decode: hostDecode })
                 .then((source: CanvasImageSource | null): void => {
                     if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-                    wrap.replaceChildren()
+                    host.replaceChildren()
                     if (source) {
-                        let painted = applyCanvasImageSource(wrap, source, { stage: true, alt })
-                        if (painted instanceof HTMLImageElement) {
+                        let painted = applyCanvasImageSource(host, source, { stage: true, alt })
+                        if (zoomable && painted instanceof HTMLImageElement) {
                             painted.addEventListener("load", () => measureZoom())
                             if (painted.complete) measureZoom()
                             return
                         }
                     }
-                    measureZoom()
+                    if (zoomable) measureZoom()
                 })
             return
         }
         let image = document.createElement("img")
         image.setAttribute("data-yorozu-media-stage", "")
-        image.src = item.src
+        image.src = src
         image.alt = "alt" in item && item.alt ? item.alt : ""
         image.draggable = false
-        image.addEventListener("load", () => measureZoom())
-        wrap.append(image)
-        pane.append(wrap)
-        if (image.complete) measureZoom()
+        if (zoomable) image.addEventListener("load", () => measureZoom())
+        host.append(image)
+        if (zoomable && image.complete) measureZoom()
     }
 
     function syncPane(
@@ -1171,7 +1183,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function startPinch(): void {
-        if (!isImage()) return
+        if (!isZoomable(viewer.snapshot().current)) return
         pinching = true
         tapMoved = true
         if (zoomDragging) {
@@ -1203,7 +1215,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             }
         }
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-        if (isImage() && pointers.size >= 2) {
+        if (isZoomable(viewer.snapshot().current) && pointers.size >= 2) {
             if (!pinching) startPinch()
             scheduleRender()
             return
@@ -1239,7 +1251,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (tapPointerId === e.pointerId) {
             if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > TAP_MOVE_PX) {
                 tapMoved = true
-                if (!zoomDragging && !pinching && isImage() && zoom.isZoomed()) {
+                if (!zoomDragging && !pinching && isZoomable(viewer.snapshot().current) && zoom.isZoomed()) {
                     zoom.beginDrag()
                     zoomDragging = true
                     let start = zoom.getDragStartTranslate()
@@ -1303,7 +1315,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function onViewportWheel(e: WheelEvent): void {
-        if (isImage()) {
+        if (isZoomable(viewer.snapshot().current)) {
             let intent = wheelIntent(zoom.isZoomed(), e.ctrlKey || e.metaKey)
             if (intent === "zoom") {
                 e.preventDefault()
