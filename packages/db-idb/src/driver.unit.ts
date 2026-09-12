@@ -236,7 +236,9 @@ describe("createIdbDriver", () => {
         let driver = createIdbDriver({ dbName: nextName() })
         let db = await driver.open(schema)
         await expect(
-            db.transact(["files"], "r", (tx) => tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} })),
+            db.transact(["files"], "r", (tx) =>
+                tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} }),
+            ),
         ).rejects.toThrow(/read-only/)
         await db.close()
     })
@@ -567,10 +569,10 @@ describe("createIdbDriver", () => {
     })
 
     it("getMany dedupes repeated cold keys into one store.get", async () => {
-        let driver = createIdbDriver({dbName: nextName()})
+        let driver = createIdbDriver({ dbName: nextName() })
         let db = await driver.open(schema)
         let col = db.collection<FileRow>("files")
-        await col.put(fileRow({key: "a"}))
+        await col.put(fileRow({ key: "a" }))
         let get = vi.spyOn(IDBObjectStore.prototype, "get")
         expect((await col.getMany(["a", "a", "a"])).map((r) => r?.key)).toEqual(["a", "a", "a"])
         expect(get.mock.calls.length).toBe(1)
@@ -578,18 +580,43 @@ describe("createIdbDriver", () => {
     })
 
     it("scan limit skips a pending update that moved off the prefix", async () => {
-        let driver = createIdbDriver({dbName: nextName(), deferPut: () => true})
+        let driver = createIdbDriver({ dbName: nextName(), deferPut: () => true })
         let db = await driver.open(schema)
         let col = db.collection<FileRow>("files")
         await col.putMany([
-            fileRow({key: "a", storedAt: 1}),
-            fileRow({key: "b", storedAt: 2}),
-            fileRow({key: "c", storedAt: 3}),
-            fileRow({key: "d", storedAt: 4}),
+            fileRow({ key: "a", storedAt: 1 }),
+            fileRow({ key: "b", storedAt: 2 }),
+            fileRow({ key: "c", storedAt: 3 }),
+            fileRow({ key: "d", storedAt: 4 }),
         ])
-        await col.put(fileRow({key: "a", storedAt: 99}), {flush: "batch"})
-        let hits = await col.scan("by-evict", {keysOnly: true, limit: 2})
+        await col.put(fileRow({ key: "a", storedAt: 99 }), { flush: "batch" })
+        let hits = await col.scan("by-evict", { keysOnly: true, limit: 2 })
         expect(hits.map((h) => h.primaryKey)).toEqual(["b", "c"])
+        await db.close()
+    })
+
+    it("scan direction rev returns highest keys first and applies limit from that end", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.putMany([fileRow({ key: "a" }), fileRow({ key: "b" }), fileRow({ key: "c" }), fileRow({ key: "d" })])
+        let all = await col.scan("__pk", { direction: "rev", keysOnly: true })
+        expect(all.map((h) => h.primaryKey)).toEqual(["d", "c", "b", "a"])
+        let limited = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
+        expect(limited.map((h) => h.primaryKey)).toEqual(["d", "c"])
+        let fwd = await col.scan("__pk", { keysOnly: true, limit: 2 })
+        expect(fwd.map((h) => h.primaryKey)).toEqual(["a", "b"])
+        await db.close()
+    })
+
+    it("scan direction rev + pending merge still limits from the high end", async () => {
+        let driver = createIdbDriver({ dbName: nextName(), deferPut: () => true })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.putMany([fileRow({ key: "a" }), fileRow({ key: "b" }), fileRow({ key: "c" })])
+        await col.put(fileRow({ key: "z" }), { flush: "batch" })
+        let hits = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
+        expect(hits.map((h) => h.primaryKey)).toEqual(["z", "c"])
         await db.close()
     })
 })

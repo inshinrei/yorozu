@@ -27,6 +27,7 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - One table per collection: `pk TEXT PRIMARY KEY`, `payload TEXT` (JSON minus blob fields), plus `"<index>__<i>"` columns (TEXT/REAL). Sidecar `"<collection>__blobs"` `(pk, field, data BLOB)`.
 - `get` rehydrates `Blob` when `Blob` exists, otherwise `Uint8Array`.
 - Reserved index `"__pk"`: primary-key walk, even if not in `CollectionDef.indexes`.
+- `scan(..., { direction: "rev" })` returns the highest keys first; omit = fwd.
 - `scan(..., { keysOnly: true })` is `SELECT pk, index columns` only. Never `payload`, never join `__blobs`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` (`[cutoff] < [cutoff, 0]`).
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `"rw"` transact commit, not `"r"`. `flush()` coalesces by `(collection, pk)`. Sync put batches use better-sqlite3 `db.transaction`.

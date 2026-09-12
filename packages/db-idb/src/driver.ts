@@ -77,6 +77,12 @@ function indexKeyPath(def: CollectionDef, name: string): string | readonly strin
     return idx.keyPath
 }
 
+function compareHits(a: ScanHit<unknown>, b: ScanHit<unknown>, rev: boolean): number {
+    let c = compareIndexKey(a.indexKey, b.indexKey)
+    if (c === 0) c = compareIndexKey(a.primaryKey, b.primaryKey)
+    return rev ? -c : c
+}
+
 class SerialQueue {
     protected _tail: Promise<void> = Promise.resolve()
 
@@ -438,8 +444,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
             countReq = store.count()
             if (pending && pending.size > 0) {
                 for (let pk of pending.keys()) {
-                    let req =
-                        typeof store.getKey === "function" ? store.getKey(pk) : store.get(pk)
+                    let req = typeof store.getKey === "function" ? store.getKey(pk) : store.get(pk)
                     probeReqs.push(req)
                 }
             }
@@ -474,6 +479,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         let range = toIdbKeyRange(bound, this._keyRange)
         let pending = this._colPending()
         let hits: Array<ScanHit<T>> = []
+        let dir: IDBCursorDirection = bound.direction === "rev" ? "prev" : "next"
         if (range !== null) {
             let keysOnly = bound.keysOnly === true
             let limit = bound.limit === undefined ? undefined : Math.max(0, bound.limit)
@@ -481,7 +487,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
                 await runTx(this._idb(), [this.name], "readonly", (tx) => {
                     let store = tx.objectStore(this.name)
                     let source: IDBObjectStore | IDBIndex = index === "__pk" ? store : store.index(index)
-                    let req = keysOnly ? source.openKeyCursor(range) : source.openCursor(range)
+                    let req = keysOnly ? source.openKeyCursor(range, dir) : source.openCursor(range, dir)
                     let live = 0
                     req.onsuccess = () => {
                         let cursor = req.result
@@ -529,11 +535,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
             if (bound.keysOnly) out.push({ primaryKey: pk, indexKey })
             else out.push({ primaryKey: pk, indexKey, value: entry.row as T })
         }
-        out.sort((a, b) => {
-            let c = compareIndexKey(a.indexKey, b.indexKey)
-            if (c !== 0) return c
-            return compareIndexKey(a.primaryKey, b.primaryKey)
-        })
+        out.sort((a, b) => compareHits(a, b, bound.direction === "rev"))
         return out
     }
 }

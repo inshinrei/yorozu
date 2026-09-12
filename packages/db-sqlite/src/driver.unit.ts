@@ -404,7 +404,9 @@ describe("createSqliteDriver", () => {
         let driver = createSqliteDriver({ filename: ":memory:" })
         let db = await driver.open(schema)
         await expect(
-            db.transact(["files"], "r", (tx) => tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} })),
+            db.transact(["files"], "r", (tx) =>
+                tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} }),
+            ),
         ).rejects.toThrow(/read-only/)
         await db.close()
     })
@@ -474,6 +476,20 @@ describe("createSqliteDriver", () => {
         let hits = await col.scan("__pk")
         expect(hits.map((h) => h.primaryKey)).toEqual(["a", "b", "c"])
         expect(hits[0]?.value).toEqual(a)
+        await db.close()
+    })
+
+    it("scan direction rev returns highest keys first and applies limit from that end", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.putMany([fileRow({ key: "a" }), fileRow({ key: "b" }), fileRow({ key: "c" }), fileRow({ key: "d" })])
+        let all = await col.scan("__pk", { direction: "rev", keysOnly: true })
+        expect(all.map((h) => h.primaryKey)).toEqual(["d", "c", "b", "a"])
+        let limited = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
+        expect(limited.map((h) => h.primaryKey)).toEqual(["d", "c"])
+        let fwd = await col.scan("__pk", { keysOnly: true, limit: 2 })
+        expect(fwd.map((h) => h.primaryKey)).toEqual(["a", "b"])
         await db.close()
     })
 

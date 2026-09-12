@@ -29,6 +29,7 @@ export type ScanBound = {
      * ScanHit.value is omitted.
      */
     keysOnly?: boolean
+    direction?: "fwd" | "rev"
 }
 
 export type ScanHit<T> = {

@@ -9,6 +9,7 @@ Public types must never mention IndexedDB or SQLite. Drivers live in other packa
 Musts:
 
 - Reserved index `"__pk"`: primary-key walk in key order, even if it is not in `CollectionDef.indexes`.
+- `scan(..., { direction: "rev" })` returns the highest keys first; omit = fwd.
 - `scan(..., { keysOnly: true })` must not materialize row values. Omit `ScanHit.value` entirely. Do not clone blobs.
 - Bounds use `compareIndexKey`: number < string < array. A shorter prefix-equal array is less (`[cutoff] < [cutoff, 0]`). Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff`.
 - `getMany` preserves input key order; missing keys are `null`.

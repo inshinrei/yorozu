@@ -105,6 +105,12 @@ function indexKeyPath(def: CollectionDef, name: string): string | readonly strin
     return idx.keyPath
 }
 
+function compareHits(a: ScanHit<unknown>, b: ScanHit<unknown>, rev: boolean): number {
+    let c = compareIndexKey(a.indexKey, b.indexKey)
+    if (c === 0) c = compareIndexKey(a.primaryKey, b.primaryKey)
+    return rev ? -c : c
+}
+
 function isBlobish(value: unknown): boolean {
     if (typeof Blob !== "undefined" && value instanceof Blob) return true
     if (typeof ArrayBuffer !== "undefined" && value instanceof ArrayBuffer) return true
@@ -698,11 +704,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
             if (!keysOnly && valueByPk.size > 0) this._attachBlobs(valueByPk, [...valueByPk.keys()])
         }
         if (pending && pending.size > 0) hits = this._mergePending(index, bound, hits, pending)
-        hits.sort((a, b) => {
-            let c = compareIndexKey(a.indexKey, b.indexKey)
-            if (c !== 0) return c
-            return compareIndexKey(a.primaryKey, b.primaryKey)
-        })
+        hits.sort((a, b) => compareHits(a, b, bound.direction === "rev"))
         if (bound.limit !== undefined) hits = hits.slice(0, Math.max(0, bound.limit))
         return hits
     }
@@ -723,11 +725,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
             if (bound.keysOnly) out.push({ primaryKey: pk, indexKey })
             else out.push({ primaryKey: pk, indexKey, value: write.row as T })
         }
-        out.sort((a, b) => {
-            let c = compareIndexKey(a.indexKey, b.indexKey)
-            if (c !== 0) return c
-            return compareIndexKey(a.primaryKey, b.primaryKey)
-        })
+        out.sort((a, b) => compareHits(a, b, bound.direction === "rev"))
         return out
     }
 }

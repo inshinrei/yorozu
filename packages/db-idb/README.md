@@ -27,6 +27,7 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 
 - Object store / index names match `CollectionDef` (no extra prefixes).
 - Reserved index `"__pk"`: primary-key walk, even if not in `CollectionDef.indexes`.
+- `scan(..., { direction: "rev" })` returns the highest keys first; omit = fwd.
 - `scan(..., { keysOnly: true })` uses `openKeyCursor`. Never reads `cursor.value`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` via IDB array keys (`[cutoff] < [cutoff, 0]`).
 - `getMany` / `putMany` / `delete` share one IDB transaction.

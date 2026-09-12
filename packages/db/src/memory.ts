@@ -41,11 +41,17 @@ function primaryKeyOf(row: Record<string, unknown>, keyPath: string): string {
 
 function withStringPk<T extends Record<string, unknown>>(row: T, keyPath: string, pk: string): T {
     if (row[keyPath] === pk) return row
-    return {...row, [keyPath]: pk}
+    return { ...row, [keyPath]: pk }
 }
 
 function cloneRow<T extends Record<string, unknown>>(row: T): T {
-    return {...row}
+    return { ...row }
+}
+
+function compareHits(a: ScanHit<unknown>, b: ScanHit<unknown>, rev: boolean): number {
+    let c = compareIndexKey(a.indexKey, b.indexKey)
+    if (c === 0) c = compareIndexKey(a.primaryKey, b.primaryKey)
+    return rev ? -c : c
 }
 
 class MemoryCollection<T extends Record<string, unknown>> implements Collection<T> {
@@ -132,17 +138,12 @@ class MemoryCollection<T extends Record<string, unknown>> implements Collection<
                 if (indexKey === undefined) continue
                 if (!inRange(indexKey, bound)) continue
                 hits.push(
-                    bound.keysOnly
-                        ? { primaryKey: pk, indexKey }
-                        : { primaryKey: pk, indexKey, value: cloneRow(row) },
+                    bound.keysOnly ? { primaryKey: pk, indexKey } : { primaryKey: pk, indexKey, value: cloneRow(row) },
                 )
             }
         }
-        hits.sort((a, b) => {
-            let c = compareIndexKey(a.indexKey, b.indexKey)
-            if (c !== 0) return c
-            return compareIndexKey(a.primaryKey, b.primaryKey)
-        })
+        let rev = bound.direction === "rev"
+        hits.sort((a, b) => compareHits(a, b, rev))
         if (bound.limit !== undefined) {
             hits = hits.slice(0, Math.max(0, bound.limit))
         }

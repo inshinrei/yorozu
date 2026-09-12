@@ -107,6 +107,20 @@ describe("openMemoryDb", () => {
         expect(hits[0]).not.toHaveProperty("blob")
     })
 
+    it("scan direction rev returns highest keys first and applies limit from that end", async () => {
+        let db = await openMemoryDb(schema)
+        let col = db.collection<ResourceRow>("files")
+        await col.putMany([row({ key: "a" }), row({ key: "b" }), row({ key: "c" }), row({ key: "d" })])
+        let all = await col.scan("__pk", { direction: "rev", keysOnly: true })
+        expect(all.map((h) => h.primaryKey)).toEqual(["d", "c", "b", "a"])
+        let limited = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
+        expect(limited.map((h) => h.primaryKey)).toEqual(["d", "c"])
+        let fwd = await col.scan("__pk", { keysOnly: true, limit: 2 })
+        expect(fwd.map((h) => h.primaryKey)).toEqual(["a", "b"])
+        let bounded = await col.scan("__pk", { gte: "b", lt: "d", direction: "rev", keysOnly: true })
+        expect(bounded.map((h) => h.primaryKey)).toEqual(["c", "b"])
+    })
+
     it("nested transact throws", async () => {
         let db = await openMemoryDb(schema)
         await expect(
@@ -199,7 +213,9 @@ describe("openMemoryDb", () => {
     it("callback collection rejects writes in read transact", async () => {
         let db = await openMemoryDb(schema)
         await expect(
-            db.transact(["files"], "r", (tx) => tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} })),
+            db.transact(["files"], "r", (tx) =>
+                tx.collection("files").put({ key: "x", storedAt: 1, bytes: 0, meta: {} }),
+            ),
         ).rejects.toThrow(/read-only/)
     })
 
@@ -228,34 +244,34 @@ describe("openMemoryDb", () => {
     it("coerces a non-string primary key field to string", async () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")
-        await col.put({key: 1, storedAt: 0, bytes: 0, meta: {}} as unknown as ResourceRow)
-        expect(await col.get("1")).toEqual({key: "1", storedAt: 0, bytes: 0, meta: {}})
+        await col.put({ key: 1, storedAt: 0, bytes: 0, meta: {} } as unknown as ResourceRow)
+        expect(await col.get("1")).toEqual({ key: "1", storedAt: 0, bytes: 0, meta: {} })
     })
 
     it("does not alias put/get row objects", async () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")
-        let rec = row({key: "a", storedAt: 1})
+        let rec = row({ key: "a", storedAt: 1 })
         await col.put(rec)
         rec.storedAt = 99
         let got = await col.get("a")
-        expect(got).toEqual(row({key: "a", storedAt: 1}))
+        expect(got).toEqual(row({ key: "a", storedAt: 1 }))
         got!.storedAt = 42
-        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        expect(await col.get("a")).toMatchObject({ storedAt: 1 })
         let many = await col.getMany(["a"])
         many[0]!.storedAt = 7
-        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        expect(await col.get("a")).toMatchObject({ storedAt: 1 })
     })
 
     it("getAll and scan value hits do not alias stored rows", async () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")
-        await col.put(row({key: "a", storedAt: 1}))
+        await col.put(row({ key: "a", storedAt: 1 }))
         let all = await col.getAll()
         all[0]!.storedAt = 99
-        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        expect(await col.get("a")).toMatchObject({ storedAt: 1 })
         let hits = await col.scan("by-evict")
         hits[0]!.value!.storedAt = 7
-        expect(await col.get("a")).toMatchObject({storedAt: 1})
+        expect(await col.get("a")).toMatchObject({ storedAt: 1 })
     })
 })
