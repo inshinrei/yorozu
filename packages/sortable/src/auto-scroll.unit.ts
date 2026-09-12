@@ -202,4 +202,47 @@ describe("createSortableAutoScroll", () => {
         expect(expected).toBeGreaterThan(8)
         expect(getScroll()).toBe(expected)
     })
+
+    it("calls onAutoScroll with applied delta and viewport after a write", () => {
+        let { vp, getScroll } = makeViewport("y")
+        let raf = mockRaf()
+        rafRestore = raf.restore
+        let onAutoScroll = vi.fn()
+        let loop = createSortableAutoScroll({
+            axis: "y",
+            zone: 60,
+            maxStep: 8,
+            getPointer: () => 250,
+            isDragging: () => true,
+            onScrolled: () => {},
+            onAutoScroll,
+        })
+        loop.begin(vp)
+        loop.kick()
+        raf.flush(1)
+        let applied = getScroll()
+        expect(applied).toBeGreaterThan(0)
+        expect(onAutoScroll).toHaveBeenCalledTimes(1)
+        expect(onAutoScroll).toHaveBeenCalledWith(applied, vp)
+    })
+
+    it("does not call onAutoScroll when clamp blocks the write", () => {
+        let { vp } = makeViewport("y", { client: 100, scrollSize: 100, start: 0, scroll: 0 })
+        let raf = mockRaf()
+        rafRestore = raf.restore
+        let onAutoScroll = vi.fn()
+        let loop = createSortableAutoScroll({
+            axis: "y",
+            zone: 60,
+            maxStep: 8,
+            getPointer: () => 90,
+            isDragging: () => true,
+            onScrolled: () => {},
+            onAutoScroll,
+        })
+        loop.begin(vp)
+        loop.kick()
+        raf.flush(3)
+        expect(onAutoScroll).not.toHaveBeenCalled()
+    })
 })

@@ -64,6 +64,7 @@ While dragging, the session scrolls the nearest overflow parent (or `getViewport
 - Scroll-max is frozen at drag begin so a lifted transform cannot grow the range.
 - Math helpers `computeAutoScrollDelta` / `computeAutoScrollDeltaX` / `computeAutoScrollDelta1d` are exported for hosts that drive their own loop.
 - `createSortableAutoScroll` is exported for hosts that drive a gesture without a session (the session still constructs it internally). Hosts may pass `maxStep: 18` (or `autoScrollMaxPxPerFrame: 18`) to keep the old cap.
+- Optional `onAutoScroll(delta, viewport)` runs after each applied write so a virtual list can expand its mounted window. Session option of the same name is forwarded.
 
 ## Virtual lists
 

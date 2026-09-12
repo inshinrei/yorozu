@@ -52,6 +52,7 @@ export function createSortableAutoScroll(opts: {
     getPointer: () => number
     isDragging: () => boolean
     onScrolled: (scrollDelta: number) => void
+    onAutoScroll?: (delta: number, viewport: HTMLElement) => void
 }): SortableAutoScroll {
     let viewport: HTMLElement | null = null
     let startScroll = 0
@@ -84,6 +85,7 @@ export function createSortableAutoScroll(opts: {
             if (next !== cur) {
                 writeAxisScroll(vp, opts.axis, next)
                 applied = true
+                opts.onAutoScroll?.(next - cur, vp)
             }
             if (readAxisScroll(vp, opts.axis) > scrollMaxAtStart) {
                 writeAxisScroll(vp, opts.axis, scrollMaxAtStart)

@@ -30,6 +30,7 @@ export type SortableSessionOptions<T> = {
     activation?: SortableActivation
     canDragKey?: (key: string | number) => boolean
     onDragEnd?: (reason: "pointerup" | "cancel") => void
+    onAutoScroll?: (delta: number, viewport: HTMLElement) => void
 }
 
 export type SortableItemHandle = {
@@ -104,6 +105,7 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
             if (nextIdx !== insertIndex) insertIndex = nextIdx
             notify()
         },
+        onAutoScroll: options.onAutoScroll,
     })
 
     function notify(): void {

@@ -127,6 +127,7 @@ function setup(opts?: {
     canDragKey?: (key: string | number) => boolean
     onDragEnd?: (reason: "pointerup" | "cancel") => void
     onReorder?: (items: string[]) => void
+    onAutoScroll?: (delta: number, viewport: HTMLElement) => void
 }) {
     let items = opts?.items ?? ["a", "b", "c"]
     let onReorder = vi.fn(opts?.onReorder)
@@ -140,6 +141,7 @@ function setup(opts?: {
         activation: opts?.activation,
         canDragKey: opts?.canDragKey,
         onDragEnd: opts?.onDragEnd,
+        onAutoScroll: opts?.onAutoScroll,
     })
     sessions.push(session)
     return { session, onReorder, items }
@@ -485,6 +487,22 @@ describe("createSortableSession auto-scroll", () => {
         expect(session.getOverlayOffset()).toBe(pointerDelta)
         expect(session.getOffset("a")).toBe(pointerDelta + scrolled)
         expect(session.getOffset("b")).toBe(-40)
+    })
+
+    it("forwards onAutoScroll from the session after an applied scroll write", () => {
+        let { vp, getScroll } = makeViewport("y")
+        let raf = mockRaf()
+        rafRestore = raf.restore
+        let onAutoScroll = vi.fn()
+        let { session } = setup({ getViewport: () => vp, onAutoScroll })
+        registerKeys(session, ["a", "b", "c"])
+        session.pointerDown("a", pointer("pointerdown", 0, 20))
+        moveTo(0, 250)
+        raf.flush(1)
+        expect(getScroll()).toBeGreaterThan(0)
+        expect(onAutoScroll).toHaveBeenCalledTimes(1)
+        expect(onAutoScroll.mock.calls[0]![0]).toBe(getScroll())
+        expect(onAutoScroll.mock.calls[0]![1]).toBe(vp)
     })
 })
 
