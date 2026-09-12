@@ -61,6 +61,28 @@ describe("createVirtualList", () => {
         list.destroy()
     })
 
+    it("onScroll does not copy the spine when first-visible stays inside the window", () => {
+        let items: readonly string[] = ids(100)
+        let slice = vi.spyOn(items as string[], "slice")
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+        })
+        list.sync()
+        slice.mockClear()
+        list.onScroll({ scrollTop: 40, viewportHeight: 80 })
+        expect(slice).not.toHaveBeenCalled()
+        expect(list.viewportIds()).toEqual(["c0", "c1", "c2", "c3", "c4"])
+        list.getMore("backwards")
+        expect(slice).toHaveBeenCalled()
+        slice.mockClear()
+        list.onScroll({ scrollTop: 40 * 80, viewportHeight: 200 })
+        expect(slice).toHaveBeenCalled()
+        expect(list.viewportIds()?.includes("c80")).toBe(true)
+        list.destroy()
+    })
+
     it("expands backwards when scrolling toward the mounted bottom", () => {
         let items = ids(100)
         let list = createVirtualList({

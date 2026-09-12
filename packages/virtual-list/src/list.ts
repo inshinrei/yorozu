@@ -299,13 +299,12 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
 
         firePaintedRange(metrics.scrollTop, metrics.viewportHeight)
 
-        let source = sourceIds()
-        let count = source.length
+        let count = options.getItems().length
         let from = controller.fromOffset
         let mountedCount = controller.viewportIds?.length ?? 0
         let first = firstVisibleIndex()
         if (first < from - 2 || first >= from + mountedCount + 2) {
-            let changed = controller.reanchorAtIndex(source, first)
+            let changed = controller.reanchorAtIndex(sourceIds(), first)
             edgeState.lastScrollTop = undefined
             scheduleIdleTrim()
             notifyIfChanged(changed)
