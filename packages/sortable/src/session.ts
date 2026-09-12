@@ -7,7 +7,7 @@ import {
     type SortableAxis,
 } from "./geometry"
 import { estimateAxisSnapshots } from "./virtual"
-import { HOLD_ACTIVATION, POINTER_ACTIVATION, SORTABLE_FEEL, type SortableActivation } from "./feel"
+import { HOLD_ACTIVATION, POINTER_ACTIVATION, SORTABLE_FEEL, type SortableActivation, type SortableFeel } from "./feel"
 import {
     AUTO_SCROLL_MAX_PX_PER_FRAME,
     AUTO_SCROLL_ZONE_PX,
@@ -31,6 +31,8 @@ export type SortableSessionOptions<T> = {
     canDragKey?: (key: string | number) => boolean
     onDragEnd?: (reason: "pointerup" | "cancel") => void
     onAutoScroll?: (delta: number, viewport: HTMLElement) => void
+    reducedMotion?: () => boolean
+    feel?: Partial<SortableFeel>
 }
 
 export type SortableItemHandle = {
@@ -42,7 +44,9 @@ export type SortableSession = {
     get draggingKey(): string | number | null
     get insertIndex(): number | null
     get isActive(): boolean
+    get axis(): SortableAxis
     get liftScale(): number
+    get siblingTransition(): string
     subscribe(listener: () => void): () => void
     registerItem(node: HTMLElement, key: string | number): SortableItemHandle
     getOffset(key: string | number): number
@@ -72,6 +76,7 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
     let zone = options.autoScrollZonePx ?? AUTO_SCROLL_ZONE_PX
     let maxStep = options.autoScrollMaxPxPerFrame ?? AUTO_SCROLL_MAX_PX_PER_FRAME
     let activation = options.activation ?? POINTER_ACTIVATION
+    let feel: SortableFeel = { ...SORTABLE_FEEL, ...options.feel }
 
     let draggingKey: string | number | null = null
     let pendingKey: string | number | null = null
@@ -432,8 +437,16 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         get isActive(): boolean {
             return draggingKey != null
         },
+        get axis(): SortableAxis {
+            return axis
+        },
         get liftScale(): number {
-            return SORTABLE_FEEL.liftScale
+            if (options.reducedMotion?.()) return 1
+            return feel.liftScale
+        },
+        get siblingTransition(): string {
+            if (options.reducedMotion?.()) return "none"
+            return `${feel.siblingMs}ms ${feel.siblingEase}`
         },
         subscribe(listener: () => void): () => void {
             listeners.add(listener)

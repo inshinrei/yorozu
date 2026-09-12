@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { computeAutoScrollDelta, computeAutoScrollDeltaX } from "./auto-scroll-geometry"
-import { HOLD_ACTIVATION, SORTABLE_FEEL } from "./feel"
+import { HOLD_ACTIVATION, SORTABLE_FEEL, type SortableFeel } from "./feel"
 import { createSortableSession, findScrollParent } from "./session"
 import type { SortableAxis } from "./geometry"
 
@@ -128,6 +128,8 @@ function setup(opts?: {
     onDragEnd?: (reason: "pointerup" | "cancel") => void
     onReorder?: (items: string[]) => void
     onAutoScroll?: (delta: number, viewport: HTMLElement) => void
+    reducedMotion?: () => boolean
+    feel?: Partial<SortableFeel>
 }) {
     let items = opts?.items ?? ["a", "b", "c"]
     let onReorder = vi.fn(opts?.onReorder)
@@ -142,6 +144,8 @@ function setup(opts?: {
         canDragKey: opts?.canDragKey,
         onDragEnd: opts?.onDragEnd,
         onAutoScroll: opts?.onAutoScroll,
+        reducedMotion: opts?.reducedMotion,
+        feel: opts?.feel,
     })
     sessions.push(session)
     return { session, onReorder, items }
@@ -558,5 +562,41 @@ describe("findScrollParent", () => {
             vi.restoreAllMocks()
             parent.remove()
         }
+    })
+})
+
+describe("createSortableSession reduced-motion feel", () => {
+    it("defaults to authored liftScale and sibling transition", () => {
+        let { session } = setup()
+        expect(session.axis).toBe("y")
+        expect(session.liftScale).toBe(1.05)
+        expect(session.siblingTransition).toBe("250ms cubic-bezier(0.42, 0, 0.58, 1)")
+    })
+
+    it("maps liftScale to 1 and siblingTransition to none while reducedMotion() is true", () => {
+        let reduced = true
+        let { session } = setup({ reducedMotion: () => reduced })
+        expect(session.liftScale).toBe(1)
+        expect(session.siblingTransition).toBe("none")
+        reduced = false
+        expect(session.liftScale).toBe(1.05)
+        expect(session.siblingTransition).toBe("250ms cubic-bezier(0.42, 0, 0.58, 1)")
+    })
+
+    it("merges partial feel and still zeros lift when reduced", () => {
+        let { session } = setup({
+            feel: { liftScale: 1.2, siblingMs: 100 },
+            reducedMotion: () => true,
+        })
+        expect(session.liftScale).toBe(1)
+        expect(session.siblingTransition).toBe("none")
+        let { session: full } = setup({ feel: { liftScale: 1.2, siblingMs: 100 } })
+        expect(full.liftScale).toBe(1.2)
+        expect(full.siblingTransition).toBe("100ms cubic-bezier(0.42, 0, 0.58, 1)")
+    })
+
+    it("exposes axis x when constructed on x", () => {
+        let { session } = setup({ axis: "x" })
+        expect(session.axis).toBe("x")
     })
 })

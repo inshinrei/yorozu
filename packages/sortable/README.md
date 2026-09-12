@@ -74,7 +74,7 @@ While dragging, the session scrolls the nearest overflow parent (or `getViewport
 
 The session does not paint. Apply `getOffset(key)` (pointer delta + scroll delta for the active row; ± one item for siblings between source and insert) yourself. Viewport-fixed overlays should use `getOverlayOffset()` (pointer delta only).
 
-For reduced motion, keep reading `session.liftScale` / `SORTABLE_FEEL` as authored and map in the host: set lift scale to `1` and sibling transition to `"none"` when the user prefers reduced motion.
+Pass `reducedMotion: () => boolean` (stored product level, not OS MQ). `session.liftScale` is `1` and `session.siblingTransition` is `"none"` while that callback is true. Optional `feel` merges over `SORTABLE_FEEL`.
 
 ## Reorder mode
 
