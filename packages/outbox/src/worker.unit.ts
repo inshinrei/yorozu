@@ -690,4 +690,26 @@ describe("OutboxWorker", () => {
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
+
+    it("requestIdleCallback yield uses timeout 0", async () => {
+        let ric = vi.fn((cb: (deadline: { didTimeout: boolean; timeRemaining(): number }) => void) => {
+            queueMicrotask(() => {
+                cb({
+                    didTimeout: true,
+                    timeRemaining(): number {
+                        return 0
+                    },
+                })
+            })
+            return 1
+        })
+        vi.stubGlobal("requestIdleCallback", ric)
+        vi.stubGlobal("cancelIdleCallback", vi.fn())
+        let { store } = makeRepo([makeEntry({ id: "e1" }), makeEntry({ id: "e2", createdAt: 1_000_001 })])
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        w.start()
+        await flushMicrotasks()
+        expect(ric).toHaveBeenCalled()
+        expect(ric.mock.calls[0]?.[1]).toEqual({ timeout: 0 })
+    })
 })

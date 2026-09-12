@@ -789,6 +789,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
 
 class SqliteDb implements Db {
     readonly schema: DbSchema
+    protected log: Logger
     protected _handle: SqliteHandle
     protected _collections: Map<string, SqliteCollection<Row>>
     protected _gated: Map<string, GatedCollection<Row>>
@@ -803,11 +804,18 @@ class SqliteDb implements Db {
     protected _autoFlush: AutoFlushConfig | null
     protected _idleHandle: IdleHandle | null = null
 
-    constructor(schema: DbSchema, handle: SqliteHandle, onClose: () => void, autoFlush: AutoFlushConfig | null) {
+    constructor(
+        schema: DbSchema,
+        handle: SqliteHandle,
+        onClose: () => void,
+        autoFlush: AutoFlushConfig | null,
+        log: Logger,
+    ) {
         this.schema = schema
         this._handle = handle
         this._onClose = onClose
         this._autoFlush = autoFlush
+        this.log = log
         this._collections = new Map()
         this._gated = new Map()
         this._txView = new NestedTxDb(
@@ -903,7 +911,7 @@ class SqliteDb implements Db {
             scheduleIdle(() => {
                 this._idleHandle = null
                 if (this._closed) return
-                void this.flush({ reason: "idle" })
+                void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
             }, timeout),
         )
     }
@@ -986,6 +994,7 @@ class SqliteDriver implements DbDriver {
                     this._conns.delete(db)
                 },
                 this._autoFlush,
+                this.log,
             )
             this._conns.add(db)
             return db

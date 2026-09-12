@@ -710,4 +710,76 @@ describe("createIdbDriver", () => {
             vi.unstubAllGlobals()
         }
     })
+
+    it("idle auto-flush rejection is swallowed", async () => {
+        let driver = createIdbDriver({
+            dbName: nextName(),
+            autoFlush: { pendingPuts: 50, idleMs: 1000 },
+        })
+        let db = await driver.open(schema)
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        let unhandled: unknown[] = []
+        let onUnhandled = (reason: unknown): void => {
+            unhandled.push(reason)
+        }
+        process.on("unhandledRejection", onUnhandled)
+        try {
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a", storedAt: 1 }), { flush: "batch" })
+            ;(db as unknown as { _idb: IDBDatabase })._idb.close()
+            await vi.advanceTimersByTimeAsync(1000)
+            await Promise.resolve()
+            await Promise.resolve()
+            await new Promise<void>((resolve) => {
+                setImmediate(resolve)
+            })
+            expect(unhandled).toEqual([])
+        } finally {
+            process.off("unhandledRejection", onUnhandled)
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+            try {
+                await db.close()
+            } catch {
+                // raw handle already closed
+            }
+        }
+    })
+
+    it("drop after autoFlush batch put cancels idle", async () => {
+        let driver = createIdbDriver({
+            dbName: nextName(),
+            autoFlush: { pendingPuts: 50, idleMs: 1000 },
+        })
+        let db = await driver.open(schema)
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        let unhandled: unknown[] = []
+        let onUnhandled = (reason: unknown): void => {
+            unhandled.push(reason)
+        }
+        process.on("unhandledRejection", onUnhandled)
+        try {
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a", storedAt: 1 }), { flush: "batch" })
+            let putSpy = vi.spyOn(IDBObjectStore.prototype, "put")
+            await driver.drop!(schema)
+            expect((db as unknown as { _closed: boolean })._closed).toBe(true)
+            expect((db as unknown as { _idleHandle: unknown })._idleHandle).toBeNull()
+            putSpy.mockClear()
+            await vi.advanceTimersByTimeAsync(5000)
+            await Promise.resolve()
+            await Promise.resolve()
+            await new Promise<void>((resolve) => {
+                setImmediate(resolve)
+            })
+            expect(putSpy).not.toHaveBeenCalled()
+            expect(unhandled).toEqual([])
+        } finally {
+            process.off("unhandledRejection", onUnhandled)
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+        }
+    })
 })

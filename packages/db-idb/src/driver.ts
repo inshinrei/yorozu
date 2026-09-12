@@ -590,6 +590,8 @@ class IdbCollection<T extends Row> implements Collection<T> {
 
 class IdbDb implements Db {
     readonly schema: DbSchema
+    readonly idbName: string
+    protected log: Logger
     protected _idb: IDBDatabase
     protected _collections: Map<string, IdbCollection<Row>>
     protected _pending: Pending = new Map()
@@ -610,8 +612,11 @@ class IdbDb implements Db {
         onClose: () => void,
         keyRange: typeof IDBKeyRange,
         autoFlush: AutoFlushConfig | null,
+        log: Logger,
     ) {
         this.schema = schema
+        this.idbName = idb.name
+        this.log = log
         this._idb = idb
         this._onClose = onClose
         this._autoFlush = autoFlush
@@ -713,7 +718,7 @@ class IdbDb implements Db {
         this._idleHandle = scheduleIdle(() => {
             this._idleHandle = null
             if (this._closed) return
-            void this.flush({ reason: "idle" })
+            void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
         }, timeout)
     }
 
@@ -768,7 +773,7 @@ class IdbDriver implements DbDriver {
     protected _dbName: string | undefined
     protected _deferPut: (collectionName: string) => boolean
     protected _autoFlush: AutoFlushConfig | null
-    protected _conns: Set<IDBDatabase> = new Set()
+    protected _conns: Set<IdbDb> = new Set()
 
     constructor(opts: IdbDriverOpts) {
         this.log = makeLog(opts.log ?? makeSilentLog(), "yorozu-db-idb")
@@ -787,17 +792,19 @@ class IdbDriver implements DbDriver {
         }
         let name = this._dbName ?? schema.name
         let idb = await openIdb(this._factory, name, schema, this.log)
-        this._conns.add(idb)
-        return new IdbDb(
+        let db = new IdbDb(
             schema,
             idb,
             this._deferPut,
             () => {
-                this._conns.delete(idb)
+                this._conns.delete(db)
             },
             this._keyRange,
             this._autoFlush,
+            this.log,
         )
+        this._conns.add(db)
+        return db
     }
 
     async drop(schema: DbSchema): Promise<void> {
@@ -808,11 +815,8 @@ class IdbDriver implements DbDriver {
         }
         let name = this._dbName ?? schema.name
         try {
-            for (let conn of [...this._conns]) {
-                if (conn.name === name) {
-                    conn.close()
-                    this._conns.delete(conn)
-                }
+            for (let db of [...this._conns]) {
+                if (db.idbName === name) await db.close()
             }
             await deleteIdb(this._factory, name)
         } catch (err) {

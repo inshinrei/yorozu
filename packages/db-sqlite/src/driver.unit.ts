@@ -719,4 +719,44 @@ describe("createSqliteDriver", () => {
             vi.unstubAllGlobals()
         }
     })
+
+    it("idle auto-flush rejection is swallowed", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        let unhandled: unknown[] = []
+        let onUnhandled = (reason: unknown): void => {
+            unhandled.push(reason)
+        }
+        process.on("unhandledRejection", onUnhandled)
+        let db: Awaited<ReturnType<ReturnType<typeof createSqliteDriver>["open"]>> | undefined
+        try {
+            let driver = createSqliteDriver({
+                filename: ":memory:",
+                autoFlush: { pendingPuts: 50, idleMs: 20 },
+            })
+            db = await driver.open(schema)
+            await db.collection<FileRow>("files").put(fileRow({ key: "a" }), { flush: "batch" })
+            ;(db as unknown as { _flushPending: () => void })._flushPending = () => {
+                throw new Error("SQLITE_FULL")
+            }
+            await vi.advanceTimersByTimeAsync(20)
+            await Promise.resolve()
+            await Promise.resolve()
+            await new Promise<void>((resolve) => {
+                setImmediate(resolve)
+            })
+            expect(unhandled).toEqual([])
+        } finally {
+            process.off("unhandledRejection", onUnhandled)
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+            if (db) {
+                try {
+                    await db.close()
+                } catch {
+                    // mocked flush-on-close may still throw
+                }
+            }
+        }
+    })
 })
