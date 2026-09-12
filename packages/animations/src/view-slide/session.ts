@@ -29,6 +29,7 @@ export type ViewSlideConfig = {
     easing?: (mode: Exclude<ViewSlideMode, "none">) => string
     mountPolicy?: ViewSlideMountPolicy
     settleSlackMs?: number
+    onChange?: () => void
 }
 
 export type ViewSlide = {
@@ -88,6 +89,10 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
     let pair: ActivePair | null = null
     let slideGen = 0
     let destroyed = false
+
+    let notify = (): void => {
+        config.onChange?.()
+    }
 
     let isMounted = (key: Key): boolean => mountedKeys.includes(key)
 
@@ -150,9 +155,12 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         if (pair && pair.gen === gen) detachPair(pair)
         pair = null
         pending = null
+        let changed = animating || leavingKey !== undefined
+        let prevMounted = mountedKeys
         animating = false
         leavingKey = undefined
         applyMountAfterSettle(to)
+        if (changed || prevMounted !== mountedKeys) notify()
     }
 
     let abortToInstant = (from: Key, to: Key, gen: number): void => {
@@ -161,10 +169,13 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         let toEl = panelEls.get(to)
         if (fromEl) clearPanel(fromEl)
         if (toEl) clearPanel(toEl)
+        let changed = animating || leavingKey !== undefined
+        let prevMounted = mountedKeys
         animating = false
         leavingKey = undefined
         pending = null
         applyMountAfterSettle(to)
+        if (changed || prevMounted !== mountedKeys) notify()
     }
 
     let performSlide = async (
@@ -262,6 +273,7 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         if (lastRequestedKey == null) {
             lastRequestedKey = key
             if (key != null) ensureMounted(key)
+            notify()
             return
         }
 
@@ -275,6 +287,7 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
             animating = false
             leavingKey = undefined
             if (mountPolicy !== "keep-visited") retainOnly([])
+            notify()
             return
         }
 
@@ -283,6 +296,7 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         animating = true
         leavingKey = from
         pending = { from, to: key, gen: slideGen }
+        notify()
         tryRunPending()
     }
 
@@ -294,6 +308,7 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         return {
             update: (next: Key): void => {
                 if (destroyed || next === key) return
+                let aborted = false
                 if (
                     (pair && (pair.from === key || pair.to === key)) ||
                     (pending && (pending.from === key || pending.to === key))
@@ -302,13 +317,16 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
                     abortInFlight()
                     animating = false
                     leavingKey = undefined
+                    aborted = true
                 }
                 if (panelEls.get(key) === el) panelEls.delete(key)
                 key = next
                 panelEls.set(key, el)
                 tryRunPending()
+                if (aborted) notify()
             },
             destroy: (): void => {
+                let aborted = false
                 if (
                     (pair && (pair.from === key || pair.to === key)) ||
                     (pending && (pending.from === key || pending.to === key))
@@ -317,25 +335,37 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
                     abortInFlight()
                     animating = false
                     leavingKey = undefined
+                    aborted = true
                 }
                 if (panelEls.get(key) === el) panelEls.delete(key)
+                if (aborted) notify()
             },
         }
     }
 
     let cancel = (): void => {
         if (destroyed) return
+        let changed = animating || leavingKey !== undefined || pending != null || pair != null
         slideGen++
         abortInFlight()
         animating = false
         leavingKey = undefined
+        let prevMounted = mountedKeys
         if (lastRequestedKey != null && mountPolicy !== "keep-visited") {
             applyMountAfterSettle(lastRequestedKey)
         }
+        if (changed || prevMounted !== mountedKeys) notify()
     }
 
     let destroy = (): void => {
         if (destroyed) return
+        let shouldNotify =
+            mountedKeys.length > 0 ||
+            animating ||
+            leavingKey !== undefined ||
+            lastRequestedKey != null ||
+            pending != null ||
+            pair != null
         destroyed = true
         slideGen++
         abortInFlight()
@@ -347,6 +377,7 @@ export function createViewSlide(config: ViewSlideConfig): ViewSlide {
         pair = null
         panelEls.clear()
         mountedKeys = []
+        if (shouldNotify) notify()
     }
 
     return {

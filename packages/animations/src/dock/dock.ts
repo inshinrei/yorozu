@@ -2,14 +2,7 @@ import { animateElement, createPlayback } from "../core/playback"
 import { dualRaf } from "../core/raf"
 import { applyStyles, clearStyles } from "../core/styles"
 import type { Playback } from "../core/types"
-import {
-    DOCK_EASING,
-    DOCK_MS,
-    dockTransforms,
-    type DockEdge,
-    type DockMode,
-    type DockPanelState,
-} from "./transforms"
+import { DOCK_EASING, DOCK_MS, dockTransforms, type DockEdge, type DockMode, type DockPanelState } from "./transforms"
 
 export type { DockEdge, DockMode, DockPanelState, DockTransforms } from "./transforms"
 export { DOCK_EASING, DOCK_FADE_OFFSET, DOCK_MS, dockTransforms } from "./transforms"
@@ -22,6 +15,7 @@ export type DockConfig = {
     edge?: DockEdge
     durationMs?: number
     easing?: string
+    onChange?: () => void
 }
 
 export type DockHandle = {
@@ -62,6 +56,10 @@ export function createDock(config: DockConfig): Dock {
     let panel: HTMLElement | null = null
     let backdrop: HTMLElement | null = null
     let active: Active | null = null
+
+    let notify = (): void => {
+        config.onChange?.()
+    }
 
     let applyPanel = (el: HTMLElement, state: DockPanelState): void => {
         applyStyles(el, {
@@ -121,6 +119,7 @@ export function createDock(config: DockConfig): Dock {
             clearPanel()
             clearBackdrop()
         }
+        notify()
         run.resolve(ran)
     }
 
@@ -138,9 +137,7 @@ export function createDock(config: DockConfig): Dock {
         if (backdrop) {
             run.backdropAnim = animateElement(
                 backdrop,
-                run.opening
-                    ? [{ opacity: "0" }, { opacity: "1" }]
-                    : [{ opacity: "1" }, { opacity: "0" }],
+                run.opening ? [{ opacity: "0" }, { opacity: "1" }] : [{ opacity: "1" }, { opacity: "0" }],
                 { duration: durationMs, easing, fill: "forwards" },
             )
         }
@@ -201,6 +198,7 @@ export function createDock(config: DockConfig): Dock {
                 wantOpen = false
                 clearPanel()
                 clearBackdrop()
+                notify()
             }
             cancel()
         }
@@ -226,6 +224,7 @@ export function createDock(config: DockConfig): Dock {
         if (mode === "none" || durationMs <= 0) {
             let { playback, resolve } = createPlayback()
             settleInstant(open)
+            notify()
             resolve(true)
             return playback
         }
@@ -246,6 +245,7 @@ export function createDock(config: DockConfig): Dock {
         }
         active = run
         bindCancel(run)
+        notify()
         kick(run)
         return playback
     }
@@ -276,6 +276,7 @@ export function createDock(config: DockConfig): Dock {
 
     let destroy = (): void => {
         if (destroyed) return
+        let shouldNotify = mounted || leaving || animating || wantOpen || active != null
         destroyed = true
         abortActive()
         clearPanel()
@@ -286,6 +287,7 @@ export function createDock(config: DockConfig): Dock {
         wantOpen = false
         panel = null
         backdrop = null
+        if (shouldNotify) notify()
     }
 
     return {

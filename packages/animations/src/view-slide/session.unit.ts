@@ -59,11 +59,13 @@ function makeSlide(opts?: {
     mode?: ViewSlideMode
     mountPolicy?: "keep-visited" | "active-plus-leaving"
     getDirection?: (from: Key, to: Key) => SlideDirection | null
+    onChange?: () => void
 }) {
     return createViewSlide({
         getMode: () => opts?.mode ?? "push",
         getDirection: opts?.getDirection ?? directionByKey,
         mountPolicy: opts?.mountPolicy,
+        onChange: opts?.onChange,
     })
 }
 
@@ -367,5 +369,30 @@ describe("createViewSlide", () => {
         expect(toFrames[1]).toMatchObject({ clipPath: "inset(0 0 0 0)" })
         slide.destroy()
         expect(toEl.style.getPropertyValue("clip-path")).toBe("")
+    })
+
+    it("onChange fires on start, finish, and mountedKeys change", async () => {
+        let ticks = 0
+        let slide = makeSlide({
+            mountPolicy: "active-plus-leaving",
+            onChange: () => {
+                ticks += 1
+            },
+        })
+        expect(ticks).toBe(0)
+        slide.setActive("a")
+        expect(ticks).toBeGreaterThanOrEqual(1)
+        let afterMount = ticks
+        slide.attach(createFakeEl() as unknown as HTMLElement, "a")
+        slide.setActive("b")
+        slide.attach(createFakeEl() as unknown as HTMLElement, "b")
+        expect(ticks).toBeGreaterThan(afterMount)
+        await flushFrames()
+        await vi.advanceTimersByTimeAsync(VIEW_SLIDE_MS + VIEW_SLIDE_SETTLE_SLACK_MS + 1)
+        expect(slide.animating).toBe(false)
+        expect(ticks).toBeGreaterThan(afterMount)
+        let afterFinish = ticks
+        slide.destroy()
+        expect(ticks).toBeGreaterThan(afterFinish)
     })
 })

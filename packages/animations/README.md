@@ -122,6 +122,9 @@ const slide = createViewSlide({
     getMode: () => resolveViewSlideMode(level, "stack"),
     getDirection: (from, to) => slideDirectionByIndex(from, to, items),
     mountPolicy: "active-plus-leaving", // or "keep-visited"
+    onChange: () => {
+        // re-render from slide.mountedKeys / slide.animating / slide.leavingKey
+    },
 })
 
 // Render only keys in slide.mountedKeys, then:
@@ -130,7 +133,28 @@ slide.setActive(nextKey)
 // handle.update(newKey) / handle.destroy() when the node unmounts
 ```
 
-`setActive` starts the pair animation when both panels are attached. `mountedKeys`, `role`, and `isVisible` drive host rendering. Call `cancel` / `destroy` on teardown.
+`setActive` starts the pair animation when both panels are attached. `mountedKeys`, `role`, and `isVisible` drive host rendering. Optional `onChange` fires on animation start, finish (including mode `"none"` instant settle), and whenever `mountedKeys` / `animating` / `leavingKey` flip — including `cancel` / `destroy` when state actually changed. Drive host state from the callback, not a poller. Call `cancel` / `destroy` on teardown.
+
+## Dock
+
+Edge panel open/close with an optional backdrop fade.
+
+```ts
+import { createDock } from "@yorozu/animations"
+
+const dock = createDock({
+    getMode: () => "slide",
+    onChange: () => {
+        // re-render from dock.mounted / dock.leaving / dock.animating
+    },
+})
+
+dock.attach(panelEl)
+dock.attachBackdrop(backdropEl)
+dock.setOpen(true)
+```
+
+Optional `onChange` fires on animation start, finish (including mode `"none"` instant settle), and whenever `mounted` / `animating` / `leaving` flip — including playback `cancel` / `destroy` when state actually changed. Drive host state from the callback, not a poller. Keep `Playback.done` as-is.
 
 ## Sliding indicator
 

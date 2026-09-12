@@ -46,10 +46,11 @@ function createFakeEl(): FakeNode {
 
 let animate = createFakeAnimate()
 
-function makeDock(opts?: { mode?: DockMode; edge?: DockEdge }) {
+function makeDock(opts?: { mode?: DockMode; edge?: DockEdge; onChange?: () => void }) {
     return createDock({
         getMode: () => opts?.mode ?? "slide",
         edge: opts?.edge,
+        onChange: opts?.onChange,
     })
 }
 
@@ -203,7 +204,7 @@ describe("createDock", () => {
             finished: new Promise<void>(() => undefined),
             cancel,
         }))
-        let dock = makeDock({mode: "slide"})
+        let dock = makeDock({ mode: "slide" })
         dock.attach(createFakeEl() as unknown as HTMLElement)
         let playback = dock.setOpen(true)
         await flushFrames()
@@ -255,5 +256,25 @@ describe("createDock", () => {
         expect(panel.style.getPropertyValue("opacity")).toBe("")
         expect(cancel).toHaveBeenCalled()
         expect(await playback.done).toBe(false)
+    })
+
+    it("onChange fires when open starts and when it settles", async () => {
+        let ticks = 0
+        let dock = createDock({
+            getMode: () => "slide",
+            onChange: () => {
+                ticks += 1
+            },
+        })
+        expect(ticks).toBe(0)
+        dock.attach(createFakeEl() as unknown as HTMLElement)
+        dock.setOpen(true)
+        expect(ticks).toBeGreaterThanOrEqual(1)
+        await flushFrames()
+        await vi.runAllTimersAsync()
+        expect(dock.animating).toBe(false)
+        expect(ticks).toBeGreaterThanOrEqual(2)
+        dock.destroy()
+        expect(ticks).toBeGreaterThanOrEqual(3)
     })
 })
