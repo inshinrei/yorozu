@@ -106,6 +106,16 @@ describe("default media viewer styles", () => {
         expect(overlayBlock).toContain("touch-action: none")
     })
 
+    it("virtualized filmstrip track does not flex-shrink so the sizer can scroll", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let virtualListBlock =
+            css.match(
+                /(?:^|\n)\[data-yorozu-media-filmstrip\]\[data-virtualized\]\s*\[role="list"\]\s*\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(virtualListBlock.length).toBeGreaterThan(0)
+        expect(virtualListBlock).toContain("flex-shrink: 0")
+    })
+
     it("filmstrip list is max-content with auto margin and no min-width center flex", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""

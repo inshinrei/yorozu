@@ -1034,7 +1034,35 @@ describe("attachMediaViewer", () => {
         expect(current.getAttribute("data-index")).toBe("20")
     })
 
+    it("virtualized filmstrip track is a non-shrinking sizer of n * itemSizePx", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 20,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let track = root.querySelector("[data-yorozu-media-filmstrip] [role='list']") as HTMLElement
+        expect(track.style.width).toBe(`${40 * 40}px`)
+        expect(track.style.flexShrink).toBe("0")
+    })
+
     it("virtualized centerCurrentThumb scrolls by index geometry, not getBoundingClientRect", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 0,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        let scrollTo = vi.fn()
+        nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
+        viewer.goTo(20)
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 20 * 40 + 20 - 100 }))
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
+    })
+
+    it("virtualized filmstrip does not recenter when neighbors change", () => {
         let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
         viewer.open({
             items,
@@ -1043,10 +1071,20 @@ describe("attachMediaViewer", () => {
         })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        Object.defineProperty(nav, "scrollLeft", { value: 400, configurable: true, writable: true })
         let scrollTo = vi.fn()
         nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
-        viewer.setItems(items, 20)
-        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 20 * 40 + 20 - 100 }))
+        viewer.setNeighbors({
+            older: { id: "id-19", kind: "image", src: "id-19.jpg" },
+            newer: { id: "id-21", kind: "image", src: "id-21.jpg" },
+        })
+        expect(scrollTo).not.toHaveBeenCalled()
+        expect(nav.scrollLeft).toBe(400)
+        viewer.setCanNav({ older: true, newer: true })
+        viewer.setFilmstripMaxWidth("100%")
+        expect(scrollTo).not.toHaveBeenCalled()
+        expect(nav.scrollLeft).toBe(400)
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
     })
 
     it("virtualized filmstrip reuses buttons by data-id when they stay in the window", () => {

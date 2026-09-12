@@ -79,6 +79,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let chromeEl: HTMLElement | null = null
     let filmstripEl: HTMLElement | null = null
     let filmstripIds: string | null = null
+    let filmstripCenteredIndex: number | null = null
     let filmstripList: VirtualList<string> | null = null
     let filmstripListItemSize: number | null = null
     let shell: MediaShell | null = null
@@ -922,14 +923,19 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return filmstripList
     }
 
-    function onFilmstripScroll(): void {
+    function syncFilmstripScroll(scrollLeft: number): void {
         if (!filmstripList || !filmstripEl) return
         filmstripList.setListSlice(filmstripSlice(filmstripEl.clientWidth))
         // Engine is vertical: map strip scrollLeft → scrollTop, clientWidth → viewportHeight.
         filmstripList.onScroll({
-            scrollTop: filmstripEl.scrollLeft,
+            scrollTop: scrollLeft,
             viewportHeight: filmstripEl.clientWidth,
         })
+    }
+
+    function onFilmstripScroll(): void {
+        if (!filmstripEl) return
+        syncFilmstripScroll(filmstripEl.scrollLeft)
     }
 
     function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
@@ -982,6 +988,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             next.push(btn)
         }
         track.style.width = `${filmstripList.totalSize()}px`
+        track.style.flexShrink = "0"
+        track.style.flexGrow = "0"
         track.replaceChildren(...next)
     }
 
@@ -1012,7 +1020,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             } else {
                 filmstripEl.scrollLeft = left
             }
-            onFilmstripScroll()
+            // Smooth: live scrollLeft is still the old offset; let the scroll event drive the engine.
+            if (behavior === "smooth") return
+            syncFilmstripScroll(left)
             return
         }
         let current = filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]")
@@ -1043,6 +1053,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripEl?.remove()
         filmstripEl = null
         filmstripIds = null
+        filmstripCenteredIndex = null
     }
 
     function paintFilmstrip(snap: MediaViewerSnapshot): void {
@@ -1078,14 +1089,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
         if (!track) return
+        let shouldCenter = true
         if (virtualize) {
+            let ids = itemIdKey(snap.items)
+            let idsChanged = filmstripIds !== ids
+            let indexChanged = filmstripCenteredIndex !== snap.index
+            let shouldReanchor = idsChanged || indexChanged || filmstripCenteredIndex == null
             let list = ensureFilmstripList()
             list.sync()
-            list.reanchor(snap.index)
+            if (shouldReanchor) list.reanchor(snap.index)
             rebuildVirtualThumbs(track, snap)
-            filmstripIds = itemIdKey(snap.items)
+            filmstripIds = ids
+            if (shouldReanchor) filmstripCenteredIndex = snap.index
+            shouldCenter = shouldReanchor
         } else {
             track.style.width = ""
+            track.style.flexShrink = ""
+            track.style.flexGrow = ""
+            filmstripCenteredIndex = null
             let ids = itemIdKey(snap.items)
             if (filmstripIds !== ids) {
                 rebuildThumbs(track, snap)
@@ -1094,6 +1115,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 syncThumbs(track, snap)
             }
         }
+        if (!shouldCenter) return
         let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
         let behavior: ScrollBehavior = instant ? "instant" : "smooth"
         centerCurrentThumb(behavior)
@@ -1401,6 +1423,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         destroyFilmstripList()
         filmstripEl = null
         filmstripIds = null
+        filmstripCenteredIndex = null
         paneIds = {}
         if (viewer.decodeFn()) decodePort.abortExcept([])
         let currentShell = shell

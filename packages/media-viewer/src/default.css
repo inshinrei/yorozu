@@ -249,6 +249,8 @@ html.yorozu-media-ghost-animating [data-yorozu-media-filmstrip] {
 [data-yorozu-media-filmstrip][data-virtualized] [role="list"] {
     position: relative;
     display: block;
+    flex-shrink: 0;
+    flex-grow: 0;
     margin-inline: 0;
     gap: 0;
 }
