@@ -53,6 +53,8 @@ const playback = se.play({
 
 `playSharedElement(opts)` remains exported for one-shot use without a retained controller (still returns `Playback | null`).
 
+One dest-sized clone at a time (`cloneCount()` is 1 in flight, else 0). Pass `image` (`CanvasImageSource`) to paint the clone from a bitmap and skip `imageUrl` decode; without `image`, the clone is `<img src=imageUrl>`.
+
 `playOpen` / `playClose` accept seeds and viewport insets when the host does not already have both rects. Math helpers (`computeFlight`, `computeOpenFlight`, …) are exported for custom layouts.
 
 ## Cancel groups

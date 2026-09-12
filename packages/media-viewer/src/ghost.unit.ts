@@ -68,6 +68,34 @@ describe("createMediaGhost", () => {
         Reflect.deleteProperty(HTMLElement.prototype, "animate")
     })
 
+    it("cloneCount is 1 during playOpen and bitmap skips origin url", () => {
+        let bitmap = document.createElement("img")
+        bitmap.src = "blob:bit"
+        let g = createMediaGhost({ bitmap })
+        g.playOpen({ host, seed, to })
+        expect(g.cloneCount()).toBe(1)
+        let cloneImg = host.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+        expect(cloneImg.src).toContain("blob:bit")
+        expect(cloneImg.src).not.toContain("cdn.example")
+        g.cancel()
+        expect(g.cloneCount()).toBe(0)
+    })
+
+    it("playClose bitmap skips origin url and replacing play does not stack clones", () => {
+        let bitmap = document.createElement("img")
+        bitmap.src = "blob:close"
+        let g = createMediaGhost({ maxClones: 1 })
+        g.playOpen({ host, seed, to })
+        g.playClose({ host, fromStage: to, target: seed, bitmap })
+        expect(g.cloneCount()).toBe(1)
+        expect(host.querySelectorAll("[data-yorozu-media-ghost]")).toHaveLength(1)
+        let cloneImg = host.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+        expect(cloneImg.src).toContain("blob:close")
+        expect(cloneImg.src).not.toContain("cdn.example")
+        g.cancel()
+        expect(g.cloneCount()).toBe(0)
+    })
+
     it("playOpen adds the animating class and stamps the ghost clone", () => {
         let hideTarget = document.createElement("div")
         hideTarget.style.visibility = "visible"

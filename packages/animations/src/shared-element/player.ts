@@ -19,6 +19,7 @@ export const SHARED_ELEMENT_END_MS: number = 16
 export type SharedElementSeed = {
     rect: Rect
     imageUrl?: string | null
+    image?: CanvasImageSource | null
     objectFit?: ObjectFit
     naturalWidth?: number
     naturalHeight?: number
@@ -29,6 +30,7 @@ export type SharedElementPlayOptions = {
     from: Rect
     to: Rect
     imageUrl?: string | null
+    image?: CanvasImageSource | null
     objectFit?: ObjectFit
     durationMs?: number
     easing?: string
@@ -56,12 +58,14 @@ export type SharedElementController = {
         fromStage: Rect
         target: SharedElementSeed | null
         imageUrl?: string | null
+        image?: CanvasImageSource | null
         fadeOut?: boolean
         durationMs?: number
         viewport?: Size
         hideTarget?: HTMLElement | null
     }) => Playback | null
     cancel: () => void
+    cloneCount: () => number
 }
 
 type Active = {
@@ -82,7 +86,77 @@ function defaultViewport(override?: Size): Size {
     return { width: window.innerWidth, height: window.innerHeight }
 }
 
-function createClone(imageUrl: string | null | undefined, objectFit: ObjectFit, roundedStart: boolean): HTMLElement {
+function fitStyles(objectFit: ObjectFit): Record<string, string> {
+    return {
+        display: "block",
+        width: "100%",
+        height: "100%",
+        "object-fit": objectFit,
+        "pointer-events": "none",
+        "user-select": "none",
+    }
+}
+
+function cloneSourceSize(source: CanvasImageSource): { width: number; height: number } {
+    if (typeof HTMLVideoElement !== "undefined" && source instanceof HTMLVideoElement) {
+        return { width: source.videoWidth || source.width, height: source.videoHeight || source.height }
+    }
+    if (typeof SVGImageElement !== "undefined" && source instanceof SVGImageElement) {
+        return { width: source.width.baseVal.value, height: source.height.baseVal.value }
+    }
+    let width = Number((source as { width?: number }).width)
+    let height = Number((source as { height?: number }).height)
+    if (!Number.isFinite(width) || width < 0) width = 0
+    if (!Number.isFinite(height) || height < 0) height = 0
+    return { width, height }
+}
+
+function createCloneMedia(
+    imageUrl: string | null | undefined,
+    objectFit: ObjectFit,
+    image?: CanvasImageSource | null,
+): HTMLElement {
+    if (image && typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement) {
+        let img = document.createElement("img")
+        img.draggable = false
+        img.alt = ""
+        applyStyles(img, fitStyles(objectFit))
+        let src = image.currentSrc || image.src
+        if (src) img.src = src
+        return img
+    }
+    if (image) {
+        let canvas = document.createElement("canvas")
+        applyStyles(canvas, fitStyles(objectFit))
+        let size = cloneSourceSize(image)
+        canvas.width = size.width
+        canvas.height = size.height
+        if (typeof canvas.getContext === "function") {
+            let ctx = canvas.getContext("2d")
+            if (ctx) {
+                try {
+                    ctx.drawImage(image, 0, 0)
+                } catch {
+                    // closed ImageBitmap / tainted canvas
+                }
+            }
+        }
+        return canvas
+    }
+    let img = document.createElement("img")
+    img.draggable = false
+    img.alt = ""
+    applyStyles(img, fitStyles(objectFit))
+    if (imageUrl) img.src = imageUrl
+    return img
+}
+
+function createClone(
+    imageUrl: string | null | undefined,
+    objectFit: ObjectFit,
+    roundedStart: boolean,
+    image?: CanvasImageSource | null,
+): HTMLElement {
     let el = document.createElement("div")
     el.setAttribute("aria-hidden", "true")
     applyStyles(el, {
@@ -94,19 +168,7 @@ function createClone(imageUrl: string | null | undefined, objectFit: ObjectFit, 
         "will-change": "transform, opacity",
         "border-radius": roundedStart ? "12px" : "0",
     })
-    let img = document.createElement("img")
-    img.draggable = false
-    img.alt = ""
-    applyStyles(img, {
-        display: "block",
-        width: "100%",
-        height: "100%",
-        "object-fit": objectFit,
-        "pointer-events": "none",
-        "user-select": "none",
-    })
-    if (imageUrl) img.src = imageUrl
-    el.appendChild(img)
+    el.appendChild(createCloneMedia(imageUrl, objectFit, image))
     return el
 }
 
@@ -149,11 +211,13 @@ export function createSharedElement(): SharedElementController {
         abort(current)
     }
 
+    let cloneCount = (): number => (current ? 1 : 0)
+
     let start = (opts: SharedElementPlayOptions, flight: Flight): Playback => {
         cancel()
         let { playback, resolve, isCancelled } = createPlayback()
         let objectFit: ObjectFit = opts.objectFit ?? "contain"
-        let clone = createClone(opts.imageUrl, objectFit, !!opts.roundedStart)
+        let clone = createClone(opts.imageUrl, objectFit, !!opts.roundedStart, opts.image)
         let hideTarget = opts.hideTarget ?? null
         let hidePrev = hideTarget?.style.visibility ?? ""
         let durationMs = opts.durationMs ?? SHARED_ELEMENT_MS
@@ -286,6 +350,7 @@ export function createSharedElement(): SharedElementController {
                 from: opts.seed.rect,
                 to: flight.to,
                 imageUrl: opts.seed.imageUrl,
+                image: opts.seed.image,
                 objectFit: "contain",
                 durationMs: opts.durationMs,
                 roundedStart: true,
@@ -302,12 +367,14 @@ export function createSharedElement(): SharedElementController {
         fromStage: Rect
         target: SharedElementSeed | null
         imageUrl?: string | null
+        image?: CanvasImageSource | null
         fadeOut?: boolean
         durationMs?: number
         viewport?: Size
         hideTarget?: HTMLElement | null
     }): Playback | null => {
         let imageUrl = opts.imageUrl ?? opts.target?.imageUrl ?? null
+        let image = opts.image ?? opts.target?.image ?? null
         if (!opts.target) {
             return start(
                 {
@@ -315,6 +382,7 @@ export function createSharedElement(): SharedElementController {
                     from: opts.fromStage,
                     to: opts.fromStage,
                     imageUrl,
+                    image,
                     objectFit: "contain",
                     durationMs: opts.durationMs,
                     fadeOut: true,
@@ -353,6 +421,7 @@ export function createSharedElement(): SharedElementController {
                 from: opts.fromStage,
                 to: flight.to,
                 imageUrl,
+                image,
                 objectFit,
                 durationMs: opts.durationMs,
                 fadeOut: opts.fadeOut ?? false,
@@ -364,7 +433,7 @@ export function createSharedElement(): SharedElementController {
         )
     }
 
-    return { play, playOpen, playClose, cancel }
+    return { play, playOpen, playClose, cancel, cloneCount }
 }
 
 let defaultController: SharedElementController | null = null

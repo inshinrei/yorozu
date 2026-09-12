@@ -302,6 +302,30 @@ describe("attachMediaViewer", () => {
         expect(animate).not.toHaveBeenCalled()
     })
 
+    it("open ghost uses the stage img as bitmap and does not steal the stage node", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        viewer.open({
+            items: [img("a", "blob:stage-a")],
+            origin: { ...origin, imageUrl: "https://cdn.example/thumb.jpg" },
+            ghost: true,
+        })
+        await vi.waitFor(() => {
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost] img")).toBeTruthy()
+        })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage).toBeInstanceOf(HTMLImageElement)
+        expect(stage.src).toContain("blob:stage-a")
+        let cloneImg = ghostHost.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+        expect(cloneImg).not.toBe(stage)
+        expect(cloneImg.src).toContain("blob:stage-a")
+        expect(cloneImg.src).not.toContain("cdn.example")
+        expect(root.querySelector("[data-yorozu-media-stage]")).toBe(stage)
+        ghostHost.remove()
+    })
+
     it("video paints <video controls>", () => {
         viewer.open({
             items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
@@ -661,6 +685,39 @@ describe("attachMediaViewer", () => {
         let image = root.querySelector("[data-yorozu-media-zoom] img") as HTMLImageElement
         image.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
         expect(capture).toHaveBeenCalledWith(1)
+    })
+
+    it("close ghost uses the stage img as bitmap and does not steal the stage node", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a", "blob:stage-a")],
+            origin: { ...origin, imageUrl: "https://cdn.example/thumb.jpg" },
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await vi.waitFor(() => {
+            expect(root.querySelector("[data-yorozu-media-stage]")).toBeTruthy()
+        })
+        api!.close()
+        await vi.waitFor(() => {
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost] img")).toBeTruthy()
+        })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage).toBeInstanceOf(HTMLImageElement)
+        let cloneImg = ghostHost.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+        expect(cloneImg).not.toBe(stage)
+        expect(cloneImg.src).toContain("blob:stage-a")
+        expect(cloneImg.src).not.toContain("cdn.example")
+        expect(root.querySelector("[data-yorozu-media-stage]")).toBe(stage)
+        ghostHost.remove()
     })
 
     it("close ghost still plays when stage fit is null", async () => {

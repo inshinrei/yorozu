@@ -34,6 +34,7 @@ export type MediaGhost = {
         hideTarget?: HTMLElement | null
         durationMs?: number
         onLand?: () => void | Promise<void>
+        bitmap?: CanvasImageSource | null
     }) => MediaGhostHandle | null
     playClose: (opts: {
         host: HTMLElement
@@ -43,8 +44,10 @@ export type MediaGhost = {
         fadeOut?: boolean
         hideTarget?: HTMLElement | null
         durationMs?: number
+        bitmap?: CanvasImageSource | null
     }) => MediaGhostHandle | null
     cancel: () => void
+    cloneCount: () => number
 }
 
 function toSeed(origin: MediaViewerOrigin): SharedElementSeed {
@@ -94,9 +97,15 @@ export function computeStageFitRectFromElement(
     }
 }
 
-export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?: string }): MediaGhost {
+export function createMediaGhost(opts?: {
+    animatingClass?: string
+    handoffClass?: string
+    maxClones?: 1
+    bitmap?: CanvasImageSource | null
+}): MediaGhost {
     let animatingClass = opts?.animatingClass ?? MEDIA_GHOST_ANIMATING_CLASS
     let handoffClass = opts?.handoffClass ?? MEDIA_GHOST_HANDOFF_CLASS
+    let factoryBitmap = opts?.bitmap ?? null
     let se = createSharedElement()
     let gen = 0
 
@@ -129,12 +138,13 @@ export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?
         hideTarget?: HTMLElement | null
         durationMs?: number
         onLand?: () => void | Promise<void>
+        bitmap?: CanvasImageSource | null
     }): MediaGhostHandle | null {
         let my = ++gen
         setAnimating(true)
         let playback = se.playOpen({
             host: playOpts.host,
-            seed: toSeed(playOpts.seed),
+            seed: { ...toSeed(playOpts.seed), image: playOpts.bitmap ?? factoryBitmap },
             to: playOpts.to,
             insets: DEFAULT_MEDIA_INSETS,
             hideTarget: playOpts.hideTarget,
@@ -170,6 +180,7 @@ export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?
         fadeOut?: boolean
         hideTarget?: HTMLElement | null
         durationMs?: number
+        bitmap?: CanvasImageSource | null
     }): MediaGhostHandle | null {
         let my = ++gen
         setAnimating(true)
@@ -178,6 +189,7 @@ export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?
             fromStage: playOpts.fromStage,
             target: playOpts.target ? toSeed(playOpts.target) : null,
             imageUrl: playOpts.imageUrl,
+            image: playOpts.bitmap ?? factoryBitmap,
             fadeOut: playOpts.fadeOut,
             hideTarget: playOpts.hideTarget,
             durationMs: playOpts.durationMs,
@@ -202,5 +214,9 @@ export function createMediaGhost(opts?: { animatingClass?: string; handoffClass?
         setAnimating(false)
     }
 
-    return { playOpen, playClose, cancel }
+    function cloneCount(): number {
+        return se.cloneCount()
+    }
+
+    return { playOpen, playClose, cancel, cloneCount }
 }

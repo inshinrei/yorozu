@@ -222,6 +222,20 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return viewport
     }
 
+    function ghostBitmap(): CanvasImageSource | undefined {
+        let scope = overlay ?? viewport
+        if (!scope) return undefined
+        let stage =
+            scope.querySelector("[data-side=active] [data-yorozu-media-stage]") ??
+            scope.querySelector("[data-yorozu-media-stage]")
+        if (stage instanceof HTMLImageElement || stage instanceof HTMLCanvasElement) return stage
+        let peek =
+            scope.querySelector("[data-side=active] [data-yorozu-media-peek]") ??
+            scope.querySelector("[data-yorozu-media-peek]")
+        if (peek instanceof HTMLImageElement || peek instanceof HTMLCanvasElement) return peek
+        return undefined
+    }
+
     function naturalForFit(snap: MediaViewerSnapshot): { width: number; height: number } {
         let current = snap.current
         let seed = snap.origin
@@ -335,6 +349,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             seed,
             to,
             hideTarget: viewport,
+            bitmap: ghostBitmap(),
             onLand: async () => {
                 await hooks.onLand()
                 applyOverlayAttrs()
@@ -383,6 +398,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             fromStage,
             target,
             imageUrl: current?.src ?? target?.imageUrl ?? null,
+            bitmap: ghostBitmap(),
             fadeOut,
             hideTarget,
         })

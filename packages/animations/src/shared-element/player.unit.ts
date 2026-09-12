@@ -100,6 +100,19 @@ describe("createSharedElement", () => {
         expect((host as unknown as FakeNode).children).toHaveLength(1)
     })
 
+    it("cloneCount is 1 during play and 0 after cancel", () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let se = createSharedElement()
+        expect(se.cloneCount()).toBe(0)
+        se.play({ host, from, to })
+        expect(se.cloneCount()).toBe(1)
+        se.play({ host, from, to })
+        expect(se.cloneCount()).toBe(1)
+        expect((host as unknown as FakeNode).children).toHaveLength(1)
+        se.cancel()
+        expect(se.cloneCount()).toBe(0)
+    })
+
     it("hides hideTarget then restores visibility", async () => {
         let host = createFakeEl() as unknown as HTMLElement
         let hideTarget = createFakeEl() as unknown as HTMLElement
