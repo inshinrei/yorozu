@@ -197,6 +197,7 @@ Wire `getMode`, `isReduced`, and `enabled` from the stored intensity so every pr
 - **Index FLIP:** list reorder uses order indices × fixed height, not layout measurement, so it stays safe for virtualized windows.
 - **Cancel before retarget:** controllers cancel in-flight WAAPI before starting a new run; call `cancel` / `destroy` when unmounting hosts to avoid leaked animations and clones.
 - **`dualRaf`:** exported for hosts that need two animation frames before measuring or starting motion after a paint.
+- **Shared frame pump:** `onAnimationFrame` is one rAF for JS ticks; `dualRaf` still waits two frames; hosts no-op non-motion subscribers while a blocking lock is held.
 - **Measure / mutate:** `queueMeasure` then `queueMutate` on one frame; `dualRaf` still means wait two frames; `queueMeasureAfterMutate` is the rare second read.
 - **First layout is a baseline:** first indicator measure and first reorder `sync` establish state without animating.
 - **Heavy-motion lock:** the host holds one `createHeavyAnimationLock` instance and `acquire`s around slides / docks / list-reorder / layout-size work. Level `any` pauses observers/decode; `blocking` also defers store fan-out. This is not list-reorder `isSuppressed`, and it does not read an OS reduced-motion media query.

@@ -56,4 +56,29 @@ describe("tween", () => {
         vi.useRealTimers()
         vi.unstubAllGlobals()
     })
+
+    it("drives updates through onAnimationFrame", async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number,
+        )
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id))
+
+        let values: number[] = []
+        let playback = tween({
+            from: 0,
+            to: 10,
+            durationMs: 32,
+            easing: (t) => t,
+            onUpdate: (value) => values.push(value),
+        })
+        await vi.advanceTimersByTimeAsync(80)
+        expect(await playback.done).toBe(true)
+        expect(values.at(-1)).toBe(10)
+        expect(values.length).toBeGreaterThan(1)
+
+        vi.useRealTimers()
+        vi.unstubAllGlobals()
+    })
 })

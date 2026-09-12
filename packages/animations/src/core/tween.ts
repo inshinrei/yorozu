@@ -1,3 +1,4 @@
+import { onAnimationFrame } from "./frame"
 import { createPlayback } from "./playback"
 import type { Playback } from "./types"
 
@@ -30,26 +31,27 @@ export function tween(options: TweenOptions): Playback {
     }
 
     let start = performance.now()
-    let frame = 0
+    let stop = (): void => {}
 
     let tick = (now: number): void => {
         if (isCancelled()) {
+            stop()
             resolve(false)
             return
         }
         let t = Math.min(1, (now - start) / durationMs)
         options.onUpdate(lerp(options.from, options.to, ease(t)))
         if (t >= 1) {
+            stop()
             resolve(true)
             return
         }
-        frame = requestAnimationFrame(tick)
     }
 
-    frame = requestAnimationFrame(tick)
+    stop = onAnimationFrame(tick)
     let cancel = playback.cancel
     playback.cancel = () => {
-        cancelAnimationFrame(frame)
+        stop()
         cancel()
     }
     return playback

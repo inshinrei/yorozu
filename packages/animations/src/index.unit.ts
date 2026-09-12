@@ -11,6 +11,7 @@ describe("package barrel", () => {
         expect(typeof animations.queueMutate).toBe("function")
         expect(typeof animations.queueMeasureAfterMutate).toBe("function")
         expect(typeof animations.flushDomSchedule).toBe("function")
+        expect(typeof animations.onAnimationFrame).toBe("function")
         expect(typeof animations.dualRaf).toBe("function")
         expect(typeof animations.createViewSlide).toBe("function")
         expect(typeof animations.createListReorder).toBe("function")
