@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { DEFAULT_DECODE_BUDGET_ACTIVE, DEFAULT_DECODE_BUDGET_PEEK, DEFAULT_DECODE_BUDGET_THUMB } from "./decode"
 import { createMediaViewer, MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT, type MediaViewer, type MediaViewerItem } from "./session"
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
@@ -359,5 +360,24 @@ describe("createMediaViewer", () => {
         viewer!.setFilmstripMaxWidth("   ")
         expect(viewer!.snapshot().filmstripMaxWidth).toBe(MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT)
         expect(ticks).toBe(2)
+    })
+
+    it("decodeFn and decodeBudget round-trip", () => {
+        expect(viewer!.decodeFn()).toBeUndefined()
+        expect(viewer!.decodeBudget()).toEqual({
+            active: DEFAULT_DECODE_BUDGET_ACTIVE,
+            peek: DEFAULT_DECODE_BUDGET_PEEK,
+            thumb: DEFAULT_DECODE_BUDGET_THUMB,
+        })
+        let decode = async () => null
+        let custom = createMediaViewer({ decode, decodeBudget: { peek: 3 } })
+        expect(custom.decodeFn()).toBe(decode)
+        expect(custom.decodeBudget()).toEqual({
+            active: DEFAULT_DECODE_BUDGET_ACTIVE,
+            peek: 3,
+            thumb: DEFAULT_DECODE_BUDGET_THUMB,
+        })
+        expect(custom.decodeBudget()).not.toBe(custom.decodeBudget())
+        custom.destroy()
     })
 })

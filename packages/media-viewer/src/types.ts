@@ -1,3 +1,5 @@
+import type { MediaDecodeBudget, MediaDecodeRequest } from "./decode"
+
 export type MediaKind = "image" | "video"
 
 export type MediaViewerItem = {
@@ -85,6 +87,8 @@ export type MediaViewerSessionOpts = {
     onRequestOlder?: () => void
     onRequestNewer?: () => void
     prefersReducedMotion?: () => boolean
+    decode?: (req: MediaDecodeRequest) => Promise<CanvasImageSource | null>
+    decodeBudget?: Partial<MediaDecodeBudget>
 }
 
 export type MediaViewer = {
@@ -105,5 +109,7 @@ export type MediaViewer = {
     wantsGhost: (kind: "open" | "close") => boolean
     subscribe: (listener: () => void) => () => void
     snapshot: () => MediaViewerSnapshot
+    decodeFn: () => ((req: MediaDecodeRequest) => Promise<CanvasImageSource | null>) | undefined
+    decodeBudget: () => MediaDecodeBudget
     destroy: () => void
 }

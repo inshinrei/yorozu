@@ -2,6 +2,7 @@
  * Overlay + stage + optional filmstrip + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
  */
 import { dualRaf, isRectFullyVisibleIn, prefersReducedMotion } from "@yorozu/animations"
+import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
 import { computeStageFitRectFromElement, createMediaGhost, DEFAULT_MEDIA_INSETS, type MediaGhost } from "./ghost"
 import { bindMediaViewerKeys } from "./keyboard"
 import { fitContain, stageContentSize } from "./layout"
@@ -82,6 +83,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
     let unmounts: { header?: () => void; footer?: () => void; overlay?: () => void } = {}
     let paneKeys = new WeakMap<HTMLElement, string>()
+    let paneIds: { older?: string; active?: string; newer?: string } = {}
+    let thumbDecodeKeys = new WeakMap<HTMLElement, string>()
+    let decodePort = createMediaDecodePort({ budget: viewer.decodeBudget() })
 
     let tapPointerId: number | null = null
     let tapX = 0
@@ -217,10 +221,22 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let seed = snap.origin
         let width = current?.naturalWidth || seed?.naturalWidth || 0
         let height = current?.naturalHeight || seed?.naturalHeight || 0
-        let imgEl = viewport?.querySelector("[data-side=active] img")
-        if (imgEl instanceof HTMLImageElement) {
-            if (imgEl.naturalWidth > 0) width = imgEl.naturalWidth
-            if (imgEl.naturalHeight > 0) height = imgEl.naturalHeight
+        let stageEl = viewport?.querySelector("[data-side=active] [data-yorozu-media-stage]")
+        if (stageEl instanceof HTMLImageElement) {
+            if (stageEl.naturalWidth > 0) width = stageEl.naturalWidth
+            if (stageEl.naturalHeight > 0) height = stageEl.naturalHeight
+        } else if (stageEl instanceof HTMLCanvasElement) {
+            if (stageEl.width > 0) width = stageEl.width
+            if (stageEl.height > 0) height = stageEl.height
+        } else if (stageEl instanceof HTMLVideoElement) {
+            if (stageEl.videoWidth > 0) width = stageEl.videoWidth
+            if (stageEl.videoHeight > 0) height = stageEl.videoHeight
+        } else {
+            let imgEl = viewport?.querySelector("[data-side=active] img")
+            if (imgEl instanceof HTMLImageElement) {
+                if (imgEl.naturalWidth > 0) width = imgEl.naturalWidth
+                if (imgEl.naturalHeight > 0) height = imgEl.naturalHeight
+            }
         }
         return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
     }
@@ -249,6 +265,12 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (stageImg instanceof HTMLImageElement) {
             if (stageImg.naturalWidth > 0) nw = stageImg.naturalWidth
             if (stageImg.naturalHeight > 0) nh = stageImg.naturalHeight
+        } else if (stageImg instanceof HTMLCanvasElement) {
+            if (stageImg.width > 0) nw = stageImg.width
+            if (stageImg.height > 0) nh = stageImg.height
+        } else if (stageImg instanceof HTMLVideoElement) {
+            if (stageImg.videoWidth > 0) nw = stageImg.videoWidth
+            if (stageImg.videoHeight > 0) nh = stageImg.videoHeight
         }
         if (nw > 0 && nh > 0) {
             zoom.setNaturalSize(nw, nh)
@@ -567,7 +589,31 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return `${side}:${item.id}:${item.kind}:${item.src ?? ""}:${poster}:${alt}`
     }
 
-    function fillPeek(pane: HTMLElement, item: MediaViewerNeighbor): void {
+    function peekBitmapSrc(item: MediaViewerNeighbor): string | null {
+        if (item.kind === "video") {
+            return typeof item.poster === "string" && item.poster.length > 0 ? item.poster : null
+        }
+        return item.src ?? null
+    }
+
+    function fillPeek(pane: HTMLElement, item: MediaViewerNeighbor, side: "older" | "newer"): void {
+        let hostDecode = viewer.decodeFn()
+        let src = peekBitmapSrc(item)
+        if (hostDecode && src) {
+            let loading = document.createElement("div")
+            loading.setAttribute("data-yorozu-media-loading", "")
+            pane.append(loading)
+            let key = paneKeys.get(pane)
+            let role: MediaDecodeRole = side === "older" ? "peek-older" : "peek-newer"
+            void decodePort
+                .request({ id: item.id, role, src, decode: hostDecode })
+                .then((source: CanvasImageSource | null): void => {
+                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
+                    pane.replaceChildren()
+                    if (source) applyCanvasImageSource(pane, source, { peek: true, alt: "" })
+                })
+            return
+        }
         if (item.kind === "video") {
             let poster = item.poster
             if (typeof poster === "string" && poster.length > 0) {
@@ -624,8 +670,33 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             pane.append(loading)
             return
         }
+        let hostDecode = viewer.decodeFn()
         let wrap = document.createElement("div")
         wrap.setAttribute("data-yorozu-media-zoom", "")
+        if (hostDecode) {
+            let loading = document.createElement("div")
+            loading.setAttribute("data-yorozu-media-loading", "")
+            wrap.append(loading)
+            pane.append(wrap)
+            let key = paneKeys.get(pane)
+            let alt = "alt" in item && item.alt ? item.alt : ""
+            void decodePort
+                .request({ id: item.id, role: "active", src: item.src, decode: hostDecode })
+                .then((source: CanvasImageSource | null): void => {
+                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
+                    wrap.replaceChildren()
+                    if (source) {
+                        let painted = applyCanvasImageSource(wrap, source, { stage: true, alt })
+                        if (painted instanceof HTMLImageElement) {
+                            painted.addEventListener("load", () => measureZoom())
+                            if (painted.complete) measureZoom()
+                            return
+                        }
+                    }
+                    measureZoom()
+                })
+            return
+        }
         let image = document.createElement("img")
         image.setAttribute("data-yorozu-media-stage", "")
         image.src = item.src
@@ -637,11 +708,18 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (image.complete) measureZoom()
     }
 
-    function syncPane(side: "older" | "active" | "newer", item: MediaViewerItem | MediaViewerNeighbor | null): void {
+    function syncPane(
+        side: "older" | "active" | "newer",
+        item: MediaViewerItem | MediaViewerNeighbor | null,
+        keep: Set<string>,
+    ): void {
         if (!strip) return
         let existing = strip.querySelector(`[data-side="${side}"]`) as HTMLElement | null
+        let prevId = paneIds[side]
         if (item == null) {
             existing?.remove()
+            delete paneIds[side]
+            if (viewer.decodeFn() && prevId && !keep.has(prevId)) decodePort.abort(prevId)
             return
         }
         let key = paneContentKey(side, item)
@@ -652,17 +730,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             placePane(existing, side)
         } else if (paneKeys.get(existing) === key) {
             return
+        } else if (viewer.decodeFn() && prevId && !keep.has(prevId)) {
+            decodePort.abort(prevId)
         }
+        paneIds[side] = item.id
         paneKeys.set(existing, key)
         existing.replaceChildren()
         if (side === "active") fillActive(existing, item)
-        else fillPeek(existing, item)
+        else fillPeek(existing, item, side)
     }
 
     function paintPanes(snap: MediaViewerSnapshot): void {
-        syncPane("older", snap.neighbors.older)
-        syncPane("active", snap.current)
-        syncPane("newer", snap.neighbors.newer)
+        let keep = new Set<string>()
+        if (snap.neighbors.older) keep.add(snap.neighbors.older.id)
+        if (snap.current) keep.add(snap.current.id)
+        if (snap.neighbors.newer) keep.add(snap.neighbors.newer.id)
+        syncPane("older", snap.neighbors.older, keep)
+        syncPane("active", snap.current, keep)
+        syncPane("newer", snap.neighbors.newer, keep)
     }
 
     function itemIdKey(list: readonly MediaViewerItem[]): string {
@@ -690,6 +775,33 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (item.kind === "video") btn.setAttribute("data-yorozu-media-thumb-video", "")
         else btn.removeAttribute("data-yorozu-media-thumb-video")
         let src = thumbSrc(item)
+        let hostDecode = viewer.decodeFn()
+        if (hostDecode && src) {
+            let key = `${item.id}:${src}`
+            if (thumbDecodeKeys.get(btn) === key) return
+            thumbDecodeKeys.set(btn, key)
+            btn.querySelector("img")?.remove()
+            btn.querySelector("canvas")?.remove()
+            let existingLoading = btn.querySelector("[data-yorozu-media-loading]")
+            if (!existingLoading) {
+                let placeholder = document.createElement("div")
+                placeholder.setAttribute("data-yorozu-media-loading", "")
+                btn.append(placeholder)
+            }
+            void decodePort
+                .request({
+                    id: `thumb:${item.id}`,
+                    role: "thumb",
+                    src,
+                    decode: (req) => hostDecode({ ...req, id: item.id }),
+                })
+                .then((source: CanvasImageSource | null): void => {
+                    if (detached || thumbDecodeKeys.get(btn) !== key) return
+                    btn.replaceChildren()
+                    if (source) applyCanvasImageSource(btn, source, { alt: item.alt ?? "" })
+                })
+            return
+        }
         let image = btn.querySelector("img")
         let loading = btn.querySelector("[data-yorozu-media-loading]")
         if (src) {
@@ -1103,6 +1215,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         startedOpen = false
         filmstripEl = null
         filmstripIds = null
+        paneIds = {}
         let currentShell = shell
         shell = null
         currentShell?.destroy()
@@ -1183,6 +1296,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         unsub()
         tearDownOverlay()
         clearScrollLockLinger()
+        decodePort.destroy()
         swipe.destroy()
         zoom.destroy()
         ghost.cancel()

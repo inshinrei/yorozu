@@ -100,3 +100,11 @@ export { bindMediaViewerKeys } from "./keyboard"
 export type { MediaViewerKeyHandlers } from "./keyboard"
 export { attachMediaViewer } from "./attach"
 export type { AttachMediaViewerOpts } from "./attach"
+export {
+    applyCanvasImageSource,
+    createMediaDecodePort,
+    DEFAULT_DECODE_BUDGET_ACTIVE,
+    DEFAULT_DECODE_BUDGET_PEEK,
+    DEFAULT_DECODE_BUDGET_THUMB,
+} from "./decode"
+export type { MediaDecodeBudget, MediaDecodePort, MediaDecodeRequest, MediaDecodeRole } from "./decode"

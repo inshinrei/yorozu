@@ -94,6 +94,42 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector("[data-yorozu-media-chrome]")).toBeTruthy()
     })
 
+    it("decode port paints peek from bitmap and does not assign item.src", async () => {
+        let imgItem = img
+        let decoded = document.createElement("img")
+        decoded.src = "blob:decoded"
+        let decode = vi.fn(async (req: { id: string; role: string }) => {
+            if (req.role === "peek-newer" && req.id === "b") return decoded
+            let other = document.createElement("img")
+            other.src = `blob:${req.role}:${req.id}`
+            return other
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({
+            items: [imgItem("a"), imgItem("b")],
+            index: 0,
+            neighbors: {
+                older: null,
+                newer: { id: "b", kind: "image", src: "b.jpg" },
+            },
+        })
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-peek]')).toBeNull()
+        await vi.waitFor(() => {
+            expect(root.querySelector('[data-side="newer"] [data-yorozu-media-peek]')).toBe(decoded)
+        })
+        expect(decode).toHaveBeenCalled()
+        let req = decode.mock.calls.find((call) => (call[0] as { role: string }).role === "peek-newer")![0] as {
+            role: string
+            src: string
+            id: string
+        }
+        expect(req).toMatchObject({ id: "b", role: "peek-newer", src: "b.jpg" })
+        expect(root.querySelector('[data-side="newer"] img[src="b.jpg"]')).toBeNull()
+    })
+
     it("chrome header mount receives api and api.close({ ghost: false }) removes overlay", () => {
         let api: MediaViewerChromeApi | undefined
         let headerEl: HTMLElement | undefined

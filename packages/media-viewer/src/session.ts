@@ -1,3 +1,10 @@
+import {
+    DEFAULT_DECODE_BUDGET_ACTIVE,
+    DEFAULT_DECODE_BUDGET_PEEK,
+    DEFAULT_DECODE_BUDGET_THUMB,
+    type MediaDecodeBudget,
+    type MediaDecodeRequest,
+} from "./decode"
 import type {
     MediaViewer,
     MediaViewerChromeSlots,
@@ -57,6 +64,11 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let filmstripWanted = true
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
     let listeners = new Set<() => void>()
+    let decodeBudgetValue: MediaDecodeBudget = {
+        active: opts?.decodeBudget?.active ?? DEFAULT_DECODE_BUDGET_ACTIVE,
+        peek: opts?.decodeBudget?.peek ?? DEFAULT_DECODE_BUDGET_PEEK,
+        thumb: opts?.decodeBudget?.thumb ?? DEFAULT_DECODE_BUDGET_THUMB,
+    }
 
     function notify(): void {
         for (let listener of listeners) listener()
@@ -257,6 +269,18 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         return navFrom
     }
 
+    function decodeFn(): ((req: MediaDecodeRequest) => Promise<CanvasImageSource | null>) | undefined {
+        return opts?.decode
+    }
+
+    function decodeBudget(): MediaDecodeBudget {
+        return {
+            active: decodeBudgetValue.active,
+            peek: decodeBudgetValue.peek,
+            thumb: decodeBudgetValue.thumb,
+        }
+    }
+
     function subscribe(listener: () => void): () => void {
         if (!alive) return () => {}
         listeners.add(listener)
@@ -292,6 +316,8 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         wantsGhost,
         subscribe,
         snapshot,
+        decodeFn,
+        decodeBudget,
         destroy,
     }
 }
