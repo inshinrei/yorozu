@@ -61,6 +61,7 @@ export function createHeavyAnimationLock(opts?: {
                 }
             }
             if (!hadLive) return
+            tokens.length = 0
             onUnlock?.()
             notify()
         }, timeoutMs)
@@ -77,6 +78,7 @@ export function createHeavyAnimationLock(opts?: {
         let after = currentLevel()
         if (before === after) return
         if (after === null) {
+            tokens.length = 0
             clearWatchdog()
             onUnlock?.()
             notify()

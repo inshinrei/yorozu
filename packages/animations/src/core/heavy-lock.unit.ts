@@ -64,7 +64,7 @@ describe("createHeavyAnimationLock", () => {
         })
         let a = lock.acquire("a")
         expect(ticks).toBe(1)
-        lock.acquire("b")
+        let b = lock.acquire("b")
         expect(ticks).toBe(1)
         let block = lock.acquire("c", { level: "blocking" })
         expect(ticks).toBe(2)
@@ -73,9 +73,12 @@ describe("createHeavyAnimationLock", () => {
         a()
         expect(lock.isHeld()).toBe(true)
         expect(ticks).toBe(3)
+        b()
+        expect(lock.isHeld()).toBe(false)
+        expect(ticks).toBe(4)
         stop()
         lock.acquire("late")
-        expect(ticks).toBe(3)
+        expect(ticks).toBe(4)
     })
 
     it("auto-releases one token at durationMs", () => {
