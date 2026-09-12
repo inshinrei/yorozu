@@ -17,3 +17,13 @@ export {
     handleEdgeScroll,
     maybePreloadBackwards,
 } from "./edge-scroll"
+export {
+    LIST_SLICE_MIN,
+    LIST_SLICE_MAX,
+    LIST_SLICE_OVERSCAN_ROWS,
+    heightPrefix,
+    firstVisibleIndexFromPrefix,
+    rowTopFromPrefix,
+    paintedIndexRange,
+    listSliceForViewport,
+} from "./range"
