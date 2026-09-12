@@ -10,6 +10,7 @@ describe("package barrel", () => {
         expect(typeof sortable.computeAutoScrollDeltaX).toBe("function")
         expect(typeof sortable.createSortableAutoScroll).toBe("function")
         expect(typeof sortable.createReorderMode).toBe("function")
+        expect(typeof sortable.paintSortableTransforms).toBe("function")
         expect(sortable.AUTO_SCROLL_ZONE_PX).toBe(60)
         expect(sortable.AUTO_SCROLL_MAX_PX_PER_FRAME).toBe(8)
         expect(sortable.SORTABLE_FEEL.liftScale).toBe(1.05)

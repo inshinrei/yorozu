@@ -22,5 +22,7 @@ export { POINTER_ACTIVATION, HOLD_ACTIVATION, SORTABLE_FEEL } from "./feel"
 export type { SortableSessionOptions, SortableItemHandle, SortableSession } from "./session"
 export { findScrollParent, createSortableSession } from "./session"
 
+export { paintSortableTransforms } from "./paint"
+
 export type { ReorderMode } from "./reorder-mode"
 export { createReorderMode } from "./reorder-mode"

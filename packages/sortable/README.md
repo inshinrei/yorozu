@@ -11,9 +11,15 @@ pnpm add @yorozu/sortable
 ## Session
 
 ```ts
-import { createSortableSession, POINTER_ACTIVATION, SORTABLE_FEEL, type SortableSession } from "@yorozu/sortable"
+import {
+    createSortableSession,
+    paintSortableTransforms,
+    POINTER_ACTIVATION,
+    type SortableSession,
+} from "@yorozu/sortable"
 
 let items = ["a", "b", "c"]
+let nodes = new Map<string, HTMLElement>()
 
 let session: SortableSession = createSortableSession({
     axis: "y",
@@ -30,20 +36,16 @@ session.subscribe(() => paint())
 
 function bindRow(node: HTMLElement, key: string): void {
     let handle = session.registerItem(node, key)
+    nodes.set(key, node)
     node.addEventListener("pointerdown", (e) => session.pointerDown(key, e))
-    // later: handle.update(newKey) / handle.destroy()
+    // later: handle.update(newKey) / handle.destroy(); nodes.delete(key)
 }
 
 function paint(): void {
-    for (let key of items) {
-        let node = document.querySelector(`[data-key="${key}"]`) as HTMLElement | null
-        if (!node) continue
-        let offset = session.getOffset(key)
-        let scale = key === session.draggingKey ? session.liftScale : 1
-        node.style.transform = `translateY(${offset}px) scale(${scale})`
-        node.style.transition =
-            key === session.draggingKey ? "none" : `transform ${SORTABLE_FEEL.siblingMs}ms ${SORTABLE_FEEL.siblingEase}`
-    }
+    // Optional { reduced: true } overrides lift/transition per call when the host
+    // did not pass reducedMotion on the session.
+    paintSortableTransforms(session, nodes)
+    // Overlay (if any) still uses session.getOverlayOffset() separately.
 }
 ```
 
@@ -72,7 +74,7 @@ While dragging, the session scrolls the nearest overflow parent (or `getViewport
 
 ## Host adapter
 
-The session does not paint. Apply `getOffset(key)` (pointer delta + scroll delta for the active row; ± one item for siblings between source and insert) yourself. Viewport-fixed overlays should use `getOverlayOffset()` (pointer delta only).
+The session does not paint unless the host calls `paintSortableTransforms(session, nodes)`. That helper writes only `transform` / `transition` from `getOffset` (pointer delta + scroll delta for the active row; ± one item for siblings between source and insert). Pass `{ reduced: true }` to force scale `1` and transition `"none"` per call when the host did not wire `reducedMotion` on the session. Viewport-fixed overlays should use `getOverlayOffset()` (pointer delta only).
 
 Pass `reducedMotion: () => boolean` (stored product level, not OS MQ). `session.liftScale` is `1` and `session.siblingTransition` is `"none"` while that callback is true. Optional `feel` merges over `SORTABLE_FEEL`.
 
