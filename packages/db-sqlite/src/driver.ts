@@ -4,11 +4,14 @@ import Database from "better-sqlite3"
 import {
     compareIndexKey,
     inRange,
+    DEFAULT_AUTO_FLUSH_IDLE_MS,
+    DEFAULT_AUTO_FLUSH_PENDING,
     type Collection,
     type CollectionDef,
     type Db,
     type DbDriver,
     type DbSchema,
+    type FlushOpts,
     type IndexDef,
     type IndexKey,
     type PutOpts,
@@ -17,7 +20,44 @@ import {
     type TxMode,
 } from "@yorozu/db"
 import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
+import { requestIdle, type IdleHandle } from "@yorozu/utils"
 import { wrapBetterSqlite3, type SqliteHandle } from "./handle"
+
+type AutoFlushInput = boolean | { pendingPuts?: number; idleMs?: number }
+type AutoFlushConfig = { pendingPuts: number; idleMs: number }
+
+function abortedReason(signal?: AbortSignal): unknown | undefined {
+    if (!signal?.aborted) return undefined
+    return signal.reason ?? new DOMException("The operation was aborted.", "AbortError")
+}
+
+function resolveAutoFlush(autoFlush?: AutoFlushInput): AutoFlushConfig | null {
+    if (autoFlush !== true && (typeof autoFlush !== "object" || autoFlush === null)) return null
+    let src = autoFlush === true ? {} : autoFlush
+    let pendingPuts = src.pendingPuts
+    let idleMs = src.idleMs
+    if (pendingPuts === undefined || !Number.isFinite(pendingPuts) || pendingPuts < 1) {
+        pendingPuts = DEFAULT_AUTO_FLUSH_PENDING
+    }
+    if (idleMs === undefined || !Number.isFinite(idleMs) || idleMs < 0) {
+        idleMs = DEFAULT_AUTO_FLUSH_IDLE_MS
+    }
+    return { pendingPuts, idleMs }
+}
+
+function scheduleIdle(fn: () => void, timeout: number): IdleHandle {
+    let g = globalThis as unknown as { requestIdleCallback?: unknown }
+    if (typeof g.requestIdleCallback === "function") {
+        return requestIdle(() => fn(), { timeout })
+    }
+    // requestIdle's no-ric fallback is setTimeout(0) and ignores timeout; honor idleMs in Node.
+    let timer = setTimeout(fn, timeout)
+    return {
+        cancel(): void {
+            clearTimeout(timer)
+        },
+    }
+}
 
 type Row = Record<string, unknown>
 
@@ -385,8 +425,10 @@ class NestedTxDb implements Db {
         return Promise.reject(new Error("nested transact is not supported"))
     }
 
-    flush(): Promise<void> {
+    flush(opts?: FlushOpts): Promise<void> {
         if (this._mode.value === "r") return Promise.resolve()
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
         this._flushUnlocked()
         return Promise.resolve()
     }
@@ -454,8 +496,15 @@ class SqliteCollection<T extends Row> implements Collection<T> {
     protected _table: string
     protected _blobTable: string
     protected _indexColIds: string[]
+    protected _onBatchQueued: () => void
 
-    constructor(def: CollectionDef, handle: SqliteHandle, pending: Pending, inSqlTx: { value: boolean }) {
+    constructor(
+        def: CollectionDef,
+        handle: SqliteHandle,
+        pending: Pending,
+        inSqlTx: { value: boolean },
+        onBatchQueued: () => void,
+    ) {
         this.name = def.name
         this._def = def
         this._keyPath = def.keyPath
@@ -467,6 +516,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         this._table = quoteIdent(def.name)
         this._blobTable = quoteIdent(`${def.name}__blobs`)
         this._indexColIds = allIndexColIds(def)
+        this._onBatchQueued = onBatchQueued
     }
 
     protected _colPending(): Map<string, PendingWrite> | undefined {
@@ -573,6 +623,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         let write = await this._prepareWrite(row)
         if ((opts?.flush ?? "now") === "batch") {
             this._ensurePending().set(write.pk, write)
+            this._onBatchQueued()
             return
         }
         this._colPending()?.delete(write.pk)
@@ -586,6 +637,7 @@ class SqliteCollection<T extends Row> implements Collection<T> {
         if ((opts?.flush ?? "now") === "batch") {
             let pending = this._ensurePending()
             for (let write of writes) pending.set(write.pk, write)
+            this._onBatchQueued()
             return
         }
         let live = this._colPending()
@@ -743,11 +795,14 @@ class SqliteDb implements Db {
     protected _txView: Db
     protected _onClose: () => void
     protected _closed = false
+    protected _autoFlush: AutoFlushConfig | null
+    protected _idleHandle: IdleHandle | null = null
 
-    constructor(schema: DbSchema, handle: SqliteHandle, onClose: () => void) {
+    constructor(schema: DbSchema, handle: SqliteHandle, onClose: () => void, autoFlush: AutoFlushConfig | null) {
         this.schema = schema
         this._handle = handle
         this._onClose = onClose
+        this._autoFlush = autoFlush
         this._collections = new Map()
         this._gated = new Map()
         this._txView = new NestedTxDb(
@@ -761,7 +816,7 @@ class SqliteDb implements Db {
             this._txMode,
         )
         for (let def of schema.collections) {
-            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx)
+            let col = new SqliteCollection(def, handle, this._pending, this._inSqlTx, () => this._onBatchQueued())
             this._collections.set(def.name, col)
             this._gated.set(def.name, new GatedCollection(col, this._lock))
         }
@@ -803,13 +858,19 @@ class SqliteDb implements Db {
         )
     }
 
-    flush(): Promise<void> {
+    flush(opts?: FlushOpts): Promise<void> {
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
         return this._lock.with(async () => {
+            if (this._closed) return
+            let aborted2 = abortedReason(opts?.signal)
+            if (aborted2 !== undefined) throw aborted2
             this._flushPending()
         })
     }
 
     async close(): Promise<void> {
+        this._cancelIdle()
         if (this._closed) return
         this._closed = true
         try {
@@ -820,13 +881,45 @@ class SqliteDb implements Db {
         }
     }
 
+    protected _pendingDistinct(): number {
+        let n = 0
+        for (let rows of this._pending.values()) n += rows.size
+        return n
+    }
+
+    protected _cancelIdle(): void {
+        this._idleHandle?.cancel()
+        this._idleHandle = null
+    }
+
+    protected _armIdle(timeout: number): void {
+        this._cancelIdle()
+        this._idleHandle = scheduleIdle(() => {
+            this._idleHandle = null
+            if (this._closed) return
+            void this.flush({ reason: "idle" })
+        }, timeout)
+    }
+
+    protected _onBatchQueued(): void {
+        if (!this._autoFlush) return
+        if (this._pendingDistinct() >= this._autoFlush.pendingPuts) {
+            this._armIdle(0)
+            return
+        }
+        if (!this._idleHandle) this._armIdle(this._autoFlush.idleMs)
+    }
+
     protected _flushPending(): void {
         let snapshot: Array<[string, PendingWrite[]]> = []
         for (let [name, rows] of this._pending) {
             if (rows.size === 0) continue
             snapshot.push([name, [...rows.values()]])
         }
-        if (snapshot.length === 0) return
+        if (snapshot.length === 0) {
+            this._cancelIdle()
+            return
+        }
         let run = (): void => {
             for (let [name, writes] of snapshot) {
                 let col = this._collections.get(name)
@@ -843,6 +936,7 @@ class SqliteDb implements Db {
                 if (live.get(write.pk) === write) live.delete(write.pk)
             }
         }
+        if (this._pendingDistinct() === 0) this._cancelIdle()
     }
 }
 
@@ -850,12 +944,19 @@ class SqliteDriver implements DbDriver {
     protected log: Logger
     protected _filename: string
     protected _native: typeof Database
+    protected _autoFlush: AutoFlushConfig | null
     protected _conns: Set<SqliteDb> = new Set()
 
-    constructor(opts: { filename: string; native?: typeof Database; log?: Logger }) {
+    constructor(opts: {
+        filename: string
+        native?: typeof Database
+        log?: Logger
+        autoFlush?: boolean | { pendingPuts?: number; idleMs?: number }
+    }) {
         this.log = makeLog(opts.log ?? makeSilentLog(), ISSUE_KEY)
         this._filename = opts.filename
         this._native = opts.native ?? Database
+        this._autoFlush = resolveAutoFlush(opts.autoFlush)
     }
 
     async open(schema: DbSchema): Promise<Db> {
@@ -871,9 +972,14 @@ class SqliteDriver implements DbDriver {
             }
             let handle = wrapBetterSqlite3(raw)
             applySchema(handle, schema)
-            let db = new SqliteDb(schema, handle, () => {
-                this._conns.delete(db)
-            })
+            let db = new SqliteDb(
+                schema,
+                handle,
+                () => {
+                    this._conns.delete(db)
+                },
+                this._autoFlush,
+            )
             this._conns.add(db)
             return db
         } catch (err) {
@@ -901,6 +1007,11 @@ class SqliteDriver implements DbDriver {
     }
 }
 
-export function createSqliteDriver(opts: { filename: string; native?: typeof Database; log?: Logger }): DbDriver {
+export function createSqliteDriver(opts: {
+    filename: string
+    native?: typeof Database
+    log?: Logger
+    autoFlush?: boolean | { pendingPuts?: number; idleMs?: number }
+}): DbDriver {
     return new SqliteDriver(opts)
 }

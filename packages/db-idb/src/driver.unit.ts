@@ -50,6 +50,8 @@ function fileRow(partial: Partial<FileRow> & Pick<FileRow, "key">): FileRow {
 
 afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
 })
 
 describe("createIdbDriver", () => {
@@ -618,5 +620,94 @@ describe("createIdbDriver", () => {
         let hits = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
         expect(hits.map((h) => h.primaryKey)).toEqual(["z", "c"])
         await db.close()
+    })
+
+    it("flush rejects when signal is already aborted and does not write pending", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put(fileRow({ key: "a" }), { flush: "batch" })
+        let putSpy = vi.spyOn(IDBObjectStore.prototype, "put")
+        putSpy.mockClear()
+        await expect(db.flush({ signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" })
+        expect(putSpy).not.toHaveBeenCalled()
+        await db.flush()
+        expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+        await db.close()
+    })
+
+    it("autoFlush idle timeout flushes batch puts", async () => {
+        let driver = createIdbDriver({
+            dbName: nextName(),
+            autoFlush: { pendingPuts: 50, idleMs: 1000 },
+        })
+        let db = await driver.open(schema)
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a", storedAt: 1 }), { flush: "batch" })
+            let putSpy = vi.spyOn(IDBObjectStore.prototype, "put")
+            putSpy.mockClear()
+            await vi.advanceTimersByTimeAsync(999)
+            expect(putSpy).not.toHaveBeenCalled()
+            await vi.advanceTimersByTimeAsync(1)
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(putSpy).toHaveBeenCalled()
+            vi.useRealTimers()
+            expect(await col.get("a")).toEqual(fileRow({ key: "a", storedAt: 1 }))
+            await db.close()
+        } finally {
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+        }
+    })
+
+    it("autoFlush pendingPuts re-arms idle with timeout 0", async () => {
+        let driver = createIdbDriver({
+            dbName: nextName(),
+            autoFlush: { pendingPuts: 2, idleMs: 60_000 },
+        })
+        let db = await driver.open(schema)
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            await col.put(fileRow({ key: "b" }), { flush: "batch" })
+            let putSpy = vi.spyOn(IDBObjectStore.prototype, "put")
+            putSpy.mockClear()
+            await vi.advanceTimersByTimeAsync(0)
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(putSpy).toHaveBeenCalled()
+            vi.useRealTimers()
+            await db.close()
+        } finally {
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+        }
+    })
+
+    it("omitted autoFlush does not flush on idle", async () => {
+        let driver = createIdbDriver({ dbName: nextName() })
+        let db = await driver.open(schema)
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            let putSpy = vi.spyOn(IDBObjectStore.prototype, "put")
+            putSpy.mockClear()
+            await vi.advanceTimersByTimeAsync(5_000)
+            expect(putSpy).not.toHaveBeenCalled()
+            vi.useRealTimers()
+            await db.flush()
+            await db.close()
+        } finally {
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+        }
     })
 })

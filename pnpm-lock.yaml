@@ -200,6 +200,9 @@ importers:
       '@yorozu/log':
         specifier: workspace:^
         version: link:../log
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../utils
     devDependencies:
       fake-indexeddb:
         specifier: 6.2.5
@@ -213,6 +216,9 @@ importers:
       '@yorozu/log':
         specifier: workspace:^
         version: link:../log
+      '@yorozu/utils':
+        specifier: workspace:^
+        version: link:../utils
       better-sqlite3:
         specifier: 12.11.1
         version: 12.11.1

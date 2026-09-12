@@ -1,11 +1,14 @@
 import {
     compareIndexKey,
     inRange,
+    DEFAULT_AUTO_FLUSH_IDLE_MS,
+    DEFAULT_AUTO_FLUSH_PENDING,
     type Collection,
     type CollectionDef,
     type Db,
     type DbDriver,
     type DbSchema,
+    type FlushOpts,
     type IndexDef,
     type IndexKey,
     type PutOpts,
@@ -15,7 +18,11 @@ import {
 } from "@yorozu/db"
 import { createTxAls, type TxAlsGate } from "@yorozu/db/tx-als"
 import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
+import { requestIdle, type IdleHandle } from "@yorozu/utils"
 import { toIdbKeyRange } from "./range"
+
+type AutoFlushInput = boolean | { pendingPuts?: number; idleMs?: number }
+type AutoFlushConfig = { pendingPuts: number; idleMs: number }
 
 type IdbDriverOpts = {
     dbName?: string
@@ -23,6 +30,40 @@ type IdbDriverOpts = {
     IDBKeyRange?: typeof IDBKeyRange
     log?: Logger
     deferPut?: (collectionName: string) => boolean
+    autoFlush?: AutoFlushInput
+}
+
+function abortedReason(signal?: AbortSignal): unknown | undefined {
+    if (!signal?.aborted) return undefined
+    return signal.reason ?? new DOMException("The operation was aborted.", "AbortError")
+}
+
+function resolveAutoFlush(autoFlush?: AutoFlushInput): AutoFlushConfig | null {
+    if (autoFlush !== true && (typeof autoFlush !== "object" || autoFlush === null)) return null
+    let src = autoFlush === true ? {} : autoFlush
+    let pendingPuts = src.pendingPuts
+    let idleMs = src.idleMs
+    if (pendingPuts === undefined || !Number.isFinite(pendingPuts) || pendingPuts < 1) {
+        pendingPuts = DEFAULT_AUTO_FLUSH_PENDING
+    }
+    if (idleMs === undefined || !Number.isFinite(idleMs) || idleMs < 0) {
+        idleMs = DEFAULT_AUTO_FLUSH_IDLE_MS
+    }
+    return { pendingPuts, idleMs }
+}
+
+function scheduleIdle(fn: () => void, timeout: number): IdleHandle {
+    let g = globalThis as unknown as { requestIdleCallback?: unknown }
+    if (typeof g.requestIdleCallback === "function") {
+        return requestIdle(() => fn(), { timeout })
+    }
+    // requestIdle's no-ric fallback is setTimeout(0) and ignores timeout; honor idleMs in Node.
+    let timer = setTimeout(fn, timeout)
+    return {
+        cancel(): void {
+            clearTimeout(timer)
+        },
+    }
 }
 
 type Row = Record<string, unknown>
@@ -281,8 +322,10 @@ class NestedTxDb implements Db {
         return Promise.reject(new Error("nested transact is not supported"))
     }
 
-    flush(): Promise<void> {
+    flush(opts?: FlushOpts): Promise<void> {
         if (this._mode.value === "r") return Promise.resolve()
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
         return this._flushUnlocked()
     }
 
@@ -301,6 +344,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
     protected _seq: SeqBox
     protected _deferPut: (collectionName: string) => boolean
     protected _keyRange: typeof IDBKeyRange
+    protected _onBatchQueued: () => void
 
     constructor(
         def: CollectionDef,
@@ -309,6 +353,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         seq: SeqBox,
         deferPut: (collectionName: string) => boolean,
         keyRange: typeof IDBKeyRange,
+        onBatchQueued: () => void,
     ) {
         this.name = def.name
         this._def = def
@@ -320,6 +365,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         this._seq = seq
         this._deferPut = deferPut
         this._keyRange = keyRange
+        this._onBatchQueued = onBatchQueued
     }
 
     protected _colPending(): Map<string, PendingEntry> | undefined {
@@ -382,6 +428,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
         let stored = withStringPk(row, this._keyPath, pk)
         if ((opts?.flush ?? "now") === "batch" && this._batchEnabled()) {
             this._ensurePending().set(pk, { row: stored, seq: nextSeq(this._seq) })
+            this._onBatchQueued()
             return
         }
         this._colPending()?.delete(pk)
@@ -400,6 +447,7 @@ class IdbCollection<T extends Row> implements Collection<T> {
                 let pk = primaryKeyOf(row, this._keyPath)
                 pending.set(pk, { row: withStringPk(row, this._keyPath, pk), seq: nextSeq(this._seq) })
             }
+            this._onBatchQueued()
             return
         }
         let live = this._colPending()
@@ -552,6 +600,8 @@ class IdbDb implements Db {
     protected _txView: Db
     protected _onClose: () => void
     protected _closed = false
+    protected _autoFlush: AutoFlushConfig | null
+    protected _idleHandle: IdleHandle | null = null
 
     constructor(
         schema: DbSchema,
@@ -559,13 +609,16 @@ class IdbDb implements Db {
         deferPut: (collectionName: string) => boolean,
         onClose: () => void,
         keyRange: typeof IDBKeyRange,
+        autoFlush: AutoFlushConfig | null,
     ) {
         this.schema = schema
         this._idb = idb
         this._onClose = onClose
+        this._autoFlush = autoFlush
         this._collections = new Map()
         this._txView = new NestedTxDb(this, () => this._flushPending(), this._txMode)
         this._idb.onversionchange = () => {
+            this._cancelIdle()
             this._closed = true
             this._idb.close()
             this._onClose()
@@ -573,7 +626,15 @@ class IdbDb implements Db {
         for (let def of schema.collections) {
             this._collections.set(
                 def.name,
-                new IdbCollection(def, () => this._idb, this._pending, this._seq, deferPut, keyRange),
+                new IdbCollection(
+                    def,
+                    () => this._idb,
+                    this._pending,
+                    this._seq,
+                    deferPut,
+                    keyRange,
+                    () => this._onBatchQueued(),
+                ),
             )
         }
     }
@@ -605,11 +666,19 @@ class IdbDb implements Db {
         })
     }
 
-    flush(): Promise<void> {
-        return this._lock.with(() => this._flushPending())
+    flush(opts?: FlushOpts): Promise<void> {
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
+        return this._lock.with(async () => {
+            if (this._closed) return
+            let aborted2 = abortedReason(opts?.signal)
+            if (aborted2 !== undefined) throw aborted2
+            await this._flushPending()
+        })
     }
 
     close(): Promise<void> {
+        this._cancelIdle()
         return this._inTransact.enter((als) => {
             if (als.getStore()) return this._closeUnlocked()
             return this._lock.with(() => this._closeUnlocked())
@@ -617,6 +686,7 @@ class IdbDb implements Db {
     }
 
     protected async _closeUnlocked(): Promise<void> {
+        this._cancelIdle()
         if (this._closed) return
         this._closed = true
         try {
@@ -627,13 +697,45 @@ class IdbDb implements Db {
         }
     }
 
+    protected _pendingDistinct(): number {
+        let n = 0
+        for (let rows of this._pending.values()) n += rows.size
+        return n
+    }
+
+    protected _cancelIdle(): void {
+        this._idleHandle?.cancel()
+        this._idleHandle = null
+    }
+
+    protected _armIdle(timeout: number): void {
+        this._cancelIdle()
+        this._idleHandle = scheduleIdle(() => {
+            this._idleHandle = null
+            if (this._closed) return
+            void this.flush({ reason: "idle" })
+        }, timeout)
+    }
+
+    protected _onBatchQueued(): void {
+        if (!this._autoFlush) return
+        if (this._pendingDistinct() >= this._autoFlush.pendingPuts) {
+            this._armIdle(0)
+            return
+        }
+        if (!this._idleHandle) this._armIdle(this._autoFlush.idleMs)
+    }
+
     protected async _flushPending(): Promise<void> {
         let snapshot: Array<[string, Array<[string, PendingEntry]>]> = []
         for (let [name, rows] of this._pending) {
             if (rows.size === 0) continue
             snapshot.push([name, [...rows.entries()]])
         }
-        if (snapshot.length === 0) return
+        if (snapshot.length === 0) {
+            this._cancelIdle()
+            return
+        }
         await Promise.resolve()
         let names = snapshot.map(([name]) => name)
         await runTx(this._idb, names, "readwrite", (tx) => {
@@ -655,6 +757,7 @@ class IdbDb implements Db {
                 if (cur && cur.seq === entry.seq) live.delete(pk)
             }
         }
+        if (this._pendingDistinct() === 0) this._cancelIdle()
     }
 }
 
@@ -664,6 +767,7 @@ class IdbDriver implements DbDriver {
     protected _keyRange: typeof IDBKeyRange
     protected _dbName: string | undefined
     protected _deferPut: (collectionName: string) => boolean
+    protected _autoFlush: AutoFlushConfig | null
     protected _conns: Set<IDBDatabase> = new Set()
 
     constructor(opts: IdbDriverOpts) {
@@ -672,6 +776,7 @@ class IdbDriver implements DbDriver {
         this._keyRange = opts.IDBKeyRange ?? globalThis.IDBKeyRange
         this._dbName = opts.dbName
         this._deferPut = opts.deferPut ?? (() => true)
+        this._autoFlush = resolveAutoFlush(opts.autoFlush)
     }
 
     async open(schema: DbSchema): Promise<Db> {
@@ -691,6 +796,7 @@ class IdbDriver implements DbDriver {
                 this._conns.delete(idb)
             },
             this._keyRange,
+            this._autoFlush,
         )
     }
 
@@ -723,6 +829,7 @@ export function createIdbDriver(
         IDBKeyRange?: typeof IDBKeyRange
         log?: Logger
         deferPut?: (collectionName: string) => boolean
+        autoFlush?: boolean | { pendingPuts?: number; idleMs?: number }
     } = {},
 ): DbDriver {
     return new IdbDriver(opts)

@@ -11,7 +11,8 @@
     },
     "dependencies": {
         "@yorozu/db": "workspace:^",
-        "@yorozu/log": "workspace:^"
+        "@yorozu/log": "workspace:^",
+        "@yorozu/utils": "workspace:^"
     },
     "devDependencies": {
         "fake-indexeddb": "6.2.5"

@@ -14,6 +14,7 @@ Musts:
 - Bounds use `compareIndexKey`: number < string < array. A shorter prefix-equal array is less (`[cutoff] < [cutoff, 0]`). Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff`.
 - `getMany` preserves input key order; missing keys are `null`.
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `"rw"` transact commit, not `"r"`. Memory treats `"batch"` as `"now"`; `flush()` still resolves as a no-op.
+- `flush({ reason, signal })`: `reason` is `"idle" | "hidden" | "explicit"` for the caller (write semantics unchanged). Already-aborted `signal` rejects with `AbortError` (or `signal.reason`) without work. Read transact `flush` stays a no-op.
 - Nested `transact` throws. Concurrent `transact` on overlapping names serializes.
 - Unknown collection / unknown index throws.
 - Primary keys are strings (`String(...)`). Index `keyPath` is top-level field names only (including compound arrays), not dotted paths.

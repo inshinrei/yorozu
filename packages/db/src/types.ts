@@ -40,6 +40,14 @@ export type ScanHit<T> = {
 
 export type PutOpts = { flush?: "now" | "batch" }
 
+export type FlushOpts = {
+    reason?: "idle" | "hidden" | "explicit"
+    signal?: AbortSignal
+}
+
+export const DEFAULT_AUTO_FLUSH_PENDING: number = 32
+export const DEFAULT_AUTO_FLUSH_IDLE_MS: number = 1000
+
 export interface Collection<T extends Record<string, unknown> = Record<string, unknown>> {
     readonly name: string
     get(key: string): Promise<T | null>
@@ -60,7 +68,7 @@ export interface Db {
     readonly schema: DbSchema
     collection<T extends Record<string, unknown>>(name: string): Collection<T>
     transact<R>(names: readonly string[], mode: TxMode, fn: (db: Db) => Promise<R>): Promise<R>
-    flush(): Promise<void>
+    flush(opts?: FlushOpts): Promise<void>
     close(): Promise<void>
 }
 

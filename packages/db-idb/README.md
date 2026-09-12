@@ -14,6 +14,7 @@ let driver = createIdbDriver({
     IDBKeyRange, // default: globalThis.IDBKeyRange
     log, // optional Logger; silent default
     deferPut: (name) => name !== "meta",
+    autoFlush: true, // opt-in; or { pendingPuts: 32, idleMs: 1000 }
 })
 
 let db = await driver.open(schema)
@@ -35,6 +36,8 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `getMany` of only-pending keys skips `IDBDatabase.transaction`. Duplicate keys share one `get`.
 - `scan({ limit })` keeps an early-stop cursor when pending exists (skip pending PKs, then merge).
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `"rw"` transact commit, not `"r"`. `flush()` coalesces by `(collection, pk)` in one multi-store `readwrite` tx.
+- `flush({ reason, signal })`: already-aborted `signal` rejects with `AbortError` (or `signal.reason`) before taking the lock; in-flight writes finish. Read transact `flush` stays a no-op.
+- Opt-in `autoFlush`: omitted = off. `true` → `{ pendingPuts: 32, idleMs: 1000 }`. After batch puts, idle-flush via `requestIdle` with `{ reason: "idle" }`; at `pendingPuts` distinct pks, re-arm with timeout 0. Successful flush / close cancels the idle handle. Keep files/avatars immediate via host `deferPut` — default is still every collection may batch.
 - Nested `transact` throws. Concurrent `transact` serializes on a mutex (tx facade; nested `transact` rejects without taking the lock).
 - Call `await db.flush()` before `close()`. Do not leave `{ flush: "batch" }` puts outstanding across multi-tab upgrades (`onversionchange` closes the connection without flushing).
 - `drop(schema)` closes tracked connections and `indexedDB.deleteDatabase`.

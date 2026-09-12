@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import Database from "better-sqlite3"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { compareIndexKey, type DbSchema } from "@yorozu/db"
 import { makeSilentLog } from "@yorozu/log"
 import { createSqliteDriver } from "./driver"
@@ -39,6 +39,11 @@ function fileRow(partial: Partial<FileRow> & Pick<FileRow, "key">): FileRow {
         ...partial,
     }
 }
+
+afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+})
 
 function nativeWithLog(log: string[]): typeof Database {
     return function Recording(filename: string, options?: Database.Options) {
@@ -561,6 +566,70 @@ describe("createSqliteDriver", () => {
             expect(existsSync(filename)).toBe(false)
         } finally {
             await rm(dir, { recursive: true, force: true })
+        }
+    })
+
+    it("flush rejects when signal is already aborted and does not write pending", async () => {
+        let sql: string[] = []
+        let driver = createSqliteDriver({ filename: ":memory:", native: nativeWithLog(sql) })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.put(fileRow({ key: "a" }), { flush: "batch" })
+        sql.length = 0
+        await expect(db.flush({ signal: AbortSignal.abort() })).rejects.toMatchObject({ name: "AbortError" })
+        expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(false)
+        await db.flush()
+        expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+        await db.close()
+    })
+
+    it("autoFlush pendingPuts re-arms idle with timeout 0", async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let sql: string[] = []
+            let driver = createSqliteDriver({
+                filename: ":memory:",
+                native: nativeWithLog(sql),
+                autoFlush: { pendingPuts: 2, idleMs: 60_000 },
+            })
+            let db = await driver.open(schema)
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            await col.put(fileRow({ key: "b" }), { flush: "batch" })
+            sql.length = 0
+            await vi.advanceTimersByTimeAsync(0)
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(true)
+            expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+            expect(await col.get("b")).toEqual(fileRow({ key: "b" }))
+            await db.close()
+        } finally {
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
+        }
+    })
+
+    it("omitted autoFlush does not persist until flush", async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal("requestIdleCallback", undefined)
+        try {
+            let sql: string[] = []
+            let driver = createSqliteDriver({ filename: ":memory:", native: nativeWithLog(sql) })
+            let db = await driver.open(schema)
+            let col = db.collection<FileRow>("files")
+            await col.put(fileRow({ key: "a" }), { flush: "batch" })
+            sql.length = 0
+            await vi.advanceTimersByTimeAsync(5_000)
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(false)
+            await db.flush()
+            expect(sql.some((s) => /INSERT OR REPLACE/i.test(s))).toBe(true)
+            expect(await col.get("a")).toEqual(fileRow({ key: "a" }))
+            await db.close()
+        } finally {
+            vi.useRealTimers()
+            vi.unstubAllGlobals()
         }
     })
 })

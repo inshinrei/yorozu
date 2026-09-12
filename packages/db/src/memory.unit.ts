@@ -241,6 +241,12 @@ describe("openMemoryDb", () => {
         await expect(db.close()).resolves.toBeUndefined()
     })
 
+    it("flush rejects when signal is already aborted", async () => {
+        let db = await openMemoryDb(schema)
+        let signal = AbortSignal.abort()
+        await expect(db.flush({ reason: "hidden", signal })).rejects.toMatchObject({ name: "AbortError" })
+    })
+
     it("coerces a non-string primary key field to string", async () => {
         let db = await openMemoryDb(schema)
         let col = db.collection<ResourceRow>("files")

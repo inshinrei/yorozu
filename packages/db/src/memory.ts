@@ -8,11 +8,17 @@ import type {
     DbSchema,
     IndexDef,
     IndexKey,
+    FlushOpts,
     PutOpts,
     ScanBound,
     ScanHit,
     TxMode,
 } from "./types"
+
+function abortedReason(signal?: AbortSignal): unknown | undefined {
+    if (!signal?.aborted) return undefined
+    return signal.reason ?? new DOMException("The operation was aborted.", "AbortError")
+}
 
 function isScalarKey(value: unknown): value is string | number {
     return typeof value === "string" || (typeof value === "number" && !Number.isNaN(value))
@@ -224,9 +230,11 @@ class NestedTxDb implements Db {
         return Promise.reject(new Error("nested transact is not supported"))
     }
 
-    flush(): Promise<void> {
+    flush(opts?: FlushOpts): Promise<void> {
         if (this._mode.value === "r") return Promise.resolve()
-        return this._inner.flush()
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
+        return this._inner.flush(opts)
     }
 
     close(): Promise<void> {
@@ -276,7 +284,9 @@ class MemoryDb implements Db {
         })
     }
 
-    flush(): Promise<void> {
+    flush(opts?: FlushOpts): Promise<void> {
+        let aborted = abortedReason(opts?.signal)
+        if (aborted !== undefined) return Promise.reject(aborted)
         return Promise.resolve()
     }
 

@@ -12,6 +12,7 @@ let driver = createSqliteDriver({
     filename: "app.sqlite",
     // native, // inject better-sqlite3 ctor (tests). Default: better-sqlite3
     log, // optional Logger; silent default
+    autoFlush: true, // opt-in; or { pendingPuts: 32, idleMs: 1000 }
 })
 
 let db = await driver.open(schema)
@@ -31,6 +32,8 @@ Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db
 - `scan(..., { keysOnly: true })` is `SELECT pk, index columns` only. Never `payload`, never join `__blobs`. Omit `ScanHit.value`.
 - Prefix TTL: `scan("by-evict", { lt: [cutoff], keysOnly: true })` matches `[storedAt, bytes]` with `storedAt < cutoff` (`[cutoff] < [cutoff, 0]`).
 - Default `put` flush is `"now"`. `"batch"` buffers until `db.flush()` or the next `"rw"` transact commit, not `"r"`. `flush()` coalesces by `(collection, pk)`. Sync put batches use better-sqlite3 `db.transaction`.
+- `flush({ reason, signal })`: already-aborted `signal` rejects with `AbortError` (or `signal.reason`) before taking the lock; in-flight writes finish. Read transact `flush` stays a no-op.
+- Opt-in `autoFlush`: omitted = off. `true` → `{ pendingPuts: 32, idleMs: 1000 }`. After batch puts, idle-flush via `requestIdle` with `{ reason: "idle" }`; at `pendingPuts` distinct pks, re-arm with timeout 0. Successful flush / close cancels the idle handle.
 - Async `transact`: mutex + `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`. Not `db.transaction(fn)` (that API is sync-only). Nested `transact` throws via a facade. Concurrent `transact` serializes. Prefer the callback's `db.collection()`. A collection obtained before `transact` is reentrant while the SQL tx is open and joins that tx (rolls back with it). Concurrent ops from another task still queue on the mutex.
 - Scan `limit` is applied after `inRange` + `compareIndexKey` sort (no SQL `LIMIT`). String / mixed index keys are not filtered by SQL `WHERE` (SQLite TEXT is UTF-8; `IndexKey` strings compare as UTF-16). Select covering columns, then `inRange` / `compareIndexKey`.
 - Call `await db.flush()` before `close()`. Do not leave `{ flush: "batch" }` puts outstanding if another process may take the file.
