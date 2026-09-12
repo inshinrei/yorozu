@@ -45,20 +45,6 @@ function resolveAutoFlush(autoFlush?: AutoFlushInput): AutoFlushConfig | null {
     return { pendingPuts, idleMs }
 }
 
-function scheduleIdle(fn: () => void, timeout: number): IdleHandle {
-    let g = globalThis as unknown as { requestIdleCallback?: unknown }
-    if (typeof g.requestIdleCallback === "function") {
-        return requestIdle(() => fn(), { timeout })
-    }
-    // requestIdle's no-ric fallback is setTimeout(0) and ignores timeout; honor idleMs in Node.
-    let timer = setTimeout(fn, timeout)
-    return {
-        cancel(): void {
-            clearTimeout(timer)
-        },
-    }
-}
-
 type Row = Record<string, unknown>
 
 type PendingWrite = {
@@ -782,7 +768,6 @@ class SqliteCollection<T extends Row> implements Collection<T> {
             if (bound.keysOnly) out.push({ primaryKey: pk, indexKey })
             else out.push({ primaryKey: pk, indexKey, value: write.row as T })
         }
-        out.sort((a, b) => compareHits(a, b, bound.direction === "rev"))
         return out
     }
 }
@@ -908,11 +893,14 @@ class SqliteDb implements Db {
     protected _armIdle(timeout: number): void {
         this._cancelIdle()
         this._idleHandle = this._lock.detached(() =>
-            scheduleIdle(() => {
-                this._idleHandle = null
-                if (this._closed) return
-                void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
-            }, timeout),
+            requestIdle(
+                () => {
+                    this._idleHandle = null
+                    if (this._closed) return
+                    void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
+                },
+                { timeout },
+            ),
         )
     }
 

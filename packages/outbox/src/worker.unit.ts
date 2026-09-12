@@ -23,10 +23,12 @@ async function flushMicrotasks(times: number = 40): Promise<void> {
     for (let i = 0; i < times; i++) await Promise.resolve()
 }
 
-async function drainWorker(times: number = 40): Promise<void> {
-    for (let i = 0; i < times; i++) {
-        await Promise.resolve()
-        await vi.advanceTimersByTimeAsync(0)
+async function drainWorker(): Promise<void> {
+    // yieldEvery default uses requestIdle({ timeout: 1 }) → setTimeout(1) without rIC.
+    // Stay under the shortest retry/watchdog in this file (5ms / 10ms).
+    for (let n = 0; n < 3; n++) {
+        for (let i = 0; i < 20; i++) await Promise.resolve()
+        await vi.advanceTimersByTimeAsync(1)
     }
 }
 
@@ -498,16 +500,18 @@ describe("OutboxWorker", () => {
                 retryBaseMs: 1000,
                 retryCapMs: 30_000,
                 clock,
+                yieldEvery: 0,
             }),
         )
         await store.enqueue({ type: "test/msg", payload: {} })
-        await startUntilIdle(w)
+        w.start()
+        await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(1)
         await vi.advanceTimersByTimeAsync(999)
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(1)
         await vi.advanceTimersByTimeAsync(1)
-        await drainWorker()
+        await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -532,15 +536,17 @@ describe("OutboxWorker", () => {
                 pollIntervalMs: 60_000,
                 leaseDurationMs: 5000,
                 clock,
+                yieldEvery: 0,
             }),
         )
-        await startUntilIdle(w)
+        w.start()
+        await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(0)
         await vi.advanceTimersByTimeAsync(4999)
         await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(0)
         await vi.advanceTimersByTimeAsync(1)
-        await drainWorker()
+        await flushMicrotasks()
         expect(processSpy).toHaveBeenCalledTimes(1)
     })
 
@@ -675,7 +681,7 @@ describe("OutboxWorker", () => {
         w.start()
         await flushMicrotasks()
         expect(order).toEqual(["e1"])
-        await vi.advanceTimersByTimeAsync(0)
+        await vi.advanceTimersByTimeAsync(1)
         await flushMicrotasks()
         expect(order).toEqual(["e1", "e2"])
     })
@@ -691,7 +697,7 @@ describe("OutboxWorker", () => {
         expect(processSpy).toHaveBeenCalledTimes(2)
     })
 
-    it("requestIdleCallback yield uses timeout 0", async () => {
+    it("requestIdleCallback yield uses a positive timeout", async () => {
         let ric = vi.fn((cb: (deadline: { didTimeout: boolean; timeRemaining(): number }) => void) => {
             queueMicrotask(() => {
                 cb({
@@ -710,6 +716,6 @@ describe("OutboxWorker", () => {
         w.start()
         await flushMicrotasks()
         expect(ric).toHaveBeenCalled()
-        expect(ric.mock.calls[0]?.[1]).toEqual({ timeout: 0 })
+        expect(ric.mock.calls[0]?.[1]).toEqual({ timeout: 1 })
     })
 })

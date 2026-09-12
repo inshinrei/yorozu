@@ -297,7 +297,7 @@ export class OutboxWorker {
         if (!Number.isFinite(every)) every = 1
         if (every > 0 && processed % every === 0) {
             await new Promise<void>((resolve) => {
-                requestIdle(() => resolve(), { timeout: 0 })
+                requestIdle(() => resolve(), { timeout: 1 })
             })
         }
     }

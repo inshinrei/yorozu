@@ -36,7 +36,7 @@ type ActiveJob = {
     controller: AbortController
 }
 
-let PRI_ORDER: BitmapPri[] = ["visible", "preload"]
+const PRI_ORDER: BitmapPri[] = ["visible", "preload"]
 
 function resolveConcurrency(value: number | undefined): number {
     if (value === undefined) return 1
@@ -94,13 +94,6 @@ export function createBitmapWorkQueue(opts?: { concurrency?: number; idle?: bool
             for (let i = 0; i < lane.length; i++) {
                 let job = lane[i]!
                 if (!job.idleReady) continue
-                if (active.has(job.id)) {
-                    lane.splice(i, 1)
-                    queuedPri.delete(job.id)
-                    cancelIdle(job)
-                    i--
-                    continue
-                }
                 lane.splice(i, 1)
                 queuedPri.delete(job.id)
                 cancelIdle(job)

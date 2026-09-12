@@ -498,6 +498,17 @@ describe("createSqliteDriver", () => {
         await db.close()
     })
 
+    it("scan direction rev + pending merge still limits from the high end", async () => {
+        let driver = createSqliteDriver({ filename: ":memory:" })
+        let db = await driver.open(schema)
+        let col = db.collection<FileRow>("files")
+        await col.putMany([fileRow({ key: "a" }), fileRow({ key: "b" }), fileRow({ key: "c" })])
+        await col.put(fileRow({ key: "z" }), { flush: "batch" })
+        let hits = await col.scan("__pk", { direction: "rev", keysOnly: true, limit: 2 })
+        expect(hits.map((h) => h.primaryKey)).toEqual(["z", "c"])
+        await db.close()
+    })
+
     it("unknown collection / unknown index throws", async () => {
         let driver = createSqliteDriver({ filename: ":memory:" })
         let db = await driver.open(schema)

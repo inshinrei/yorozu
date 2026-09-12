@@ -217,6 +217,53 @@ describe("createBitmapWorkQueue", () => {
         expect(order).toEqual(["v", "p"])
     })
 
+    it("idle fire while paused leaves preload queued until resume", async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal("requestIdleCallback", undefined)
+        vi.stubGlobal("createImageBitmap", async () => fakeBitmap())
+        let q = createBitmapWorkQueue()
+        let started = false
+        q.pause()
+        q.enqueue({
+            id: "p",
+            pri: "preload",
+            source: new Blob(),
+            run: async () => {
+                started = true
+            },
+        })
+        await vi.advanceTimersByTimeAsync(0)
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(started).toBe(false)
+        expect(q.stats.queued).toBe(1)
+        expect(q.stats.active).toBe(0)
+        q.resume()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(started).toBe(true)
+    })
+
+    it("closes bitmap when canceled during decode", async () => {
+        let bmp = fakeBitmap()
+        let release!: () => void
+        vi.stubGlobal(
+            "createImageBitmap",
+            () =>
+                new Promise<ImageBitmap>((resolve) => {
+                    release = () => resolve(bmp)
+                }),
+        )
+        let q = createBitmapWorkQueue({ idle: false })
+        q.enqueue({ id: "a", pri: "visible", source: new Blob() })
+        await Promise.resolve()
+        expect(q.cancel("a")).toBe(true)
+        release()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(bmp.close).toHaveBeenCalledTimes(1)
+    })
+
     it("pause blocks new starts including visible; resume pumps; cancel aborts running", async () => {
         vi.stubGlobal("createImageBitmap", async () => fakeBitmap())
         let q = createBitmapWorkQueue({ idle: false, concurrency: 1 })

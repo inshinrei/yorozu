@@ -67,7 +67,7 @@ Optional `class` on put (`"thumb"` | `"original"` | any string). Pass `preferDro
 ## Musts
 
 - Port is `Collection`. Host opens memory / IDB / SQLite via a `DbDriver` and passes `db.collection(...)`.
-- Covering index `by-evict` is `["storedAt", "bytes"]`. Eviction walks `scan("by-evict", { keysOnly: true, limit?: n })`. Count trim passes `limit: extra`; seed / ledger rebuild omit `limit`. Never `getAll()` on blob collections.
+- Covering index `by-evict` is `["storedAt", "bytes"]`. TTL/count eviction walks `scan("by-evict", { keysOnly: true, limit?: n })`. Count trim passes `limit: extra`; seed / ledger rebuild omit `limit`. Bytes trim is keysOnly unless `preferDrop` is set (then values so `class` is visible). Never `getAll()` on blob collections.
 - Bytes: `getBytesTotal` then ordered pick. Under cap: do not scan for the pick.
 - `put` bytes come from `blob.size`. If `maxBytes` is set and `bytes > maxBytes`, put is a no-op.
 - Tests in this package use `openMemoryDb` only. Do not import `@yorozu/db-idb` or `@yorozu/db-sqlite` here.

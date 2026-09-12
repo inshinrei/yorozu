@@ -52,20 +52,6 @@ function resolveAutoFlush(autoFlush?: AutoFlushInput): AutoFlushConfig | null {
     return { pendingPuts, idleMs }
 }
 
-function scheduleIdle(fn: () => void, timeout: number): IdleHandle {
-    let g = globalThis as unknown as { requestIdleCallback?: unknown }
-    if (typeof g.requestIdleCallback === "function") {
-        return requestIdle(() => fn(), { timeout })
-    }
-    // requestIdle's no-ric fallback is setTimeout(0) and ignores timeout; honor idleMs in Node.
-    let timer = setTimeout(fn, timeout)
-    return {
-        cancel(): void {
-            clearTimeout(timer)
-        },
-    }
-}
-
 type Row = Record<string, unknown>
 type PendingEntry = { row: Row; seq: number }
 type Pending = Map<string, Map<string, PendingEntry>>
@@ -715,11 +701,14 @@ class IdbDb implements Db {
 
     protected _armIdle(timeout: number): void {
         this._cancelIdle()
-        this._idleHandle = scheduleIdle(() => {
-            this._idleHandle = null
-            if (this._closed) return
-            void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
-        }, timeout)
+        this._idleHandle = requestIdle(
+            () => {
+                this._idleHandle = null
+                if (this._closed) return
+                void this.flush({ reason: "idle" }).catch((err) => reportError(this.log, err))
+            },
+            { timeout },
+        )
     }
 
     protected _onBatchQueued(): void {

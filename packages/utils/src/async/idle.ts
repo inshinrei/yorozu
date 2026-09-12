@@ -14,14 +14,22 @@ export function requestIdle(fn: (deadline: IdleDeadline) => void, opts?: { timeo
         requestIdleCallback?: Ric
         cancelIdleCallback?: (id: number) => void
     }
+    let timeout = opts?.timeout
     if (typeof g.requestIdleCallback === "function") {
-        let id = g.requestIdleCallback(fn, opts?.timeout !== undefined ? { timeout: opts.timeout } : undefined)
+        let ricOpts: { timeout: number } | undefined
+        if (timeout !== undefined) {
+            // rIC ignores timeout <= 0; a 1ms cap is still a deadline.
+            ricOpts = { timeout: timeout > 0 ? timeout : 1 }
+        }
+        let id = g.requestIdleCallback(fn, ricOpts)
         return {
             cancel(): void {
                 g.cancelIdleCallback?.(id)
             },
         }
     }
+    let delay = 0
+    if (typeof timeout === "number" && Number.isFinite(timeout) && timeout > 0) delay = timeout
     let timer = setTimeout(() => {
         fn({
             didTimeout: true,
@@ -29,7 +37,7 @@ export function requestIdle(fn: (deadline: IdleDeadline) => void, opts?: { timeo
                 return 0
             },
         })
-    }, 0)
+    }, delay)
     return {
         cancel(): void {
             clearTimeout(timer)
