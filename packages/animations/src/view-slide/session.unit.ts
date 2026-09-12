@@ -317,7 +317,7 @@ describe("createViewSlide", () => {
         expect(opts.duration).toBe(250)
         expect(opts.easing).toBe("ease-in-out")
         let fromFrames = animate.mock.calls[0]![0]
-        expect(fromFrames[1]).toMatchObject({ transform: "scale(0.7)", opacity: "0" })
+        expect(fromFrames[1]).toMatchObject({ transform: "translate3d(0, 0, 0)", opacity: "0" })
         let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
     })

@@ -49,6 +49,7 @@ export {
 export type {
     SlideDirection,
     ViewSlideMode,
+    CoverMotion,
     ViewSlideKind,
     ViewSlideMountPolicy,
     PanelRole,

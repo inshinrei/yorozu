@@ -60,20 +60,31 @@ describe("viewSlideTransforms", () => {
         expect(back.toStart.transform).toBe("translate3d(-1.5rem, 0, 0)")
     })
 
-    it("cover forward scales the leaving panel and slides the entering one from 200%", () => {
+    it("cover forward fades the leaving panel and slides the entering one from 200%", () => {
         let t = viewSlideTransforms("forward", "cover")
-        expect(t.fromStart).toEqual({ transform: "scale(1)", opacity: "1" })
-        expect(t.fromEnd).toEqual({ transform: "scale(0.7)", opacity: "0" })
+        expect(t.fromStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "0" })
         expect(t.toStart).toEqual({ transform: "translateX(200%)", opacity: "1" })
         expect(t.toEnd).toEqual({ transform: "translateX(0)", opacity: "1" })
+        expect(t.fromEnd.transform.includes("scale")).toBe(false)
     })
 
-    it("cover back reverses scale-out and the 200% slide", () => {
+    it("cover back reverses the 200% slide and fade", () => {
         let t = viewSlideTransforms("back", "cover")
         expect(t.fromStart).toEqual({ transform: "translateX(0)", opacity: "1" })
         expect(t.fromEnd).toEqual({ transform: "translateX(200%)", opacity: "1" })
-        expect(t.toStart).toEqual({ transform: "scale(0.7)", opacity: "0" })
-        expect(t.toEnd).toEqual({ transform: "scale(1)", opacity: "1" })
+        expect(t.toStart).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "0" })
+        expect(t.toEnd).toEqual({ transform: "translate3d(0, 0, 0)", opacity: "1" })
+    })
+
+    it("coverMotion scale keeps the snapshot scale-out poses", () => {
+        let t = viewSlideTransforms("forward", "cover", "scale")
+        expect(t.fromStart).toEqual({ transform: "scale(1)", opacity: "1" })
+        expect(t.fromEnd).toEqual({ transform: "scale(0.7)", opacity: "0" })
+        expect(t.toStart).toEqual({ transform: "translateX(200%)", opacity: "1" })
+        let back = viewSlideTransforms("back", "cover", "scale")
+        expect(back.toStart).toEqual({ transform: "scale(0.7)", opacity: "0" })
+        expect(back.toEnd).toEqual({ transform: "scale(1)", opacity: "1" })
     })
 
     it("peek forward leaves at -20% / 0.7 and enters from 100%", () => {

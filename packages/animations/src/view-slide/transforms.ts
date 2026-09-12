@@ -3,6 +3,7 @@ import type { Key } from "../core/types"
 
 export type SlideDirection = "forward" | "back"
 export type ViewSlideMode = "push" | "crossfade" | "cover" | "peek" | "lift" | "zoom" | "reveal" | "none"
+export type CoverMotion = "scale" | "fade"
 export type ViewSlideKind = "stack" | "layer"
 export type ViewSlideMountPolicy = "keep-visited" | "active-plus-leaving"
 export type PanelRole = "entering" | "leaving" | "active" | "idle"
@@ -52,7 +53,11 @@ export function viewSlideEasing(mode: Exclude<ViewSlideMode, "none">): string {
     return VIEW_SLIDE_EASING
 }
 
-export function viewSlideTransforms(direction: SlideDirection, mode: Exclude<ViewSlideMode, "none">): SlideTransforms {
+export function viewSlideTransforms(
+    direction: SlideDirection,
+    mode: Exclude<ViewSlideMode, "none">,
+    coverMotion?: CoverMotion,
+): SlideTransforms {
     if (mode === "crossfade") {
         let leave = direction === "forward" ? `-${VIEW_SLIDE_FADE_OFFSET}` : VIEW_SLIDE_FADE_OFFSET
         let enter = direction === "forward" ? VIEW_SLIDE_FADE_OFFSET : `-${VIEW_SLIDE_FADE_OFFSET}`
@@ -65,10 +70,26 @@ export function viewSlideTransforms(direction: SlideDirection, mode: Exclude<Vie
     }
 
     if (mode === "cover") {
+        if (coverMotion === "scale") {
+            if (direction === "forward") {
+                return {
+                    fromStart: { transform: "scale(1)", opacity: "1" },
+                    fromEnd: { transform: "scale(0.7)", opacity: "0" },
+                    toStart: { transform: "translateX(200%)", opacity: "1" },
+                    toEnd: { transform: "translateX(0)", opacity: "1" },
+                }
+            }
+            return {
+                fromStart: { transform: "translateX(0)", opacity: "1" },
+                fromEnd: { transform: "translateX(200%)", opacity: "1" },
+                toStart: { transform: "scale(0.7)", opacity: "0" },
+                toEnd: { transform: "scale(1)", opacity: "1" },
+            }
+        }
         if (direction === "forward") {
             return {
-                fromStart: { transform: "scale(1)", opacity: "1" },
-                fromEnd: { transform: "scale(0.7)", opacity: "0" },
+                fromStart: { transform: "translate3d(0, 0, 0)", opacity: "1" },
+                fromEnd: { transform: "translate3d(0, 0, 0)", opacity: "0" },
                 toStart: { transform: "translateX(200%)", opacity: "1" },
                 toEnd: { transform: "translateX(0)", opacity: "1" },
             }
@@ -76,8 +97,8 @@ export function viewSlideTransforms(direction: SlideDirection, mode: Exclude<Vie
         return {
             fromStart: { transform: "translateX(0)", opacity: "1" },
             fromEnd: { transform: "translateX(200%)", opacity: "1" },
-            toStart: { transform: "scale(0.7)", opacity: "0" },
-            toEnd: { transform: "scale(1)", opacity: "1" },
+            toStart: { transform: "translate3d(0, 0, 0)", opacity: "0" },
+            toEnd: { transform: "translate3d(0, 0, 0)", opacity: "1" },
         }
     }
 

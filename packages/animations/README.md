@@ -112,7 +112,7 @@ canAnimate(level) // false only for low
 
 ## View slide
 
-Panel stack transitions driven by an active key. Built-in modes: `push` (full-width), `crossfade` (±1.5rem + opacity), `cover` (scale-out leave + 200% enter), `peek` (~20% back + dim), `lift` (vertical ±100%), `zoom` (scale 1.1 / 0.95), `reveal` (`clip-path` inset wipe), `none`.
+Panel stack transitions driven by an active key. Built-in modes: `push` (full-width), `crossfade` (±1.5rem + opacity), `cover` (translate + opacity leave + 200% enter; pass `coverMotion: "scale"` only when the host snapshots the leaving pane), `peek` (~20% back + dim), `lift` (vertical ±100%), `zoom` (scale 1.1 / 0.95), `reveal` (`clip-path` inset wipe), `none`.
 
 ```ts
 import { createViewSlide, slideDirectionByIndex, resolveViewSlideMode } from "@yorozu/animations"
@@ -213,7 +213,7 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 | Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                                                       |
 | Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                                                                  |
 | Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                                                          |
-| Cover slide       | `createViewSlide` `cover`               | Scale-out leave + 200% enter (list-layer open/close)                                       |
+| Cover slide       | `createViewSlide` `cover`               | Default translate + opacity (no scale); `coverMotion: "scale"` when host snapshots leave   |
 | Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim                                              |
 | Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                                                                |
 | Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                                                           |

@@ -6,6 +6,7 @@ import {
     viewSlideDurationMs,
     viewSlideEasing,
     viewSlideTransforms,
+    type CoverMotion,
     type PanelRole,
     type SlideDirection,
     type SlidePanelState,
@@ -17,7 +18,15 @@ import {
 export { VIEW_SLIDE_COVER_EASING, VIEW_SLIDE_COVER_MS, VIEW_SLIDE_EASING, VIEW_SLIDE_MS } from "./transforms"
 export const VIEW_SLIDE_SETTLE_SLACK_MS: number = 80
 
-export type { PanelRole, SlideDirection, SlidePanelState, SlideTransforms, ViewSlideMode, ViewSlideMountPolicy }
+export type {
+    CoverMotion,
+    PanelRole,
+    SlideDirection,
+    SlidePanelState,
+    SlideTransforms,
+    ViewSlideMode,
+    ViewSlideMountPolicy,
+}
 
 const PANEL_STYLE_KEYS: readonly string[] = ["transform", "opacity", "will-change", "clip-path"]
 
@@ -25,6 +34,7 @@ export type ViewSlideConfig = {
     getMode: () => ViewSlideMode
     getDirection: (from: Key, to: Key) => SlideDirection | null
     transforms?: (dir: SlideDirection, mode: Exclude<ViewSlideMode, "none">) => SlideTransforms
+    coverMotion?: CoverMotion
     durationMs?: (mode: Exclude<ViewSlideMode, "none">) => number
     easing?: (mode: Exclude<ViewSlideMode, "none">) => string
     mountPolicy?: ViewSlideMountPolicy
@@ -84,7 +94,8 @@ function sameMountedKeys(a: readonly Key[], b: readonly Key[]): boolean {
 export function createViewSlide(config: ViewSlideConfig): ViewSlide {
     let mountPolicy: ViewSlideMountPolicy = config.mountPolicy ?? "keep-visited"
     let settleSlackMs = config.settleSlackMs ?? VIEW_SLIDE_SETTLE_SLACK_MS
-    let resolveTransforms = config.transforms ?? viewSlideTransforms
+    let resolveTransforms =
+        config.transforms ?? ((dir, mode) => viewSlideTransforms(dir, mode, config.coverMotion ?? "fade"))
     let resolveDuration = config.durationMs ?? viewSlideDurationMs
     let resolveEasing = config.easing ?? viewSlideEasing
 
