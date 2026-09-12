@@ -18,21 +18,24 @@ let runTick = (cancelPending: boolean): void => {
         cancelAnimationFrame(scheduled)
     }
     scheduled = 0
-    phase = "measure"
-    while (measures.length) measures.shift()!()
-    phase = "mutate"
-    while (mutates.length) mutates.shift()!()
-    phase = "after"
-    let follow: Array<() => void> = []
-    while (afterMutate.length) {
-        let result = afterMutate.shift()!()
-        if (typeof result === "function") follow.push(result)
+    try {
+        phase = "measure"
+        while (measures.length) measures.shift()!()
+        phase = "mutate"
+        while (mutates.length) mutates.shift()!()
+        phase = "after"
+        let follow: Array<() => void> = []
+        while (afterMutate.length) {
+            let result = afterMutate.shift()!()
+            if (typeof result === "function") follow.push(result)
+        }
+        phase = "mutate"
+        for (let fn of follow) fn()
+        while (mutates.length) mutates.shift()!()
+    } finally {
+        phase = "idle"
+        if (measures.length || mutates.length || afterMutate.length) schedule()
     }
-    phase = "mutate"
-    for (let fn of follow) fn()
-    while (mutates.length) mutates.shift()!()
-    phase = "idle"
-    if (measures.length || mutates.length || afterMutate.length) schedule()
 }
 
 export function queueMeasure(fn: () => void): void {

@@ -77,4 +77,17 @@ describe("dom schedule", () => {
         flushDomSchedule()
         expect(order).toEqual(["r", "w"])
     })
+
+    it("recovers after a thrown mutate so later frames still run", () => {
+        queueMutate(() => {
+            throw new Error("mutate failed")
+        })
+        expect(() => flushDomSchedule()).toThrow("mutate failed")
+        let ran = false
+        queueMeasure(() => {
+            ran = true
+        })
+        flushDomSchedule()
+        expect(ran).toBe(true)
+    })
 })
