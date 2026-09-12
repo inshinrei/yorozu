@@ -28,7 +28,7 @@ Idle 100% view does not hold an animation-frame pump. Settle lerps through `@yor
 
 Omit `decode` to keep today's `<img src>` / poster path. Attach does not call the port.
 
-When `decode` is set, neighbor peeks, the active image, and painted thumbs wait on a budgeted abortable port (`createMediaDecodePort`) and then `applyCanvasImageSource`. Video active panes still use `<video src>`. The package does not decode the full album on open — only the active image, neighbor peeks, and painted thumbs.
+When `decode` is set, neighbor peeks, the active image, and painted thumbs wait on a budgeted abortable port (`createMediaDecodePort`) and then `applyCanvasImageSource`. `applyCanvasImageSource` **adopts** a returned `HTMLImageElement` (moves it in the DOM). Hosts must not reuse one node for active + peek. Video active panes still use `<video src>`. The package does not decode the full album on open — only the active image, neighbor peeks, and painted thumbs.
 
 Default budget: 1 active, 2 peeks (older and newer share), 4 thumbs. The host supplies `decode` (for example a `createBitmapWorkQueue` wrapper).
 
@@ -40,7 +40,7 @@ Hosts that warm their own bitmaps should `pause()` that work while `viewer.isGes
 
 `onVisible` is a host port. The package does not warm bitmaps and does not call `decode` from it.
 
-Attach emits `{ stage, peeks, thumbs }` after overlay paint: open, index change, neighbor change, virtualized strip window shift, and swipe settle. Session `open` / `next` / `setNeighbors` / `setItems` do not fire it. Identical structs are coalesced.
+Attach emits `{ stage, peeks, thumbs }` after overlay paint: open, index change, neighbor change, virtualized strip window shift, and swipe settle. Close / overlay teardown emits `{ stage: "", peeks: [], thumbs: [] }`. Session `open` / `next` / `setNeighbors` / `setItems` do not fire it. Identical structs are coalesced. Hosts can abort warm on the empty set.
 
 - `stage` — current item id, or `""` if none
 - `peeks` — older then newer neighbor ids that exist

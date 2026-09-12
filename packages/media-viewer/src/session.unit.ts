@@ -477,6 +477,25 @@ describe("createMediaViewer", () => {
         expect(seen.at(-1)).toEqual(first)
     })
 
+    it("notifyVisible coalesces by fields so a pipe item id does not collide", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer!.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        let thumbsPipe: MediaVisibleIds = { stage: "a", peeks: [], thumbs: ["|"] }
+        let peeksPipe: MediaVisibleIds = { stage: "a", peeks: ["|"], thumbs: [] }
+        viewer.notifyVisible(thumbsPipe)
+        viewer.notifyVisible({ stage: "a", peeks: [], thumbs: ["|"] })
+        expect(seen).toEqual([thumbsPipe])
+        viewer.notifyVisible(peeksPipe)
+        expect(seen).toEqual([thumbsPipe, peeksPipe])
+        viewer.notifyVisible({ stage: "a", peeks: ["|"], thumbs: [] })
+        expect(seen).toHaveLength(2)
+    })
+
     it("gif is a valid item kind and snapshot preserves it", () => {
         viewer!.open({ items: [{ id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }] })
         expect(viewer!.snapshot().current?.kind).toBe("gif")

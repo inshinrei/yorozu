@@ -629,7 +629,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function paneContentKey(side: string, item: MediaViewerItem | MediaViewerNeighbor): string {
         let poster = "poster" in item && item.poster ? item.poster : ""
         let alt = "alt" in item && item.alt ? item.alt : ""
-        return `${side}:${item.id}:${item.kind}:${item.src ?? ""}:${poster}:${alt}`
+        let motion = reducedMotion() ? "rm" : "full"
+        return `${side}:${item.id}:${item.kind}:${item.src ?? ""}:${poster}:${alt}:${motion}`
     }
 
     function peekBitmapSrc(item: MediaViewerNeighbor): string | null {
@@ -908,7 +909,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                     decode: (req) => hostDecode({ ...req, id: item.id }),
                 })
                 .then((source: CanvasImageSource | null): void => {
-                    if (detached || thumbDecodeKeys.get(btn) !== key) return
+                    if (detached || !btn.isConnected || viewer.isGesturing() || thumbDecodeKeys.get(btn) !== key) {
+                        return
+                    }
                     btn.replaceChildren()
                     if (source) applyCanvasImageSource(btn, source, { alt: item.alt ?? "" })
                 })
@@ -1073,7 +1076,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let itemSizePx = viewer.filmstripItemSizePx()
             let viewportWidth = filmstripEl.clientWidth
             let left = index * itemSizePx + itemSizePx / 2 - viewportWidth / 2
+            let totalSize =
+                filmstripList != null ? filmstripList.totalSize() : viewer.snapshot().items.length * itemSizePx
+            let maxLeft = Math.max(0, totalSize - viewportWidth)
             if (left < 0) left = 0
+            if (left > maxLeft) left = maxLeft
             if (typeof filmstripEl.scrollTo === "function") {
                 filmstripEl.scrollTo({ left, behavior })
             } else {
@@ -1489,6 +1496,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let currentShell = shell
         shell = null
         currentShell?.destroy()
+        if (overlay != null) {
+            viewer.notifyVisible({ stage: "", peeks: [], thumbs: [] })
+        }
         overlay?.remove()
         overlay = null
         // zoom.reset may have scheduled a frame while overlay was still set.

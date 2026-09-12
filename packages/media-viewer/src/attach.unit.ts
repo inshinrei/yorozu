@@ -491,6 +491,20 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
     })
 
+    it("gif with poster remounts to poster when prefersReducedMotion flips to true", () => {
+        stop?.()
+        let rm = false
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => rm })
+        let gif: MediaViewerItem = { id: "g", kind: "gif", src: "g.gif", poster: "g.jpg" }
+        viewer.open({ items: [gif] })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage.getAttribute("src")).toBe("g.gif")
+        rm = true
+        viewer.setItems([gif])
+        stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(stage.getAttribute("src")).toBe("g.jpg")
+    })
+
     it("gif swipe still navigates", () => {
         viewer.open({
             items: [{ id: "g", kind: "gif", src: "g.gif" }, img("b")],
@@ -1213,6 +1227,21 @@ describe("attachMediaViewer", () => {
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
     })
 
+    it("virtualized centerCurrentThumb clamps left at the last index", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({
+            items,
+            index: 0,
+            filmstrip: { virtualize: true, itemSizePx: 40, overscan: 2 },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        let scrollTo = vi.fn()
+        nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
+        viewer.goTo(39)
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 1400 }))
+    })
+
     it("virtualized filmstrip does not recenter when neighbors change", () => {
         let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
         viewer.open({
@@ -1621,12 +1650,30 @@ describe("attachMediaViewer", () => {
         stop = attachMediaViewer(viewer, root)
         viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
         expect(seen[0]).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
-        let n = seen.length
-        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
-        // reopen same ids may tear down overlay — allow one more equal or coalesced
         viewer.next("next")
         expect(seen.at(-1)).toEqual({ stage: "b", peeks: ["a"], thumbs: [] })
-        void n
+        let n = seen.length
+        viewer.setNeighbors({
+            older: { id: "a", kind: "image", src: "a.jpg" },
+            newer: null,
+        })
+        expect(seen.length).toBe(n)
+    })
+
+    it("onVisible after forceClose is empty ids", () => {
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a"), img("b")], index: 0, filmstrip: false })
+        expect(seen[0]).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
+        viewer.forceClose()
+        expect(seen.at(-1)).toEqual({ stage: "", peeks: [], thumbs: [] })
     })
 
     it("onVisible filmstrip on reports all item ids as thumbs", () => {

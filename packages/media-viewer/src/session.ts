@@ -49,8 +49,8 @@ function areIdArraysEqual(a: readonly string[] | undefined, b: readonly string[]
     return true
 }
 
-function visibleSignature(ids: MediaVisibleIds): string[] {
-    return [ids.stage, ...ids.peeks, "|", ...ids.thumbs]
+function visibleIdsEqual(a: MediaVisibleIds, b: MediaVisibleIds): boolean {
+    return a.stage === b.stage && areIdArraysEqual(a.peeks, b.peeks) && areIdArraysEqual(a.thumbs, b.thumbs)
 }
 
 function clampIndex(index: number, length: number): number {
@@ -87,7 +87,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let filmstripThumbSrcFn: ((item: MediaViewerItem) => string | null) | undefined
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
     let gesturingFlag = false
-    let lastVisible: string[] | undefined
+    let lastVisible: MediaVisibleIds | undefined
     let listeners = new Set<() => void>()
     let decodeBudgetValue: MediaDecodeBudget = {
         active: opts?.decodeBudget?.active ?? DEFAULT_DECODE_BUDGET_ACTIVE,
@@ -367,9 +367,8 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
             peeks: ids.peeks.slice(),
             thumbs: ids.thumbs.slice(),
         }
-        let sig = visibleSignature(next)
-        if (areIdArraysEqual(lastVisible, sig)) return
-        lastVisible = sig
+        if (lastVisible != null && visibleIdsEqual(lastVisible, next)) return
+        lastVisible = next
         opts?.onVisible?.(next)
     }
 
