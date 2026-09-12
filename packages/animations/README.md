@@ -69,6 +69,24 @@ group.take("overlay-fade", fade.setVisible(true))
 // fade.destroy() cancels the in-flight fade without throwing when idle
 ```
 
+## Layout size writer
+
+Scheduled `readPx` / `writePx` under the heavy lock; not a height WAAPI helper. Prefer compositor substitutes (`scaleY` / clip) for chrome; do not height-tween a scrolling column.
+
+```ts
+import { createHeavyAnimationLock, createLayoutSizeTween } from "@yorozu/animations"
+
+const lock = createHeavyAnimationLock()
+const size = createLayoutSizeTween({
+    readPx: () => readPanelSize(),
+    writePx: (px) => writePanelSize(px),
+    applyRest: () => clearPanelSize(),
+    lock,
+})
+size.play(240, 200)
+size.snap()
+```
+
 ## Intensity
 
 Three playback levels. The OS `prefers-reduced-motion` query is **seed only** — after the host stores a pick, that value owns playback.
@@ -215,3 +233,4 @@ Wire `getMode`, `isReduced`, and `enabled` from the stored intensity so every pr
 - **Measure / mutate:** `queueMeasure` then `queueMutate` on one frame; `dualRaf` still means wait two frames; `queueMeasureAfterMutate` is the rare second read.
 - **First layout is a baseline:** first indicator measure and first reorder `sync` establish state without animating.
 - **Heavy-motion lock:** the host holds one `createHeavyAnimationLock` instance and `acquire`s around slides / docks / list-reorder / layout-size work. Level `any` pauses observers/decode; `blocking` also defers store fan-out. This is not list-reorder `isSuppressed`, and it does not read an OS reduced-motion media query.
+- **Layout size writer:** scheduled `readPx` / `writePx` under the heavy lock; not a height WAAPI helper; prefer compositor substitutes (`scaleY` / clip) for chrome; do not height-tween a scrolling column.

@@ -19,5 +19,6 @@ describe("package barrel", () => {
         expect(typeof animations.createSharedElement).toBe("function")
         expect(typeof animations.playSharedElement).toBe("function")
         expect(typeof animations.createCancelGroup).toBe("function")
+        expect(typeof animations.createLayoutSizeTween).toBe("function")
     })
 })

@@ -21,6 +21,8 @@ export type { TweenOptions } from "./core/tween"
 export { easeOutCubic, lerp, tween } from "./core/tween"
 export type { HeavyLockLevel, HeavyAnimationLock } from "./core/heavy-lock"
 export { DEFAULT_HEAVY_LOCK_TIMEOUT_MS, createHeavyAnimationLock } from "./core/heavy-lock"
+export type { LayoutSizeTween } from "./core/layout-size"
+export { createLayoutSizeTween } from "./core/layout-size"
 
 export type { Rect, Size, Insets, ObjectFit } from "./rect/types"
 export { fitContain, centerFitInViewport } from "./rect/fit"
