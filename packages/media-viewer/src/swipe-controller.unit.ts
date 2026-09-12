@@ -74,8 +74,11 @@ describe("createMediaSwipe", () => {
     it("bounces on reverse-cancel after past-threshold drag", () => {
         vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        let onSettle = vi.fn()
+        let onGestureChange = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer, onSettle, onGestureChange }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        expect(onGestureChange).toHaveBeenCalledWith(true)
         swipe.onPointerMove(pointer("pointermove", { clientX: 300, clientY: 200 }))
         // reverse a few px so lastDelta disagrees with total offset
         swipe.onPointerMove(pointer("pointermove", { clientX: 310, clientY: 200 }))
@@ -84,11 +87,13 @@ describe("createMediaSwipe", () => {
         let bounced = swipe.offsetX()
         expect(bounced).not.toBe(0)
         expect(swipe.settling()).toBe(true)
+        expect(onSettle).not.toHaveBeenCalled()
         vi.advanceTimersByTime(50)
         expect(Math.abs(swipe.offsetX())).toBeLessThan(Math.abs(bounced))
         vi.advanceTimersByTime(400)
         expect(swipe.offsetX()).toBe(0)
         expect(onNewer).not.toHaveBeenCalled()
+        expect(onSettle).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 

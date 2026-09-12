@@ -63,6 +63,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let navFrom: MediaViewerNavFrom | null = null
     let filmstripWanted = true
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
+    let gesturingFlag = false
     let listeners = new Set<() => void>()
     let decodeBudgetValue: MediaDecodeBudget = {
         active: opts?.decodeBudget?.active ?? DEFAULT_DECODE_BUDGET_ACTIVE,
@@ -281,6 +282,15 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         }
     }
 
+    function isGesturing(): boolean {
+        return gesturingFlag
+    }
+
+    function setGesturing(on: boolean): void {
+        if (!alive) return
+        gesturingFlag = on
+    }
+
     function subscribe(listener: () => void): () => void {
         if (!alive) return () => {}
         listeners.add(listener)
@@ -318,6 +328,8 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         snapshot,
         decodeFn,
         decodeBudget,
+        isGesturing,
+        setGesturing,
         destroy,
     }
 }

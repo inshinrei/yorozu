@@ -155,6 +155,12 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (dir === "older") return snap.index > 0
             return snap.index < snap.items.length - 1
         },
+        onGestureChange: (): void => {
+            syncSwipeGesturing()
+        },
+        onSettle: (): void => {
+            afterSwipeSettle()
+        },
     })
 
     function cancelRaf(): void {
@@ -499,6 +505,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         percentLabel: (): string => zoom.percentLabel(),
         scale: (): number => zoom.scale(),
         onZoomChange: (listener: () => void): (() => void) => zoom.onChange(listener),
+        isGesturing: (): boolean => viewer.isGesturing(),
         snapshot: (): MediaViewerSnapshot => viewer.snapshot(),
     }
 
@@ -745,9 +752,37 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (snap.neighbors.older) keep.add(snap.neighbors.older.id)
         if (snap.current) keep.add(snap.current.id)
         if (snap.neighbors.newer) keep.add(snap.neighbors.newer.id)
+        if (viewer.decodeFn() && viewer.isGesturing()) decodePort.abortExcept(keep)
         syncPane("older", snap.neighbors.older, keep)
         syncPane("active", snap.current, keep)
         syncPane("newer", snap.neighbors.newer, keep)
+    }
+
+    function syncSwipeGesturing(): void {
+        let on = swipe.gesturing() || swipe.settling() || swipe.dismissing()
+        viewer.setGesturing(on)
+        if (on) {
+            decodePort.pausePeeksAndThumbs()
+            return
+        }
+        decodePort.resume()
+    }
+
+    function afterSwipeSettle(): void {
+        syncSwipeGesturing()
+        if (detached || viewer.isGesturing() || overlay == null || abort == null) return
+        if (!viewer.decodeFn()) return
+        let snap = viewer.snapshot()
+        paintPanes(snap)
+        if (!filmstripEl || !snap.filmstrip) return
+        let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+        if (!track) return
+        for (let el of track.querySelectorAll("[data-yorozu-media-thumb]")) {
+            if (!(el instanceof HTMLElement)) continue
+            if (el.querySelector("img, canvas")) continue
+            thumbDecodeKeys.delete(el)
+        }
+        syncThumbs(track, snap)
     }
 
     function itemIdKey(list: readonly MediaViewerItem[]): string {
@@ -1204,6 +1239,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         lastWheelZoomOrigin = null
         ghost.cancel()
         swipe.reset()
+        viewer.setGesturing(false)
         zoom.reset()
         zoomDragging = false
         tapPointerId = null

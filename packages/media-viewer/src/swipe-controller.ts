@@ -32,6 +32,8 @@ export type MediaSwipeCallbacks = {
     onClose: () => void
     /** When false, a committed swipe bounces instead of rebasing (pagination edge). Default true. */
     willRebaseNav?: (dir: "older" | "newer") => boolean
+    onSettle?: () => void
+    onGestureChange?: (gesturing: boolean) => void
 }
 
 export type MediaSwipe = {
@@ -135,12 +137,23 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         }, MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
     }
 
+    function setSwipeGesturing(next: boolean): void {
+        if (gesturing === next) return
+        gesturing = next
+        cbs.onGestureChange?.(next)
+    }
+
+    function fireSettle(): void {
+        cbs.onSettle?.()
+    }
+
     function resetOffsetsInstant(): void {
+        let wasBusy = gesturing || settling || dismissing
         settleGen++
         offsetX = 0
         offsetY = 0
         axis = "none"
-        gesturing = false
+        setSwipeGesturing(false)
         settling = false
         dismissing = false
         pointerId = null
@@ -149,6 +162,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         clearWheelTimer()
         cancelSettleRaf()
         clearLastDelta()
+        if (wasBusy) fireSettle()
     }
 
     function applyProjected(rawX: number, rawY: number): void {
@@ -186,7 +200,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function endPointerWheel(): void {
-        gesturing = false
+        setSwipeGesturing(false)
         pointerId = null
         wheelActive = false
         if (!wheelGated()) clearWheelTimer()
@@ -209,6 +223,28 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         let fromY = offsetY
         if (fromX === 0 && fromY === 0) {
             settling = false
+            fireSettle()
+            return
+        }
+
+        let gen = ++settleGen
+        settling = true
+
+        let finish = (): void => {
+            if (gen !== settleGen) return
+            offsetX = 0
+            offsetY = 0
+            settling = false
+            settleRaf = null
+            fireSettle()
+        }
+
+        if (cbs.getPrefersReducedMotion()) {
+            if (typeof requestAnimationFrame === "function") {
+                settleRaf = requestAnimationFrame(finish)
+                return
+            }
+            finish()
             return
         }
 
@@ -216,9 +252,6 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         let remaining = Math.max(Math.abs(fromX), Math.abs(fromY))
         let viewport = Math.abs(fromX) >= Math.abs(fromY) ? w : h
         let duration = settleDurationMs(remaining, viewport)
-        let gen = ++settleGen
-        settling = true
-
         let start = typeof performance !== "undefined" ? performance.now() : Date.now()
 
         let frame = (now: number): void => {
@@ -231,18 +264,13 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
                 settleRaf = requestAnimationFrame(frame)
                 return
             }
-            offsetX = 0
-            offsetY = 0
-            settling = false
-            settleRaf = null
+            finish()
         }
 
         if (typeof requestAnimationFrame === "function") {
             settleRaf = requestAnimationFrame(frame)
         } else {
-            offsetX = 0
-            offsetY = 0
-            settling = false
+            finish()
         }
     }
 
@@ -251,13 +279,13 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         let fromOffset = offsetX
         let rebase = cbs.willRebaseNav?.(dir) !== false
         let rebased = rebasedOffsetAfterNav(fromOffset, dir, w)
-        endPointerWheel()
         axis = "none"
         offsetY = 0
         clearLastDelta()
         cancelSettleRaf()
         offsetX = rebase ? rebased : fromOffset
         settling = offsetX !== 0
+        endPointerWheel()
         markSessionConsumed()
         if (dir === "older") cbs.onOlder()
         else cbs.onNewer()
@@ -276,8 +304,8 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function commitCloseFromSwipe(): void {
-        endPointerWheel()
         dismissing = true
+        endPointerWheel()
         clearLastDelta()
         cancelSettleRaf()
         markSessionConsumed()
@@ -299,6 +327,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         }
         if (result === "bounce" && (offsetX !== 0 || offsetY !== 0)) {
             let fromWheel = wheelActive
+            settling = true
             endPointerWheel()
             axis = "none"
             clearLastDelta()
@@ -340,7 +369,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         pointerId = e.pointerId
         startClientX = e.clientX
         startClientY = e.clientY
-        gesturing = true
+        setSwipeGesturing(true)
         wheelActive = false
         if (!wheelGated()) clearWheelTimer()
         axis = "none"
@@ -396,7 +425,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         cancelSettleRaf()
         settling = false
         wheelActive = true
-        gesturing = true
+        setSwipeGesturing(true)
 
         if (starting) {
             offsetX = 0

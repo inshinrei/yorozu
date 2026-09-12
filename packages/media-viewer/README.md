@@ -26,4 +26,8 @@ Omit `decode` to keep today's `<img src>` / poster path. Attach does not call th
 
 When `decode` is set, neighbor peeks, the active image, and painted thumbs wait on a budgeted abortable port (`createMediaDecodePort`) and then `applyCanvasImageSource`. Video active panes still use `<video src>`. The package does not decode the full album on open — only the active image, neighbor peeks, and painted thumbs.
 
-Default budget: 1 active, 2 peeks (older and newer share), 4 thumbs. The host supplies `decode` (for example a `createBitmapWorkQueue` wrapper). `pausePeeksAndThumbs` / `resume` exist on the port for gesture pause; attach does not pause yet.
+Default budget: 1 active, 2 peeks (older and newer share), 4 thumbs. The host supplies `decode` (for example a `createBitmapWorkQueue` wrapper).
+
+While a swipe is gesturing, settling, or dismissing, attach calls `pausePeeksAndThumbs` so new peek and thumb jobs do not start. Active-pane decode may continue. After settle, attach `resume()`s and requests the landed peek neighbors. Zoom drag is not a gesture.
+
+Hosts that warm their own bitmaps should `pause()` that work while `viewer.isGesturing()` is true (chrome `api.isGesturing()` reads the same flag). `setGesturing` does not notify session `subscribe`.

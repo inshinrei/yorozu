@@ -159,6 +159,66 @@ describe("attachMediaViewer", () => {
         await vi.waitFor(() => expect(started).toContain("active:z"))
     })
 
+    it("does not start peek decode while swipe is gesturing; resumes after settle", async () => {
+        let started: string[] = []
+        let decode = vi.fn(async (req: { id: string; role: string }) => {
+            started.push(`${req.role}:${req.id}`)
+            return document.createElement("img")
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a"), img("b"), img("c")],
+            index: 1,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await vi.waitFor(() => expect(started.length).toBeGreaterThan(0))
+        started.length = 0
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 140, clientY: 200 }))
+        expect(viewer.isGesturing()).toBe(true)
+        expect(api!.isGesturing()).toBe(true)
+        viewer.setNeighbors({
+            older: { id: "x", kind: "image", src: "x.jpg" },
+            newer: { id: "y", kind: "image", src: "y.jpg" },
+        })
+        await Promise.resolve()
+        expect(started.some((s) => s.startsWith("peek-"))).toBe(false)
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 140, clientY: 200 }))
+        vi.advanceTimersByTime(400)
+        vi.useRealTimers()
+        await vi.waitFor(() => expect(started.some((s) => s.startsWith("peek-"))).toBe(true))
+        expect(viewer.isGesturing()).toBe(false)
+        expect(api!.isGesturing()).toBe(false)
+    })
+
+    it("zoom drag does not set isGesturing", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        api!.zoomIn()
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 140, clientY: 200 }))
+        expect(viewer.isGesturing()).toBe(false)
+        expect(api!.isGesturing()).toBe(false)
+    })
+
     it("chrome header mount receives api and api.close({ ghost: false }) removes overlay", () => {
         let api: MediaViewerChromeApi | undefined
         let headerEl: HTMLElement | undefined

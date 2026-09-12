@@ -380,4 +380,18 @@ describe("createMediaViewer", () => {
         expect(custom.decodeBudget()).not.toBe(custom.decodeBudget())
         custom.destroy()
     })
+
+    it("isGesturing defaults false; setGesturing is idempotent-notify free for same value", () => {
+        expect(viewer!.isGesturing()).toBe(false)
+        let n = 0
+        viewer!.subscribe(() => {
+            n += 1
+        })
+        viewer!.setGesturing(true)
+        expect(viewer!.isGesturing()).toBe(true)
+        viewer!.setGesturing(true)
+        viewer!.setGesturing(false)
+        expect(viewer!.isGesturing()).toBe(false)
+        expect(n).toBe(0)
+    })
 })

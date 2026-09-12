@@ -42,6 +42,7 @@ export type MediaViewerChromeApi = {
     percentLabel: () => string
     scale: () => number
     onZoomChange: (listener: () => void) => () => void
+    isGesturing: () => boolean
     snapshot: () => MediaViewerSnapshot
 }
 
@@ -111,5 +112,7 @@ export type MediaViewer = {
     snapshot: () => MediaViewerSnapshot
     decodeFn: () => ((req: MediaDecodeRequest) => Promise<CanvasImageSource | null>) | undefined
     decodeBudget: () => MediaDecodeBudget
+    isGesturing: () => boolean
+    setGesturing: (on: boolean) => void
     destroy: () => void
 }
