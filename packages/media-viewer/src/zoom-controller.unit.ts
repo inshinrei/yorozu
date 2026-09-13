@@ -83,9 +83,10 @@ describe("createMediaImageZoom", () => {
     it("pinch below fit settles back to 1 with motion", () => {
         vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let zoom = sizedZoom()
-        zoom.applyRelativeZoomSoft(-0.6, { offsetX: 0, offsetY: 0 })
+        zoom.applyRelativeZoomSoft(-0.85, { offsetX: 0, offsetY: 0 })
         expect(zoom.scale()).toBeLessThan(1)
-        expect(zoom.scale()).toBeGreaterThanOrEqual(0.5)
+        expect(zoom.scale()).toBeGreaterThanOrEqual(0.2)
+        expect(zoom.scale()).toBeLessThan(0.5)
         zoom.endDrag({ withInertia: false, pinchOrigin: { offsetX: 0, offsetY: 0 } })
         expect(zoom.isSettling()).toBe(true)
         expect(zoom.scale()).toBeLessThan(1)
@@ -129,9 +130,10 @@ describe("createMediaImageZoom", () => {
         vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         let zoom = sizedZoom()
         let origin = { offsetX: 0, offsetY: 0 }
-        // Positive deltaY → zoom out; soft min is 0.5× fit
+        // Positive deltaY → zoom out; soft min is 0.2× fit
         for (let i = 0; i < 40; i++) zoom.applyWheel(900, origin)
-        expect(zoom.scale()).toBeGreaterThanOrEqual(0.5)
+        expect(zoom.scale()).toBeGreaterThanOrEqual(0.2)
+        expect(zoom.scale()).toBeLessThan(0.5)
         expect(zoom.scale()).toBeLessThan(1)
 
         zoom.endDrag({ withInertia: false, pinchOrigin: origin })
@@ -158,7 +160,8 @@ describe("createMediaImageZoom", () => {
         for (let i = 0; i < 40; i++) zoom.applyWheel(900, origin)
         let undershoot = zoom.scale()
         expect(undershoot).toBeLessThan(1)
-        expect(undershoot).toBeGreaterThanOrEqual(0.5)
+        expect(undershoot).toBeGreaterThanOrEqual(0.2)
+        expect(undershoot).toBeLessThan(0.5)
 
         zoom.endDrag({ withInertia: false, pinchOrigin: origin })
         expect(zoom.isSettling()).toBe(true)

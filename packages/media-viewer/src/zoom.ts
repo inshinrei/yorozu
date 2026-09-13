@@ -51,9 +51,9 @@ export const MEDIA_ZOOM_SETTLE_MS: number = 350
 export const MEDIA_ZOOM_SETTLE_MS_MIN: number = 160
 /**
  * Soft scale overshoot during multi-touch pinch only (relative to hard min/max).
- * Pinch may undershoot to 0.5× fit and overshoot max by 1.15×, then legalize.
+ * Pinch may undershoot to 0.2× fit and overshoot max by 1.15×, then legalize.
  */
-export const MEDIA_SOFT_SCALE_MIN_FACTOR: number = 0.5
+export const MEDIA_SOFT_SCALE_MIN_FACTOR: number = 0.2
 export const MEDIA_SOFT_SCALE_MAX_FACTOR: number = 1.15
 
 /** Offset from displayed image center (client coords). */

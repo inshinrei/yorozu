@@ -707,7 +707,8 @@ describe("attachMediaViewer", () => {
             )
         }
         expect(api!.scale()).toBeLessThan(1)
-        expect(api!.scale()).toBeGreaterThanOrEqual(0.5)
+        expect(api!.scale()).toBeGreaterThanOrEqual(0.2)
+        expect(api!.scale()).toBeLessThan(0.5)
 
         vi.advanceTimersByTime(MEDIA_WHEEL_ZOOM_RELEASE_MS)
         expect(api!.scale()).toBeLessThan(1)
