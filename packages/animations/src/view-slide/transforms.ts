@@ -1,4 +1,5 @@
 import type { AnimationLevel } from "../core/level"
+import { MOTION_EASE, MOTION_EASE_IN, MOTION_NAV_MS, MOTION_SPRING_EASE } from "../core/motion-timing"
 import type { Key } from "../core/types"
 
 export type SlideDirection = "forward" | "back"
@@ -17,14 +18,14 @@ export type SlideTransforms = {
 }
 
 export const VIEW_SLIDE_FADE_OFFSET: string = "1.5rem"
-export const VIEW_SLIDE_MS: number = 300
-export const VIEW_SLIDE_EASING: string = "cubic-bezier(0.25, 1, 0.5, 1)"
-export const VIEW_SLIDE_COVER_MS: number = 250
-export const VIEW_SLIDE_COVER_EASING: string = "ease-in-out"
-export const VIEW_SLIDE_ZOOM_MS: number = 150
-export const VIEW_SLIDE_ZOOM_EASING: string = "ease"
-export const VIEW_SLIDE_REVEAL_MS: number = 350
-export const VIEW_SLIDE_REVEAL_EASING: string = "ease-in"
+export const VIEW_SLIDE_MS: number = MOTION_NAV_MS
+export const VIEW_SLIDE_EASING: string = MOTION_EASE
+export const VIEW_SLIDE_COVER_MS: number = MOTION_NAV_MS
+export const VIEW_SLIDE_COVER_EASING: string = MOTION_SPRING_EASE
+export const VIEW_SLIDE_ZOOM_MS: number = MOTION_NAV_MS
+export const VIEW_SLIDE_ZOOM_EASING: string = MOTION_SPRING_EASE
+export const VIEW_SLIDE_REVEAL_MS: number = MOTION_NAV_MS
+export const VIEW_SLIDE_REVEAL_EASING: string = MOTION_EASE_IN
 
 export function slideDirectionByIndex(from: Key, to: Key, items: readonly { id: Key }[]): SlideDirection | null {
     let fromIndex = items.findIndex((item) => item.id === from)

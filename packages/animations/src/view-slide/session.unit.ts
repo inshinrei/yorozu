@@ -307,7 +307,7 @@ describe("createViewSlide", () => {
         expect(slide.mountedKeys).toEqual(["b"])
     })
 
-    it("cover uses 250ms ease-in-out on both panels", async () => {
+    it("cover uses 350ms spring ease on both panels", async () => {
         let slide = makeSlide({ mode: "cover" })
         slide.setActive("a")
         slide.attach(createFakeEl() as unknown as HTMLElement, "a")
@@ -316,8 +316,9 @@ describe("createViewSlide", () => {
         await flushFrames()
         expect(animate).toHaveBeenCalled()
         let opts = animate.mock.calls[0]![1]!
-        expect(opts.duration).toBe(250)
-        expect(opts.easing).toBe("ease-in-out")
+        expect(opts.duration).toBe(350)
+        expect(opts.easing).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
+
         let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "translate3d(0, 0, 0)", opacity: "0" })
         let toFrames = animate.mock.calls[1]![0]
@@ -338,7 +339,7 @@ describe("createViewSlide", () => {
         expect(toFrames[0]).toMatchObject({ transform: "translateX(200%)", opacity: "1" })
     })
 
-    it("peek uses 300ms stack easing", async () => {
+    it("peek uses 350ms default ease", async () => {
         let slide = makeSlide({ mode: "peek" })
         slide.setActive("a")
         slide.attach(createFakeEl() as unknown as HTMLElement, "a")
@@ -346,13 +347,14 @@ describe("createViewSlide", () => {
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         await flushFrames()
         let opts = animate.mock.calls[0]![1]!
-        expect(opts.duration).toBe(300)
-        expect(opts.easing).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+        expect(opts.duration).toBe(350)
+        expect(opts.easing).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
+
         let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
     })
 
-    it("zoom uses 150ms ease", async () => {
+    it("zoom uses 350ms spring ease", async () => {
         let slide = makeSlide({ mode: "zoom" })
         slide.setActive("a")
         slide.attach(createFakeEl() as unknown as HTMLElement, "a")
@@ -360,8 +362,9 @@ describe("createViewSlide", () => {
         slide.attach(createFakeEl() as unknown as HTMLElement, "b")
         await flushFrames()
         let opts = animate.mock.calls[0]![1]!
-        expect(opts.duration).toBe(150)
-        expect(opts.easing).toBe("ease")
+        expect(opts.duration).toBe(350)
+        expect(opts.easing).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
+
         let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ transform: "scale(1.1)", opacity: "0" })
         expect(toFrames[1]).toMatchObject({ transform: "scale(1)", opacity: "1" })

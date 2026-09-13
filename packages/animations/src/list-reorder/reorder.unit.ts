@@ -23,7 +23,7 @@ describe("createListReorder", () => {
     })
 
     it("exports default timing constants", () => {
-        expect(LIST_REORDER_MS).toBe(200)
+        expect(LIST_REORDER_MS).toBe(250)
         expect(LIST_REORDER_EASING).toBe("ease-out")
     })
 

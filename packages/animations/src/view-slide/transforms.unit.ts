@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { MOTION_EASE, MOTION_SPRING_EASE } from "../core/motion-timing"
 import {
     resolveViewSlideMode,
     slideDirectionByIndex,
@@ -185,25 +186,25 @@ describe("resolveViewSlideMode", () => {
 })
 
 describe("view-slide timing", () => {
-    it("cover uses 250ms ease-in-out; other modes keep 300ms ease-out curve", () => {
-        expect(viewSlideDurationMs("cover")).toBe(250)
-        expect(viewSlideEasing("cover")).toBe("ease-in-out")
-        expect(viewSlideDurationMs("push")).toBe(300)
-        expect(viewSlideDurationMs("crossfade")).toBe(300)
-        expect(viewSlideEasing("push")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
-        expect(viewSlideEasing("crossfade")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+    it("cover, push, and crossfade use 350ms; cover uses spring ease", () => {
+        expect(viewSlideDurationMs("cover")).toBe(350)
+        expect(viewSlideEasing("cover")).toBe(MOTION_SPRING_EASE)
+        expect(viewSlideDurationMs("push")).toBe(350)
+        expect(viewSlideDurationMs("crossfade")).toBe(350)
+        expect(viewSlideEasing("push")).toBe(MOTION_EASE)
+        expect(viewSlideEasing("crossfade")).toBe(MOTION_EASE)
     })
 
-    it("peek and lift keep the stack 300ms ease-out curve", () => {
-        expect(viewSlideDurationMs("peek")).toBe(300)
-        expect(viewSlideDurationMs("lift")).toBe(300)
-        expect(viewSlideEasing("peek")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
-        expect(viewSlideEasing("lift")).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+    it("peek and lift use 350ms default ease", () => {
+        expect(viewSlideDurationMs("peek")).toBe(350)
+        expect(viewSlideDurationMs("lift")).toBe(350)
+        expect(viewSlideEasing("peek")).toBe(MOTION_EASE)
+        expect(viewSlideEasing("lift")).toBe(MOTION_EASE)
     })
 
-    it("zoom uses 150ms ease; reveal uses 350ms ease-in", () => {
-        expect(viewSlideDurationMs("zoom")).toBe(150)
-        expect(viewSlideEasing("zoom")).toBe("ease")
+    it("zoom uses 350ms spring ease; reveal stays 350ms ease-in", () => {
+        expect(viewSlideDurationMs("zoom")).toBe(350)
+        expect(viewSlideEasing("zoom")).toBe(MOTION_SPRING_EASE)
         expect(viewSlideDurationMs("reveal")).toBe(350)
         expect(viewSlideEasing("reveal")).toBe("ease-in")
     })

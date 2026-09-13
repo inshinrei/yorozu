@@ -1,9 +1,11 @@
+import { MOTION_EASE_OUT, MOTION_UI_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import { applyStyles } from "../core/styles"
 import type { Playback } from "../core/types"
 
-export const RIPPLE_MS: number = 400
-export const RIPPLE_EASING: string = "ease-out"
+export const RIPPLE_MS: number = MOTION_UI_MS
+export const RIPPLE_EASING: string = MOTION_EASE_OUT
+
 export const RIPPLE_COLOR: string = "currentColor"
 export const RIPPLE_SIZE_PX: number = 48
 

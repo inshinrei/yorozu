@@ -1,7 +1,8 @@
+import { MOTION_SETTLE_MS } from "../core/motion-timing"
 import { lerp, tween } from "../core/tween"
 import type { Playback } from "../core/types"
 
-export const SCROLL_TWEEN_MS: number = 200
+export const SCROLL_TWEEN_MS: number = MOTION_SETTLE_MS
 
 export type ScrollTweenOptions = {
     left?: number

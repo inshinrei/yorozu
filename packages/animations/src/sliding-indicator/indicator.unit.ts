@@ -37,12 +37,7 @@ function createFakeStyle(): CSSStyleDeclaration {
     }) as unknown as CSSStyleDeclaration
 }
 
-function createFakeEl(box?: {
-    left?: number
-    top?: number
-    width?: number
-    height?: number
-}): FakeNode {
+function createFakeEl(box?: { left?: number; top?: number; width?: number; height?: number }): FakeNode {
     return {
         style: createFakeStyle(),
         offsetLeft: box?.left ?? 0,
@@ -82,8 +77,8 @@ describe("createSlidingIndicator", () => {
     })
 
     it("exports default timing constants", () => {
-        expect(INDICATOR_MS).toBe(300)
-        expect(INDICATOR_EASING).toBe("cubic-bezier(0.25, 1, 0.5, 1)")
+        expect(INDICATOR_MS).toBe(350)
+        expect(INDICATOR_EASING).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
     })
 
     it("measure sets transform to active origin and size instantly", () => {

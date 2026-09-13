@@ -78,7 +78,8 @@ describe("playRipple", () => {
     })
 
     it("appends a circular ink at the host-relative point", async () => {
-        expect(RIPPLE_MS).toBe(400)
+        expect(RIPPLE_MS).toBe(200)
+
         let host = createFakeEl() as unknown as HTMLElement
         let playback = playRipple(host, { x: 12, y: 24, color: "rgba(0, 0, 0, 0.2)" })
         let ink = (host as unknown as FakeNode).children[0]!
@@ -95,7 +96,8 @@ describe("playRipple", () => {
             { transform: "translate(-50%, -50%) scale(0)", opacity: "1" },
             { transform: "translate(-50%, -50%) scale(1)", opacity: "0" },
         ])
-        expect(opts.duration).toBe(400)
+        expect(opts.duration).toBe(200)
+
         expect(await playback.done).toBe(true)
         expect((host as unknown as FakeNode).children).toHaveLength(0)
     })

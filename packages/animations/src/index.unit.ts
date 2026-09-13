@@ -20,4 +20,11 @@ describe("package barrel", () => {
         expect(typeof animations.createCancelGroup).toBe("function")
         expect(typeof animations.createLayoutSizeTween).toBe("function")
     })
+
+    it("re-exports motion timing tokens and aliases", () => {
+        expect(animations.MOTION_UI_MS).toBe(200)
+        expect(animations.MOTION_NAV_MS).toBe(350)
+        expect(animations.FADE_MS).toBe(animations.MOTION_UI_MS)
+        expect(animations.SHARED_ELEMENT_MS).toBe(animations.MOTION_NAV_MS)
+    })
 })

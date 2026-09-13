@@ -52,9 +52,9 @@ describe("createFade", () => {
         vi.unstubAllGlobals()
     })
 
-    it("defaults to 120ms ease-out", async () => {
-        expect(FADE_MS).toBe(120)
-        expect(FADE_EASING).toBe("ease-out")
+    it("defaults to 200ms control-scale ease", async () => {
+        expect(FADE_MS).toBe(200)
+        expect(FADE_EASING).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
         let el = createFakeEl()
         let fade = createFade(el as unknown as HTMLElement)
         let playback = fade.setVisible(true)
@@ -62,8 +62,8 @@ describe("createFade", () => {
         let frames = animate.mock.calls[0]![0]
         let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([{ opacity: "0" }, { opacity: "1" }])
-        expect(opts.duration).toBe(120)
-        expect(opts.easing).toBe("ease-out")
+        expect(opts.duration).toBe(200)
+        expect(opts.easing).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
         expect(await playback.done).toBe(true)
     })
 

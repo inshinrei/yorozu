@@ -1,8 +1,9 @@
+import { MOTION_EASE, MOTION_NAV_MS } from "../core/motion-timing"
 import { animateElement } from "../core/playback"
 import { applyStyles } from "../core/styles"
 
-export const INDICATOR_MS: number = 300
-export const INDICATOR_EASING: string = "cubic-bezier(0.25, 1, 0.5, 1)"
+export const INDICATOR_MS: number = MOTION_NAV_MS
+export const INDICATOR_EASING: string = MOTION_EASE
 
 export type SlidingIndicator = {
     measure: () => void

@@ -1,9 +1,10 @@
+import { MOTION_SETTLE_MS } from "../core/motion-timing"
 import { tween } from "../core/tween"
 import type { Playback } from "../core/types"
 
 export const SWIPE_THRESHOLD: number = 56
 export const SWIPE_MAX: number = 80
-export const SWIPE_TWEEN_MS: number = 200
+export const SWIPE_TWEEN_MS: number = MOTION_SETTLE_MS
 
 export function shouldCommitSwipe(offset: number, threshold: number): boolean {
     return offset >= threshold

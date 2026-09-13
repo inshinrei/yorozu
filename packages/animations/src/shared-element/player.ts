@@ -1,3 +1,4 @@
+import { MOTION_EASE, MOTION_NAV_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import { dualRaf } from "../core/raf"
 import { applyStyles } from "../core/styles"
@@ -12,8 +13,8 @@ import {
     type Flight,
 } from "./math"
 
-export const SHARED_ELEMENT_MS: number = 200
-export const SHARED_ELEMENT_EASING: string = "ease"
+export const SHARED_ELEMENT_MS: number = MOTION_NAV_MS
+export const SHARED_ELEMENT_EASING: string = MOTION_EASE
 export const SHARED_ELEMENT_END_MS: number = 16
 
 export type SharedElementSeed = {

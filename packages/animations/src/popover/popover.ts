@@ -1,9 +1,11 @@
+import { MOTION_EASE_OUT, MOTION_UI_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import { applyStyles, clearStyles } from "../core/styles"
 import type { Playback } from "../core/types"
 
-export const POPOVER_MS: number = 120
-export const POPOVER_EASING: string = "ease-out"
+export const POPOVER_MS: number = MOTION_UI_MS
+export const POPOVER_EASING: string = MOTION_EASE_OUT
+
 export const POPOVER_ORIGIN: string = "center top"
 export const POPOVER_SCALE: number = 0.92
 

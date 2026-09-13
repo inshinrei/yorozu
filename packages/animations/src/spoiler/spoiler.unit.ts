@@ -88,8 +88,9 @@ describe("createSpoiler", () => {
     })
 
     it("appends a canvas overlay and paints a dot field", () => {
-        expect(SPOILER_MS).toBe(200)
+        expect(SPOILER_MS).toBe(250)
         expect(SPOILER_EASING).toBe("ease-out")
+
         let el = createFakeEl()
         let spoiler = createSpoiler(el as unknown as HTMLElement, { revealed: () => false })
         let canvas = el.children[0]!
@@ -107,8 +108,9 @@ describe("createSpoiler", () => {
         let frames = animate.mock.calls[0]![0]
         let opts = animate.mock.calls[0]![1]!
         expect(frames).toEqual([{ opacity: "1" }, { opacity: "0" }])
-        expect(opts.duration).toBe(200)
+        expect(opts.duration).toBe(250)
         expect(opts.easing).toBe("ease-out")
+
         expect(await playback.done).toBe(true)
         expect(el.children[0]!.style.getPropertyValue("opacity")).toBe("0")
         spoiler.destroy()

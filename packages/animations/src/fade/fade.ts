@@ -1,9 +1,10 @@
+import { MOTION_EASE, MOTION_UI_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import { applyStyles, clearStyles } from "../core/styles"
 import type { Playback } from "../core/types"
 
-export const FADE_MS: number = 120
-export const FADE_EASING: string = "ease-out"
+export const FADE_MS: number = MOTION_UI_MS
+export const FADE_EASING: string = MOTION_EASE
 
 const STYLE_KEYS: readonly string[] = ["will-change"]
 

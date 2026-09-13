@@ -1,10 +1,11 @@
+import { MOTION_EASE, MOTION_UI_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import type { Playback } from "../core/types"
 import { DIGIT_FLIP_MS } from "./slots"
 
-export const DIGIT_FLIP_EASING: string = "ease"
-export const PRESENCE_POP_MS: number = 200
-export const PRESENCE_POP_EASING: string = "ease"
+export const DIGIT_FLIP_EASING: string = MOTION_EASE
+export const PRESENCE_POP_MS: number = MOTION_UI_MS
+export const PRESENCE_POP_EASING: string = MOTION_EASE
 
 function playTransform(
     el: HTMLElement,
@@ -33,21 +34,11 @@ function playTransform(
     return playback
 }
 
-export function playDigitFlip(
-    el: HTMLElement,
-    options?: { durationMs?: number; easing?: string },
-): Playback {
-    return playTransform(
-        el,
-        [{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }],
-        options,
-    )
+export function playDigitFlip(el: HTMLElement, options?: { durationMs?: number; easing?: string }): Playback {
+    return playTransform(el, [{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }], options)
 }
 
-export function playPresencePop(
-    el: HTMLElement,
-    options?: { durationMs?: number; easing?: string },
-): Playback {
+export function playPresencePop(el: HTMLElement, options?: { durationMs?: number; easing?: string }): Playback {
     return playTransform(
         el,
         [

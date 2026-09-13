@@ -1,9 +1,10 @@
-import { createFade } from "../fade/fade"
+import { MOTION_EASE_OUT, MOTION_SETTLE_MS } from "../core/motion-timing"
 import { applyStyles } from "../core/styles"
 import type { Playback } from "../core/types"
+import { createFade } from "../fade/fade"
 
-export const SPOILER_MS: number = 200
-export const SPOILER_EASING: string = "ease-out"
+export const SPOILER_MS: number = MOTION_SETTLE_MS
+export const SPOILER_EASING: string = MOTION_EASE_OUT
 
 const DOT_GAP = 6
 const DOT_RADIUS = 1.15

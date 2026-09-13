@@ -1,11 +1,13 @@
+import { MOTION_EASE, MOTION_NAV_MS } from "../core/motion-timing"
+
 export type DockMode = "none" | "fade" | "slide"
 export type DockEdge = "right" | "left" | "top" | "bottom"
 export type DockPanelState = { transform: string; opacity: string }
 export type DockTransforms = { closed: DockPanelState; open: DockPanelState }
 
 export const DOCK_FADE_OFFSET: string = "1.5rem"
-export const DOCK_MS: number = 300
-export const DOCK_EASING: string = "cubic-bezier(0.25, 1, 0.5, 1)"
+export const DOCK_MS: number = MOTION_NAV_MS
+export const DOCK_EASING: string = MOTION_EASE
 
 function isVertical(edge: DockEdge): boolean {
     return edge === "top" || edge === "bottom"

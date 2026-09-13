@@ -23,6 +23,16 @@ export type { HeavyLockLevel, HeavyAnimationLock } from "./core/heavy-lock"
 export { DEFAULT_HEAVY_LOCK_TIMEOUT_MS, createHeavyAnimationLock } from "./core/heavy-lock"
 export type { LayoutSizeTween } from "./core/layout-size"
 export { createLayoutSizeTween } from "./core/layout-size"
+export {
+    MOTION_UI_MS,
+    MOTION_SETTLE_MS,
+    MOTION_NAV_MS,
+    MOTION_MODAL_MS,
+    MOTION_EASE,
+    MOTION_EASE_OUT,
+    MOTION_EASE_IN,
+    MOTION_SPRING_EASE,
+} from "./core/motion-timing"
 
 export type { Rect, Size, Insets, ObjectFit } from "./rect/types"
 export { fitContain, centerFitInViewport } from "./rect/fit"

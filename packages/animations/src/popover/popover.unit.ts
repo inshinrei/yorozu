@@ -53,8 +53,9 @@ describe("createPopover", () => {
     })
 
     it("playOpen scales from 0.92 with opacity 0 and default origin", async () => {
-        expect(POPOVER_MS).toBe(120)
+        expect(POPOVER_MS).toBe(200)
         expect(POPOVER_EASING).toBe("ease-out")
+
         expect(POPOVER_ORIGIN).toBe("center top")
         expect(POPOVER_SCALE).toBe(0.92)
         let el = createFakeEl()
@@ -67,8 +68,9 @@ describe("createPopover", () => {
             { transform: "scale(0.92)", opacity: "0" },
             { transform: "scale(1)", opacity: "1" },
         ])
-        expect(opts.duration).toBe(120)
+        expect(opts.duration).toBe(200)
         expect(opts.easing).toBe("ease-out")
+
         expect(await playback.done).toBe(true)
     })
 

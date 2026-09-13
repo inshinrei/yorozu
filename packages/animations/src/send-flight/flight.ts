@@ -1,11 +1,12 @@
+import { MOTION_EASE, MOTION_NAV_MS } from "../core/motion-timing"
 import { animateElement, createPlayback } from "../core/playback"
 import { applyStyles } from "../core/styles"
 import type { Playback } from "../core/types"
 import type { Rect } from "../rect/types"
 import { computeFlight } from "../shared-element/math"
 
-export const SEND_FLIGHT_MS: number = 200
-export const SEND_FLIGHT_EASING: string = "ease"
+export const SEND_FLIGHT_MS: number = MOTION_NAV_MS
+export const SEND_FLIGHT_EASING: string = MOTION_EASE
 
 export type SendFlightOptions = {
     host: HTMLElement
@@ -33,9 +34,7 @@ export function playSendFlight(options: SendFlightOptions): Playback | null {
     let flight = computeFlight(options.from, options.to)
     if (!flight) return null
 
-    let clone = options.node
-        ? (options.node.cloneNode(true) as HTMLElement)
-        : createImageClone(options.imageUrl ?? "")
+    let clone = options.node ? (options.node.cloneNode(true) as HTMLElement) : createImageClone(options.imageUrl ?? "")
     applyStyles(clone, {
         position: "fixed",
         top: `${flight.to.top}px`,
@@ -60,10 +59,7 @@ export function playSendFlight(options: SendFlightOptions): Playback | null {
     )
     let anim = animateElement(
         clone,
-        [
-            { transform: fromTransform },
-            { transform: "translate3d(0, 0, 0) scale(1, 1)" },
-        ],
+        [{ transform: fromTransform }, { transform: "translate3d(0, 0, 0) scale(1, 1)" }],
         { duration: durationMs, easing, fill: "forwards" },
     )
 

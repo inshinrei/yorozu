@@ -1,6 +1,8 @@
 import { onAnimationFrame } from "../core/frame"
+import { MOTION_UI_MS } from "../core/motion-timing"
 
-export const DIGIT_FLIP_MS: number = 200
+export const DIGIT_FLIP_MS: number = MOTION_UI_MS
+
 export const MAX_SIMULTANEOUS_DIGIT_FLIPS: number = 10
 
 export type DigitSlot = { kind: "static"; char: string } | { kind: "flip"; char: string; prevChar: string }

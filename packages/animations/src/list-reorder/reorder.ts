@@ -1,9 +1,11 @@
+import { MOTION_EASE_OUT, MOTION_SETTLE_MS } from "../core/motion-timing"
 import { animateElement } from "../core/playback"
 import type { AttachHandle, Key } from "../core/types"
 import { buildOrderDiff, classifyReorderAnim } from "./classify"
 
-export const LIST_REORDER_MS: number = 200
-export const LIST_REORDER_EASING: string = "ease-out"
+export const LIST_REORDER_MS: number = MOTION_SETTLE_MS
+export const LIST_REORDER_EASING: string = MOTION_EASE_OUT
+
 export const LIST_REORDER_EPSILON_PX: number = 1
 
 export type ListReorderSyncOptions = {
