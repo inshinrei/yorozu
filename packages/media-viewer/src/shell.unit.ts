@@ -15,6 +15,7 @@ describe("createMediaShell", () => {
         })
         expect(shell.phase()).toEqual({ kind: "ready" })
         expect(shell.openPhase()).toBe("open")
+        expect(shell.scrimSolid()).toBe(true)
         expect(shell.mediaRevealed()).toBe(true)
         expect(shell.pinnedPreviewUrl()).toBeNull()
         shell.destroy()
@@ -44,14 +45,53 @@ describe("createMediaShell", () => {
         })
         expect(land).toBeTypeOf("function")
         expect(shell.phase()).toEqual({ kind: "open-flight", pinnedUrl: "pin.jpg", scrimSolid: true })
-        expect(shell.openPhase()).toBe("open")
+        expect(shell.openPhase()).toBe("opening")
+        expect(shell.scrimSolid()).toBe(true)
         expect(shell.mediaRevealed()).toBe(false)
 
         await land!()
         expect(shell.phase()).toEqual({ kind: "ready" })
+        expect(shell.openPhase()).toBe("open")
+        expect(shell.scrimSolid()).toBe(true)
         expect(shell.mediaRevealed()).toBe(true)
         expect(shell.pinnedPreviewUrl()).toBeNull()
         await started
+        shell.destroy()
+    })
+
+    it("scrimSolid is false at start, true after open tick, false while closing", async () => {
+        let land: (() => void | Promise<void>) | undefined
+        let shell = createMediaShell({
+            skipGhost: () => false,
+            hasOpenOrigin: () => true,
+            getOpenPinnedUrl: () => "pin.jpg",
+            runOpenGhost: ({ onLand }) => {
+                land = onLand
+                return true
+            },
+            runCloseGhost: () => false,
+            onFinishClose: () => {},
+        })
+        expect(shell.scrimSolid()).toBe(false)
+        expect(shell.openPhase()).toBe("opening")
+
+        let started = shell.startOpen()
+        expect(shell.scrimSolid()).toBe(false)
+        expect(shell.openPhase()).toBe("opening")
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve())
+        })
+        expect(shell.scrimSolid()).toBe(true)
+        expect(shell.openPhase()).toBe("opening")
+
+        await land!()
+        expect(shell.scrimSolid()).toBe(true)
+        expect(shell.openPhase()).toBe("open")
+        await started
+
+        void shell.requestClose()
+        expect(shell.scrimSolid()).toBe(false)
+        expect(shell.openPhase()).toBe("closing")
         shell.destroy()
     })
 

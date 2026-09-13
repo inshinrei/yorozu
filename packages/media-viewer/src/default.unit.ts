@@ -106,7 +106,8 @@ describe("default media viewer styles", () => {
 
     it("filmstrip overrides inherited touch-action none so overflow-x pan works", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        let filmstripBlock =
+            css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*touch-action:\s*pan-x[^}]*\}/)?.[0] ?? ""
         expect(filmstripBlock).toContain("touch-action: pan-x")
         expect(filmstripBlock).toContain("overscroll-behavior: none")
         expect(filmstripBlock).toContain("overflow-x: auto")
@@ -134,6 +135,19 @@ describe("default media viewer styles", () => {
         expect(listBlock).toContain("margin-inline: auto")
         expect(listBlock).not.toContain("min-width: 100%")
         expect(listBlock).not.toContain("justify-content: center")
+    })
+
+    it("chrome and filmstrip reveal with clip-path inset, not opacity-only", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain("clip-path: inset(0 0 100% 0)")
+        expect(css).toContain("clip-path: inset(100% 0 0 0)")
+        expect(css).toContain("clip-path: inset(100% 0 100% 0)")
+        expect(css).toContain("clip-path: inset(0)")
+        expect(css).toContain("--yorozu-media-chrome-ease")
+        expect(css).toContain("--yorozu-media-chrome-hide-ease")
+        expect(css).toContain("[data-scrim]")
+        let ghostChrome = css.match(/html\.yorozu-media-ghost-animating \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/)
+        expect(ghostChrome).toBeNull()
     })
 
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {
@@ -172,7 +186,10 @@ describe("default media viewer styles", () => {
 
     it("current filmstrip thumb is taller; bar and chrome clear current-h", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        let filmstripBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        let filmstripBlock =
+            css.match(
+                /(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*height:\s*var\(--yorozu-media-filmstrip-current-h\)[^}]*\}/,
+            )?.[0] ?? ""
         expect(filmstripBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
         let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(listBlock).toContain("align-items: flex-end")

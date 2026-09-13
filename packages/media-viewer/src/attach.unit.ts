@@ -811,6 +811,63 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("opening")
     })
 
+    it("origin open stays opening until ghost lands; data-scrim follows the open tick", async () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.getAttribute("data-phase")).toBe("opening")
+        expect(overlay.hasAttribute("data-scrim")).toBe(false)
+
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve())
+        })
+        expect(overlay.getAttribute("data-phase")).toBe("opening")
+        expect(overlay.hasAttribute("data-scrim")).toBe(true)
+
+        await vi.waitFor(() => {
+            expect(overlay.getAttribute("data-phase")).toBe("open")
+        })
+        expect(overlay.hasAttribute("data-scrim")).toBe(true)
+
+        api!.close()
+        expect(overlay.getAttribute("data-phase")).toBe("closing")
+        expect(overlay.hasAttribute("data-scrim")).toBe(false)
+    })
+
+    it("no-ghost open ends data-phase open with data-scrim", () => {
+        viewer.open({ items: [img("a")], origin, ghost: false })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.getAttribute("data-phase")).toBe("open")
+        expect(overlay.hasAttribute("data-scrim")).toBe(true)
+    })
+
+    it("created overlay commits data-phase opening then reflows before open attrs", () => {
+        let phasesAtReflow: string[] = []
+        Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+            configurable: true,
+            get() {
+                if ((this as HTMLElement).hasAttribute("data-yorozu-media-viewer")) {
+                    phasesAtReflow.push((this as HTMLElement).getAttribute("data-phase") ?? "")
+                }
+                return 800
+            },
+        })
+        viewer.open({ items: [img("a")] })
+        expect(phasesAtReflow).toContain("opening")
+        let overlay = root.querySelector("[data-yorozu-media-viewer]")
+        expect(overlay?.getAttribute("data-phase")).toBe("open")
+        expect(overlay?.hasAttribute("data-scrim")).toBe(true)
+    })
+
     it("keyboard nav sets data-switch on the strip; swipe does not", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
@@ -1569,13 +1626,10 @@ describe("attachMediaViewer", () => {
                 },
             },
         })
-        await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => resolve())
-            })
-        })
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
-        expect(overlay?.getAttribute("data-phase")).toBe("open")
+        await vi.waitFor(() => {
+            expect(overlay?.getAttribute("data-phase")).toBe("open")
+        })
 
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))

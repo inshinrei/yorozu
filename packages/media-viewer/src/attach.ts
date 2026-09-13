@@ -325,6 +325,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (!overlay) return
         let phase = shell?.openPhase() ?? "open"
         overlay.setAttribute("data-phase", phase)
+        if (shell?.scrimSolid()) overlay.setAttribute("data-scrim", "")
+        else overlay.removeAttribute("data-scrim")
         let hidden = shell != null && !shell.mediaRevealed() && phase !== "closing"
         if (hidden) overlay.setAttribute("data-media-hidden", "")
         else overlay.removeAttribute("data-media-hidden")
@@ -1552,6 +1554,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         paintFilmstrip(snap)
         if (!overlay) return
         bindKeys()
+        if (created && overlay) {
+            overlay.setAttribute("data-phase", "opening")
+            overlay.removeAttribute("data-scrim")
+            void overlay.offsetWidth
+        }
         applyOverlayAttrs()
         measureZoom()
         if (created && !startedOpen) {

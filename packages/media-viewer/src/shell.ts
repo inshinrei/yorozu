@@ -18,6 +18,7 @@ export type MediaSwitchDirection = "none" | "older" | "newer" | "jump"
 export type MediaShell = {
     phase: () => MediaOpenClosePhase
     openPhase: () => "opening" | "open" | "closing"
+    scrimSolid: () => boolean
     mediaRevealed: () => boolean
     pinnedPreviewUrl: () => string | null
     switchDir: () => MediaSwitchDirection
@@ -221,13 +222,19 @@ export function createMediaShell(opts: {
 
     function openPhase(): "opening" | "open" | "closing" {
         if (currentPhase.kind === "close-flight") return "closing"
-        if (currentPhase.kind === "open-flight" && !currentPhase.scrimSolid) return "opening"
+        if (currentPhase.kind === "open-flight") return "opening"
         return "open"
+    }
+
+    function scrimSolid(): boolean {
+        if (currentPhase.kind === "open-flight") return currentPhase.scrimSolid
+        return currentPhase.kind === "ready"
     }
 
     return {
         phase: () => currentPhase,
         openPhase,
+        scrimSolid,
         mediaRevealed: () => currentPhase.kind !== "open-flight",
         pinnedPreviewUrl: () => (currentPhase.kind === "open-flight" ? currentPhase.pinnedUrl : null),
         switchDir: () => switchDirection,
