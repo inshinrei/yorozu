@@ -18,6 +18,11 @@ let tokenNames = [
     "--yorozu-media-chrome-ms",
     "--yorozu-media-switch-ms",
     "--yorozu-media-ghost-ms",
+    "--yorozu-media-ghost-close-ms",
+    "--yorozu-media-ghost-ease",
+    "--yorozu-media-ghost-close-ease",
+    "--yorozu-media-chrome-ease",
+    "--yorozu-media-chrome-hide-ease",
     "--yorozu-media-radius",
     "--yorozu-media-filmstrip-ms",
     "--yorozu-media-filmstrip-thumb-h",
@@ -43,11 +48,16 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-pad-bottom: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-x: 0.75rem")
         expect(css).toContain("--yorozu-media-slide-gap: 40px")
-        expect(css).toContain("--yorozu-media-open-ms: 220ms")
-        expect(css).toContain("--yorozu-media-close-ms: 200ms")
-        expect(css).toContain("--yorozu-media-chrome-ms: 150ms")
+        expect(css).toContain("--yorozu-media-open-ms: 500ms")
+        expect(css).toContain("--yorozu-media-close-ms: 250ms")
+        expect(css).toContain("--yorozu-media-chrome-ms: 200ms")
         expect(css).toContain("--yorozu-media-switch-ms: 320ms")
-        expect(css).toContain("--yorozu-media-ghost-ms: 200ms")
+        expect(css).toContain("--yorozu-media-ghost-ms: 500ms")
+        expect(css).toContain("--yorozu-media-ghost-close-ms: 250ms")
+        expect(css).toContain("--yorozu-media-ghost-ease: cubic-bezier(0.2, 0.8, 0.2, 1)")
+        expect(css).toContain("--yorozu-media-ghost-close-ease: cubic-bezier(0.4, 0, 1, 1)")
+        expect(css).toContain("--yorozu-media-chrome-ease: cubic-bezier(0.25, 0.1, 0.25, 1)")
+        expect(css).toContain("--yorozu-media-chrome-hide-ease: ease-in")
         expect(css).toContain("--yorozu-media-radius: 0.75rem")
         expect(css).toContain("--yorozu-media-filmstrip-ms: 0.2s")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")

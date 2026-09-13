@@ -4,7 +4,16 @@
 import { dualRaf, isRectFullyVisibleIn, prefersReducedMotion } from "@yorozu/animations"
 import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
 import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
-import { computeStageFitRectFromElement, createMediaGhost, DEFAULT_MEDIA_INSETS, type MediaGhost } from "./ghost"
+import {
+    computeStageFitRectFromElement,
+    createMediaGhost,
+    DEFAULT_MEDIA_INSETS,
+    MEDIA_GHOST_CLOSE_EASING,
+    MEDIA_GHOST_CLOSE_MS,
+    MEDIA_GHOST_EASING,
+    MEDIA_GHOST_MS,
+    type MediaGhost,
+} from "./ghost"
 import { bindMediaViewerKeys } from "./keyboard"
 import { fitContain, stageContentSize } from "./layout"
 import { captureOriginFromDom, queryMediaOriginEl } from "./origin"
@@ -359,6 +368,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             to,
             hideTarget: viewport,
             bitmap: ghostBitmap(),
+            durationMs: MEDIA_GHOST_MS,
+            easing: MEDIA_GHOST_EASING,
             onLand: async () => {
                 await hooks.onLand()
                 applyOverlayAttrs()
@@ -410,6 +421,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             bitmap: ghostBitmap(),
             fadeOut,
             hideTarget,
+            durationMs: MEDIA_GHOST_CLOSE_MS,
+            easing: MEDIA_GHOST_CLOSE_EASING,
         })
         if (!handle) return false
         let ran = await handle.done

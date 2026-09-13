@@ -50,6 +50,7 @@ export type SharedElementController = {
         insets?: Insets
         to?: Rect | null
         durationMs?: number
+        easing?: string
         hideTarget?: HTMLElement | null
         onLand?: () => void | Promise<void>
     }) => Playback | null
@@ -61,6 +62,7 @@ export type SharedElementController = {
         image?: CanvasImageSource | null
         fadeOut?: boolean
         durationMs?: number
+        easing?: string
         viewport?: Size
         hideTarget?: HTMLElement | null
     }) => Playback | null
@@ -328,6 +330,7 @@ export function createSharedElement(): SharedElementController {
         insets?: Insets
         to?: Rect | null
         durationMs?: number
+        easing?: string
         hideTarget?: HTMLElement | null
         onLand?: () => void | Promise<void>
     }): Playback | null => {
@@ -353,6 +356,7 @@ export function createSharedElement(): SharedElementController {
                 image: opts.seed.image,
                 objectFit: "contain",
                 durationMs: opts.durationMs,
+                easing: opts.easing,
                 roundedStart: true,
                 roundedEnd: false,
                 hideTarget: opts.hideTarget,
@@ -370,6 +374,7 @@ export function createSharedElement(): SharedElementController {
         image?: CanvasImageSource | null
         fadeOut?: boolean
         durationMs?: number
+        easing?: string
         viewport?: Size
         hideTarget?: HTMLElement | null
     }): Playback | null => {
@@ -385,6 +390,7 @@ export function createSharedElement(): SharedElementController {
                     image,
                     objectFit: "contain",
                     durationMs: opts.durationMs,
+                    easing: opts.easing,
                     fadeOut: true,
                     roundedStart: false,
                     roundedEnd: false,
@@ -424,6 +430,7 @@ export function createSharedElement(): SharedElementController {
                 image,
                 objectFit,
                 durationMs: opts.durationMs,
+                easing: opts.easing,
                 fadeOut: opts.fadeOut ?? false,
                 roundedStart: false,
                 roundedEnd: true,

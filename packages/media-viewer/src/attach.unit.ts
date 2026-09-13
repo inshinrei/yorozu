@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./attach"
-import { MEDIA_GHOST_ANIMATING_CLASS } from "./ghost"
+import {
+    MEDIA_GHOST_ANIMATING_CLASS,
+    MEDIA_GHOST_CLOSE_EASING,
+    MEDIA_GHOST_CLOSE_MS,
+    MEDIA_GHOST_EASING,
+    MEDIA_GHOST_MS,
+} from "./ghost"
 import { createMediaViewer, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin, MediaVisibleIds } from "./types"
@@ -323,6 +329,30 @@ describe("attachMediaViewer", () => {
         expect(cloneImg.src).toContain("blob:stage-a")
         expect(cloneImg.src).not.toContain("cdn.example")
         expect(root.querySelector("[data-yorozu-media-stage]")).toBe(stage)
+        ghostHost.remove()
+    })
+
+    it("open ghost play uses MEDIA_GHOST_MS and MEDIA_GHOST_EASING", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+        })
+        await vi.waitFor(() => {
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()
+        })
+        await vi.waitFor(() => {
+            expect(animate.mock.calls.length).toBeGreaterThan(0)
+            expect(animate.mock.calls.at(-1)?.[1]).toMatchObject({
+                duration: MEDIA_GHOST_MS,
+                easing: MEDIA_GHOST_EASING,
+                fill: "forwards",
+            })
+        })
         ghostHost.remove()
     })
 
@@ -908,6 +938,38 @@ describe("attachMediaViewer", () => {
         expect(cloneImg.src).toContain("blob:stage-a")
         expect(cloneImg.src).not.toContain("cdn.example")
         expect(root.querySelector("[data-yorozu-media-stage]")).toBe(stage)
+        ghostHost.remove()
+    })
+
+    it("close ghost play uses MEDIA_GHOST_CLOSE_MS and MEDIA_GHOST_CLOSE_EASING", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await vi.waitFor(() => {
+            expect(root.querySelector("[data-yorozu-media-stage]")).toBeTruthy()
+        })
+        animate.mockClear()
+        api!.close()
+        await vi.waitFor(() => {
+            expect(animate.mock.calls.length).toBeGreaterThan(0)
+            expect(animate.mock.calls.at(-1)?.[1]).toMatchObject({
+                duration: MEDIA_GHOST_CLOSE_MS,
+                easing: MEDIA_GHOST_CLOSE_EASING,
+                fill: "forwards",
+            })
+        })
         ghostHost.remove()
     })
 

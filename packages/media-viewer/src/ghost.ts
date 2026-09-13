@@ -3,7 +3,6 @@
  */
 import {
     SHARED_ELEMENT_END_MS,
-    SHARED_ELEMENT_MS,
     centerFitInViewport,
     createSharedElement,
     fitContain,
@@ -15,7 +14,10 @@ import type { MediaViewerOrigin } from "./types"
 
 export const MEDIA_GHOST_ANIMATING_CLASS: string = "yorozu-media-ghost-animating"
 export const MEDIA_GHOST_HANDOFF_CLASS: string = "yorozu-media-ghost-handoff"
-export const MEDIA_GHOST_MS: number = SHARED_ELEMENT_MS
+export const MEDIA_GHOST_MS: number = 500
+export const MEDIA_GHOST_CLOSE_MS: number = 250
+export const MEDIA_GHOST_EASING: string = "cubic-bezier(0.2, 0.8, 0.2, 1)"
+export const MEDIA_GHOST_CLOSE_EASING: string = "cubic-bezier(0.4, 0, 1, 1)"
 export const MEDIA_GHOST_END_MS: number = SHARED_ELEMENT_END_MS
 export const DEFAULT_MEDIA_INSETS: { top: number; right: number; bottom: number; left: number } = {
     top: 52,
@@ -33,6 +35,7 @@ export type MediaGhost = {
         to?: { top: number; left: number; width: number; height: number } | null
         hideTarget?: HTMLElement | null
         durationMs?: number
+        easing?: string
         onLand?: () => void | Promise<void>
         bitmap?: CanvasImageSource | null
     }) => MediaGhostHandle | null
@@ -44,6 +47,7 @@ export type MediaGhost = {
         fadeOut?: boolean
         hideTarget?: HTMLElement | null
         durationMs?: number
+        easing?: string
         bitmap?: CanvasImageSource | null
     }) => MediaGhostHandle | null
     cancel: () => void
@@ -137,6 +141,7 @@ export function createMediaGhost(opts?: {
         to?: { top: number; left: number; width: number; height: number } | null
         hideTarget?: HTMLElement | null
         durationMs?: number
+        easing?: string
         onLand?: () => void | Promise<void>
         bitmap?: CanvasImageSource | null
     }): MediaGhostHandle | null {
@@ -148,7 +153,8 @@ export function createMediaGhost(opts?: {
             to: playOpts.to,
             insets: DEFAULT_MEDIA_INSETS,
             hideTarget: playOpts.hideTarget,
-            durationMs: playOpts.durationMs,
+            durationMs: playOpts.durationMs ?? MEDIA_GHOST_MS,
+            easing: playOpts.easing ?? MEDIA_GHOST_EASING,
             onLand: async () => {
                 if (gen !== my) return
                 htmlEl()?.classList.add(handoffClass)
@@ -180,6 +186,7 @@ export function createMediaGhost(opts?: {
         fadeOut?: boolean
         hideTarget?: HTMLElement | null
         durationMs?: number
+        easing?: string
         bitmap?: CanvasImageSource | null
     }): MediaGhostHandle | null {
         let my = ++gen
@@ -192,7 +199,8 @@ export function createMediaGhost(opts?: {
             image: playOpts.bitmap ?? factoryBitmap,
             fadeOut: playOpts.fadeOut,
             hideTarget: playOpts.hideTarget,
-            durationMs: playOpts.durationMs,
+            durationMs: playOpts.durationMs ?? MEDIA_GHOST_CLOSE_MS,
+            easing: playOpts.easing ?? MEDIA_GHOST_CLOSE_EASING,
         })
         if (!playback) {
             if (gen === my) setAnimating(false)

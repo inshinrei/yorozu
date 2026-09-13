@@ -133,9 +133,9 @@ describe("createMediaShell", () => {
         await vi.advanceTimersByTimeAsync(MEDIA_CLOSE_MS)
         await closed
         expect(finish).toHaveBeenCalledTimes(1)
-        expect(MEDIA_OPEN_MS).toBe(220)
-        expect(MEDIA_CLOSE_MS).toBe(200)
-        expect(MEDIA_CHROME_MS).toBe(150)
+        expect(MEDIA_OPEN_MS).toBe(500)
+        expect(MEDIA_CLOSE_MS).toBe(250)
+        expect(MEDIA_CHROME_MS).toBe(200)
         expect(MEDIA_SWITCH_MS).toBe(320)
         shell.destroy()
     })

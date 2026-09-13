@@ -256,6 +256,42 @@ describe("createSharedElement", () => {
         expect(hideTarget.style.visibility).toBe("")
     })
 
+    it("playOpen forwards durationMs and easing into animate options", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let se = createSharedElement()
+        let playback = se.playOpen({
+            host,
+            seed: { rect: from },
+            to,
+            durationMs: 40,
+            easing: "linear",
+        })
+        expect(playback).not.toBeNull()
+        await vi.runAllTimersAsync()
+        expect(await playback!.done).toBe(true)
+        expect(animate).toHaveBeenCalled()
+        let options = animate.mock.calls.at(-1)![1]!
+        expect(options).toMatchObject({ duration: 40, easing: "linear", fill: "forwards" })
+    })
+
+    it("playClose forwards durationMs and easing into animate options", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let se = createSharedElement()
+        let playback = se.playClose({
+            host,
+            fromStage: to,
+            target: { rect: from },
+            durationMs: 40,
+            easing: "linear",
+        })
+        expect(playback).not.toBeNull()
+        await vi.runAllTimersAsync()
+        expect(await playback!.done).toBe(true)
+        expect(animate).toHaveBeenCalled()
+        let options = animate.mock.calls.at(-1)![1]!
+        expect(options).toMatchObject({ duration: 40, easing: "linear", fill: "forwards" })
+    })
+
     it("playClose with a null target fades out in place", async () => {
         let host = createFakeEl() as unknown as HTMLElement
         let se = createSharedElement()
