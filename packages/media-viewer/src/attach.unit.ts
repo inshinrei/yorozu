@@ -79,6 +79,7 @@ describe("attachMediaViewer", () => {
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollTo")
         Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect")
+        Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth")
     })
 
     it("open paints dialog + active img src", () => {
@@ -861,11 +862,15 @@ describe("attachMediaViewer", () => {
                 return 800
             },
         })
-        viewer.open({ items: [img("a")] })
-        expect(phasesAtReflow).toContain("opening")
-        let overlay = root.querySelector("[data-yorozu-media-viewer]")
-        expect(overlay?.getAttribute("data-phase")).toBe("open")
-        expect(overlay?.hasAttribute("data-scrim")).toBe(true)
+        try {
+            viewer.open({ items: [img("a")] })
+            expect(phasesAtReflow).toContain("opening")
+            let overlay = root.querySelector("[data-yorozu-media-viewer]")
+            expect(overlay?.getAttribute("data-phase")).toBe("open")
+            expect(overlay?.hasAttribute("data-scrim")).toBe(true)
+        } finally {
+            Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth")
+        }
     })
 
     it("keyboard nav sets data-switch on the strip; swipe does not", () => {

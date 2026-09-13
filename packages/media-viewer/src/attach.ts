@@ -1554,7 +1554,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         paintFilmstrip(snap)
         if (!overlay) return
         bindKeys()
-        if (created && overlay) {
+        if (created) {
             overlay.setAttribute("data-phase", "opening")
             overlay.removeAttribute("data-scrim")
             void overlay.offsetWidth

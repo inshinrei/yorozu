@@ -180,7 +180,7 @@
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-footer],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-chrome],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip] {
-    clip-path: inset(0);
+    clip-path: inset(0 0 0 0);
     transition-timing-function: var(--yorozu-media-chrome-ease);
 }
 

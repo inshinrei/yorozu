@@ -142,7 +142,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("clip-path: inset(0 0 100% 0)")
         expect(css).toContain("clip-path: inset(100% 0 0 0)")
         expect(css).toContain("clip-path: inset(100% 0 100% 0)")
-        expect(css).toContain("clip-path: inset(0)")
+        expect(css).toContain("clip-path: inset(0 0 0 0)")
         expect(css).toContain("--yorozu-media-chrome-ease")
         expect(css).toContain("--yorozu-media-chrome-hide-ease")
         expect(css).toContain("[data-scrim]")
