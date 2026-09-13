@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { playScrollTween } from "./scroll"
+import { MOTION_SETTLE_MS } from "../core/motion-timing"
+import { playScrollTween, SCROLL_TWEEN_MS } from "./scroll"
 
 describe("playScrollTween", () => {
+    it("default duration aliases MOTION_SETTLE_MS", () => {
+        expect(SCROLL_TWEEN_MS).toBe(MOTION_SETTLE_MS)
+    })
+
     beforeEach(() => {
         vi.useFakeTimers()
         vi.stubGlobal(
@@ -39,6 +44,17 @@ describe("playScrollTween", () => {
         let playback = playScrollTween(el as unknown as HTMLElement, { left: 100, durationMs: 200 })
         expect(el.scrollLeft).toBe(0)
         await vi.advanceTimersByTimeAsync(250)
+        expect(el.scrollLeft).toBe(100)
+        expect(await playback.done).toBe(true)
+    })
+
+    it("omitted durationMs uses SCROLL_TWEEN_MS", async () => {
+        let el = { scrollLeft: 0, scrollTop: 0 }
+        let playback = playScrollTween(el as unknown as HTMLElement, { left: 100 })
+        expect(el.scrollLeft).toBe(0)
+        await vi.advanceTimersByTimeAsync(SCROLL_TWEEN_MS - 16)
+        expect(el.scrollLeft).toBeLessThan(100)
+        await vi.advanceTimersByTimeAsync(50)
         expect(el.scrollLeft).toBe(100)
         expect(await playback.done).toBe(true)
     })

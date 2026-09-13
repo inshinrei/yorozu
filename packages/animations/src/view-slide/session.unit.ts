@@ -318,7 +318,6 @@ describe("createViewSlide", () => {
         let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(350)
         expect(opts.easing).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
-
         let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "translate3d(0, 0, 0)", opacity: "0" })
         let toFrames = animate.mock.calls[1]![0]
@@ -349,7 +348,6 @@ describe("createViewSlide", () => {
         let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(350)
         expect(opts.easing).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
-
         let fromFrames = animate.mock.calls[0]![0]
         expect(fromFrames[1]).toMatchObject({ transform: "translate3d(-20%, 0, 0)", opacity: "0.7" })
     })
@@ -364,7 +362,6 @@ describe("createViewSlide", () => {
         let opts = animate.mock.calls[0]![1]!
         expect(opts.duration).toBe(350)
         expect(opts.easing).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
-
         let toFrames = animate.mock.calls[1]![0]
         expect(toFrames[0]).toMatchObject({ transform: "scale(1.1)", opacity: "0" })
         expect(toFrames[1]).toMatchObject({ transform: "scale(1)", opacity: "1" })

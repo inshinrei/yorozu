@@ -26,5 +26,8 @@ describe("package barrel", () => {
         expect(animations.MOTION_NAV_MS).toBe(350)
         expect(animations.FADE_MS).toBe(animations.MOTION_UI_MS)
         expect(animations.SHARED_ELEMENT_MS).toBe(animations.MOTION_NAV_MS)
+        expect(animations.SEND_FLIGHT_MS).toBe(animations.MOTION_NAV_MS)
+        expect(animations.SWIPE_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)
+        expect(animations.SCROLL_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)
     })
 })

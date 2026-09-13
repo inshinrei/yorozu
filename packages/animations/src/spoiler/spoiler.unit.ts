@@ -90,7 +90,6 @@ describe("createSpoiler", () => {
     it("appends a canvas overlay and paints a dot field", () => {
         expect(SPOILER_MS).toBe(250)
         expect(SPOILER_EASING).toBe("ease-out")
-
         let el = createFakeEl()
         let spoiler = createSpoiler(el as unknown as HTMLElement, { revealed: () => false })
         let canvas = el.children[0]!

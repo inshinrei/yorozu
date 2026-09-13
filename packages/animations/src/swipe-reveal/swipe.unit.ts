@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { MOTION_SETTLE_MS } from "../core/motion-timing"
 import {
     createSwipeReveal,
     rubberSwipeOffset,
     shouldCommitSwipe,
     SWIPE_MAX,
     SWIPE_THRESHOLD,
+    SWIPE_TWEEN_MS,
 } from "./swipe"
 
 describe("shouldCommitSwipe", () => {
+    it("settle duration aliases MOTION_SETTLE_MS", () => {
+        expect(SWIPE_TWEEN_MS).toBe(MOTION_SETTLE_MS)
+    })
+
     it("commits at or past the threshold", () => {
         expect(SWIPE_THRESHOLD).toBe(56)
         expect(shouldCommitSwipe(55, 56)).toBe(false)
@@ -112,7 +118,7 @@ describe("createSwipeReveal", () => {
         expect(el.style.getPropertyValue("transform")).toBe("translateX(120px)")
         el.listeners.get("pointerup")!(pointer("pointerup", 160))
         expect(onCommit).toHaveBeenCalledOnce()
-        await vi.advanceTimersByTimeAsync(300)
+        await vi.advanceTimersByTimeAsync(SWIPE_TWEEN_MS + 50)
         expect(el.style.getPropertyValue("transform")).toBe("translateX(80px)")
     })
 
@@ -125,7 +131,7 @@ describe("createSwipeReveal", () => {
         expect(el.style.getPropertyValue("transform")).toBe("translateX(30px)")
         el.listeners.get("pointerup")!(pointer("pointerup", 40))
         expect(onCommit).not.toHaveBeenCalled()
-        await vi.advanceTimersByTimeAsync(300)
+        await vi.advanceTimersByTimeAsync(SWIPE_TWEEN_MS + 50)
         expect(el.style.getPropertyValue("transform")).toBe("translateX(0px)")
     })
 

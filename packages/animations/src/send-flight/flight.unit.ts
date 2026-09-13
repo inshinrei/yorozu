@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createFakeAnimate } from "../_test/fake-animate"
 import { computeFlight } from "../shared-element/math"
-import { playSendFlight } from "./flight"
+import { MOTION_EASE, MOTION_NAV_MS } from "../core/motion-timing"
+import { playSendFlight, SEND_FLIGHT_EASING, SEND_FLIGHT_MS } from "./flight"
 
 type FakeNode = {
     tagName: string
@@ -76,6 +77,11 @@ let from = { top: 10, left: 20, width: 40, height: 40 }
 let to = { top: 100, left: 80, width: 200, height: 200 }
 
 describe("playSendFlight", () => {
+    it("defaults duration and easing to navigation-scale motion tokens", () => {
+        expect(SEND_FLIGHT_MS).toBe(MOTION_NAV_MS)
+        expect(SEND_FLIGHT_EASING).toBe(MOTION_EASE)
+    })
+
     beforeEach(() => {
         animate = createFakeAnimate()
         vi.stubGlobal("document", {
@@ -124,6 +130,9 @@ describe("playSendFlight", () => {
         expect(frames[1]).toMatchObject({
             transform: "translate3d(0, 0, 0) scale(1, 1)",
         })
+        let opts = animate.mock.calls[0]![1]!
+        expect(opts.duration).toBe(SEND_FLIGHT_MS)
+        expect(opts.easing).toBe(SEND_FLIGHT_EASING)
     })
 
     it("creates an image clone when no node is given", () => {

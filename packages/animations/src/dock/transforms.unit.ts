@@ -6,7 +6,6 @@ describe("dockTransforms", () => {
     it("exports default timing and fade offset", () => {
         expect(DOCK_MS).toBe(350)
         expect(DOCK_EASING).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
-
         expect(DOCK_FADE_OFFSET).toBe("1.5rem")
     })
 

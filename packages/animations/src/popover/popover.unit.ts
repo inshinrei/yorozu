@@ -55,7 +55,6 @@ describe("createPopover", () => {
     it("playOpen scales from 0.92 with opacity 0 and default origin", async () => {
         expect(POPOVER_MS).toBe(200)
         expect(POPOVER_EASING).toBe("ease-out")
-
         expect(POPOVER_ORIGIN).toBe("center top")
         expect(POPOVER_SCALE).toBe(0.92)
         let el = createFakeEl()
