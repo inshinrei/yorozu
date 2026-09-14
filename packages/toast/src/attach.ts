@@ -116,6 +116,39 @@ export function attachToastRoot<T extends ToastContent>(
         if (item.lane === "stack") stack.forget(item.el)
     }
 
+    function dropHidden(id: string, item: Painted): void {
+        if (!alive) return
+        if (items.get(id) !== item) return
+        if (!item.hiding) return
+        let current = session.toasts()
+        if (current.some((record) => record.id === id)) {
+            if (timedVisible(current).some((record) => record.id === id)) return
+        }
+        forgetStacked(item)
+        dropItem(item)
+        items.delete(id)
+    }
+
+    function hideStacked(id: string, item: Painted, axis: StackAxis, layerMs: number, slot: number): void {
+        let hideDepth = TOAST_STACK_MAX_BEHIND + 1
+        item.el.setAttribute("data-stack-depth", String(hideDepth))
+        item.depth = hideDepth
+        placeChild(stackLane, item.el, slot)
+        if (item.hiding) return
+        item.hiding = true
+        item.playback?.cancel()
+        item.playback = null
+        let playback = stack.set(item.el, hideDepth, { axis, durationMs: layerMs })
+        void playback.done.then(() => dropHidden(id, item))
+    }
+
+    function restack(item: Painted, depth: number, axis: StackAxis, durationMs: number): void {
+        item.playback?.cancel()
+        item.playback = null
+        item.depth = depth
+        stack.set(item.el, depth, { axis, durationMs })
+    }
+
     function paint(): void {
         if (!alive) return
         let placement = session.placement()
@@ -167,6 +200,11 @@ export function attachToastRoot<T extends ToastContent>(
         for (let index = 0; index < visible.length; index++) {
             let record = visible[index]!
             let depth = visible.length - 1 - index
+            if (record.exiting && depth > 0) {
+                let stacked = items.get(record.id)
+                if (stacked) stacked.el.classList.add("exiting")
+                continue
+            }
             seen.add(record.id)
             let existing = items.get(record.id)
             if (existing) {
@@ -178,11 +216,11 @@ export function attachToastRoot<T extends ToastContent>(
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
+                    if (existing.depth !== 0) stack.set(existing.el, 0, { axis, durationMs: 0 })
                     existing.playback = existing.popover.playClose(existing.el, { origin, durationMs: closeMs })
-                    existing.depth = depth
+                    existing.depth = 0
                 } else if (!record.exiting && existing.depth !== depth) {
-                    existing.depth = depth
-                    stack.set(existing.el, depth, { axis, durationMs: layerMs })
+                    restack(existing, depth, axis, layerMs)
                 }
                 continue
             }
@@ -213,7 +251,6 @@ export function attachToastRoot<T extends ToastContent>(
         }
 
         let hideSlot = 0
-        let hideDepth = TOAST_STACK_MAX_BEHIND + 1
         for (let [id, item] of [...items]) {
             if (seen.has(id)) continue
             let stillInSession = records.some((record) => record.id === id)
@@ -223,23 +260,8 @@ export function attachToastRoot<T extends ToastContent>(
                 items.delete(id)
                 continue
             }
-            item.el.setAttribute("data-stack-depth", String(hideDepth))
-            item.depth = hideDepth
-            placeChild(stackLane, item.el, hideSlot)
+            hideStacked(id, item, axis, layerMs, hideSlot)
             hideSlot += 1
-            if (item.hiding) continue
-            item.hiding = true
-            let playback = stack.set(item.el, hideDepth, { axis, durationMs: layerMs })
-            void playback.done.then(() => {
-                if (!alive) return
-                if (items.get(id) !== item) return
-                if (!item.hiding) return
-                let stillVisible = timedVisible(session.toasts()).some((record) => record.id === id)
-                if (stillVisible) return
-                forgetStacked(item)
-                dropItem(item)
-                items.delete(id)
-            })
         }
     }
 

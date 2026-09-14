@@ -2,7 +2,14 @@
 import { MENU_POPOVER_CLOSE_MS, MENU_POPOVER_OPEN_MS, MENU_POPOVER_SCALE } from "@yorozu/context-menu"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachToastRoot } from "./attach"
-import { TOAST_ENTER_MS, TOAST_EXIT_MS, TOAST_SCALE, createToastSession, type ToastSession } from "./session"
+import {
+    TOAST_ENTER_MS,
+    TOAST_EXIT_MS,
+    TOAST_SCALE,
+    TOAST_STACK_MAX_BEHIND,
+    createToastSession,
+    type ToastSession,
+} from "./session"
 
 async function flushMicrotasks(): Promise<void> {
     for (let i = 0; i < 16; i++) await Promise.resolve()
@@ -190,5 +197,57 @@ describe("attachToastRoot", () => {
         session.show("x")
         session.show("y")
         expect(animate).not.toHaveBeenCalled()
+    })
+
+    it("hides a timed toast that expires behind without snapping to the front slot", async () => {
+        session.show("behind", { duration: 1000 })
+        session.show("front", { duration: 5000 })
+        await flushMicrotasks()
+        let behind = [...root.querySelectorAll("[data-yorozu-toast]")].find(
+            (el) => el.querySelector("[data-yorozu-toast-content]")?.textContent === "behind",
+        ) as HTMLElement
+        let front = [...root.querySelectorAll("[data-yorozu-toast]")].find(
+            (el) => el.querySelector("[data-yorozu-toast-content]")?.textContent === "front",
+        ) as HTMLElement
+        expect(behind.getAttribute("data-stack-depth")).toBe("1")
+        expect(front.getAttribute("data-stack-depth")).toBe("0")
+
+        vi.advanceTimersByTime(1000)
+
+        expect(front.getAttribute("data-stack-depth")).toBe("0")
+        expect(behind.getAttribute("data-stack-depth")).not.toBe("0")
+        expect(behind.getAttribute("data-stack-depth")).toBe(String(TOAST_STACK_MAX_BEHIND + 1))
+        let transform = behind.style.getPropertyValue("transform")
+        expect(transform).not.toBe("scale(1)")
+        expect(transform.includes("translateY") || behind.style.getPropertyValue("opacity") === "0").toBe(true)
+    })
+
+    it("cancels playOpen when a stacked toast recedes behind a new front", async () => {
+        let resolveOpen: (() => void) | undefined
+        let openFinished = new Promise<void>((resolve) => {
+            resolveOpen = resolve
+        })
+        let openCancel = vi.fn()
+        let first = true
+        animate.mockImplementation(() => {
+            if (first) {
+                first = false
+                return { finished: openFinished, cancel: openCancel }
+            }
+            return { finished: Promise.resolve(), cancel: vi.fn() }
+        })
+
+        session.show("A")
+        let receding = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        session.show("B")
+
+        expect(openCancel).toHaveBeenCalled()
+        await flushMicrotasks()
+        resolveOpen!()
+        await flushMicrotasks()
+
+        expect(receding.getAttribute("data-stack-depth")).toBe("1")
+        expect(receding.style.getPropertyValue("transform")).toBe("translateY(-8px) scale(0.95)")
+        expect(receding.style.getPropertyValue("transform")).not.toBe("scale(1)")
     })
 })
