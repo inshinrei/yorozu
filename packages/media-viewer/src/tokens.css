@@ -1,7 +1,7 @@
 /* Optional default tokens for the media viewer overlay. Override via CSS custom properties. */
 [data-yorozu-media-viewer] {
     --yorozu-media-z: 1400;
-    --yorozu-media-scrim: #19191a;
+    --yorozu-media-scrim: rgba(25, 25, 26, 0.5);
     --yorozu-media-pad-top: 3.25rem;
     --yorozu-media-pad-bottom: 3.25rem;
     --yorozu-media-pad-x: 0.75rem;

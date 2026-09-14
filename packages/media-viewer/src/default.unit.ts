@@ -43,7 +43,7 @@ describe("default media viewer styles", () => {
             expect(css).toContain(name)
         }
         expect(css).toContain("--yorozu-media-z: 1400")
-        expect(css).toContain("--yorozu-media-scrim: #19191a")
+        expect(css).toContain("--yorozu-media-scrim: rgba(25, 25, 26, 0.5)")
         expect(css).toContain("--yorozu-media-pad-top: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-bottom: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-x: 0.75rem")
@@ -86,7 +86,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("[data-yorozu-media-footer]")
         expect(css).toContain("[data-yorozu-media-chrome]")
         expect(css).toContain("[data-swipe-dismiss]")
-        expect(css).toContain("--yorozu-media-dismiss-alpha")
+        expect(css).toContain("[data-yorozu-media-backdrop]")
         expect(css).not.toContain("data-gallery-stage-media")
         expect(css).toContain('[data-switch="newer"]')
         expect(css).toContain('[data-switch="older"]')
@@ -145,18 +145,15 @@ describe("default media viewer styles", () => {
         expect(css).toContain("clip-path: inset(0 0 0 0)")
         expect(css).toContain("--yorozu-media-chrome-ease")
         expect(css).toContain("--yorozu-media-chrome-hide-ease")
-        expect(css).toContain("[data-scrim]")
+        expect(css).toContain("[data-yorozu-media-backdrop]")
+        expect(css).not.toContain("[data-yorozu-media-viewer][data-scrim]")
         let ghostChrome = css.match(/html\.yorozu-media-ghost-animating \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/)
         expect(ghostChrome).toBeNull()
     })
 
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        let closingBlock =
-            css.match(/(?:^|\n)\[data-yorozu-media-viewer\]\[data-phase="closing"\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(closingBlock.length).toBeGreaterThan(0)
-        expect(closingBlock).not.toContain("pointer-events: none")
-        expect(closingBlock).not.toContain("pointer-events:none")
+        expect(css).not.toMatch(/\[data-yorozu-media-viewer\]\[data-phase="closing"\]\s*\{[^}]*pointer-events:\s*none/)
     })
 
     it("footer sits above the filmstrip when the strip is present and stays at bottom when not", () => {

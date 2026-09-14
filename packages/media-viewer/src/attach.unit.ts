@@ -99,6 +99,10 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector("[data-yorozu-media-header]")).toBeTruthy()
         expect(root.querySelector("[data-yorozu-media-footer]")).toBeTruthy()
         expect(root.querySelector("[data-yorozu-media-chrome]")).toBeTruthy()
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let backdrop = overlay.querySelector("[data-yorozu-media-backdrop]") as HTMLElement
+        expect(backdrop).toBeTruthy()
+        expect(overlay.firstElementChild).toBe(backdrop)
     })
 
     it("decode port paints peek from bitmap and does not assign item.src", async () => {

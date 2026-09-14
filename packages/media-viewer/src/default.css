@@ -6,28 +6,19 @@
     inset: 0;
     z-index: var(--yorozu-media-z);
     background-color: transparent;
-    transition: background-color var(--yorozu-media-open-ms) var(--yorozu-media-ghost-ease);
     overscroll-behavior: none;
     touch-action: none;
     box-sizing: border-box;
 }
 
-[data-yorozu-media-viewer][data-scrim] {
+[data-yorozu-media-backdrop] {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
     background-color: var(--yorozu-media-scrim);
-}
-
-[data-yorozu-media-viewer][data-phase="closing"] {
-    background-color: transparent;
-    transition-duration: var(--yorozu-media-close-ms);
-    transition-timing-function: var(--yorozu-media-ghost-close-ease);
-}
-
-[data-yorozu-media-viewer][data-swipe-dismiss] {
-    background: color-mix(
-        in srgb,
-        var(--yorozu-media-scrim) calc(var(--yorozu-media-dismiss-alpha) * 100%),
-        transparent
-    );
+    clip-path: inset(100% 0 100% 0);
+    transition: clip-path var(--yorozu-media-chrome-ms) var(--yorozu-media-chrome-hide-ease);
 }
 
 [data-yorozu-media-viewport] {
@@ -179,7 +170,8 @@
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-header],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-footer],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-chrome],
-[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip] {
+[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip],
+[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-backdrop] {
     clip-path: inset(0 0 0 0);
     transition-timing-function: var(--yorozu-media-chrome-ease);
 }
@@ -284,6 +276,7 @@ html.yorozu-media-ghost-animating [data-yorozu-media-viewport] {
     [data-yorozu-media-footer],
     [data-yorozu-media-chrome],
     [data-yorozu-media-filmstrip],
+    [data-yorozu-media-backdrop],
     [data-yorozu-media-viewer] {
         transition: none;
     }

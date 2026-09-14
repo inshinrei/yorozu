@@ -91,6 +91,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let header: HTMLElement | null = null
     let footer: HTMLElement | null = null
     let chromeEl: HTMLElement | null = null
+    let backdrop: HTMLElement | null = null
     let filmstripEl: HTMLElement | null = null
     let filmstripIds: string | null = null
     let filmstripCenteredIndex: number | null = null
@@ -1435,6 +1436,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         strip.style.setProperty("--yorozu-media-slide-gap", "40px")
         viewport.append(strip)
 
+        backdrop = document.createElement("div")
+        backdrop.setAttribute("data-yorozu-media-backdrop", "")
         header = document.createElement("div")
         header.setAttribute("data-yorozu-media-header", "")
         footer = document.createElement("div")
@@ -1442,7 +1445,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         chromeEl = document.createElement("div")
         chromeEl.setAttribute("data-yorozu-media-chrome", "")
 
-        overlay.append(viewport, header, footer, chromeEl)
+        overlay.append(backdrop, viewport, header, footer, chromeEl)
         root.append(overlay)
 
         let filmstripTouchX: number | null = null
@@ -1561,6 +1564,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         header = null
         footer = null
         chromeEl = null
+        backdrop = null
         if (shouldLinger) armScrollLockLinger()
     }
 
