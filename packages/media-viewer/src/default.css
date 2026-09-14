@@ -18,7 +18,7 @@
     pointer-events: none;
     background-color: var(--yorozu-media-scrim);
     clip-path: inset(100% 0 100% 0);
-    transition: clip-path var(--yorozu-media-chrome-ms) var(--yorozu-media-chrome-hide-ease);
+    transition: clip-path var(--yorozu-media-close-ms) var(--yorozu-media-ghost-close-ease);
 }
 
 [data-yorozu-media-viewport] {
@@ -170,10 +170,16 @@
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-header],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-footer],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-chrome],
-[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip],
-[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-backdrop] {
+[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip] {
     clip-path: inset(0 0 0 0);
     transition-timing-function: var(--yorozu-media-chrome-ease);
+}
+
+html.yorozu-media-ghost-animating [data-yorozu-media-viewer][data-phase="opening"] [data-yorozu-media-backdrop],
+[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-backdrop] {
+    clip-path: inset(0 0 0 0);
+    transition-duration: var(--yorozu-media-open-ms);
+    transition-timing-function: var(--yorozu-media-ghost-ease);
 }
 
 [data-media-hidden] [data-yorozu-media-viewport],

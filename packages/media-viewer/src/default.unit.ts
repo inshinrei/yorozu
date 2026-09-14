@@ -151,6 +151,31 @@ describe("default media viewer styles", () => {
         expect(ghostChrome).toBeNull()
     })
 
+    it("backdrop clip-path rides the ghost flight, not chrome phase", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain(
+            'html.yorozu-media-ghost-animating [data-yorozu-media-viewer][data-phase="opening"] [data-yorozu-media-backdrop]',
+        )
+        expect(css).toContain(
+            '[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-backdrop]',
+        )
+        expect(css).toContain("--yorozu-media-open-ms")
+        expect(css).toContain("--yorozu-media-close-ms")
+        expect(css).toContain("--yorozu-media-ghost-ease")
+        expect(css).toContain("--yorozu-media-ghost-close-ease")
+        let chromeGroup =
+            css.match(
+                /\[data-yorozu-media-viewer\]\[data-phase="open"\]:not\(\[data-swipe-dismiss\]\) \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(chromeGroup).toContain("[data-yorozu-media-filmstrip]")
+        expect(chromeGroup).not.toContain("[data-yorozu-media-backdrop]")
+        let backdropBlock = css.match(/(?:^|\n)\[data-yorozu-media-backdrop\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(backdropBlock).toContain("clip-path: inset(100% 0 100% 0)")
+        expect(backdropBlock).toContain("--yorozu-media-close-ms")
+        expect(backdropBlock).toContain("--yorozu-media-ghost-close-ease")
+        expect(backdropBlock).not.toContain("--yorozu-media-chrome-ms")
+    })
+
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).not.toMatch(/\[data-yorozu-media-viewer\]\[data-phase="closing"\]\s*\{[^}]*pointer-events:\s*none/)

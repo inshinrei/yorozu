@@ -839,6 +839,11 @@ describe("attachMediaViewer", () => {
         expect(overlay.hasAttribute("data-scrim")).toBe(true)
 
         await vi.waitFor(() => {
+            expect(document.documentElement.classList.contains("yorozu-media-ghost-animating")).toBe(true)
+            expect(overlay.getAttribute("data-phase")).toBe("opening")
+        })
+
+        await vi.waitFor(() => {
             expect(overlay.getAttribute("data-phase")).toBe("open")
         })
         expect(overlay.hasAttribute("data-scrim")).toBe(true)
@@ -846,6 +851,7 @@ describe("attachMediaViewer", () => {
         api!.close()
         expect(overlay.getAttribute("data-phase")).toBe("closing")
         expect(overlay.hasAttribute("data-scrim")).toBe(false)
+        expect(document.documentElement.classList.contains("yorozu-media-ghost-animating")).toBe(true)
     })
 
     it("no-ghost open ends data-phase open with data-scrim", () => {
