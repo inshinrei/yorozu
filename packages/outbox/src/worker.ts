@@ -6,8 +6,16 @@ import type { Clock, OutboxEntry, OutboxStore } from "./types"
 
 const ISSUE_KEY: string = "yorozu-outbox"
 
+export type OutboxTransport = {
+    send(entry: OutboxEntry): Promise<unknown>
+}
+
+export type OutboxProcessContext = {
+    result?: unknown
+}
+
 export type OutboxHandler = {
-    process: (entry: OutboxEntry) => Promise<void>
+    process: (entry: OutboxEntry, ctx?: OutboxProcessContext) => Promise<void>
     /**
      * Revert an optimistic mutation that can no longer succeed (e.g. restore a reaction).
      * Runs at exhaustion only when no `onExhausted` is defined; the entry is then deleted.
@@ -53,6 +61,12 @@ export type OutboxWorkerOptions = {
      * Yield to idle every N handled entries. Default 1. `<= 0` disables. Non-finite is treated as 1.
      */
     yieldEvery?: number
+    /**
+     * Optional send before `process`. When set: `result = await transport.send(entry)` then
+     * `process(entry, { result })`. Send and process errors share the retry/offline/exhaust path.
+     * This package does not spawn a Web Worker; the host may post inside `send`.
+     */
+    transport?: OutboxTransport
 }
 
 export class OutboxWorker {
@@ -221,7 +235,11 @@ export class OutboxWorker {
                 }
 
                 try {
-                    await flow.span("process " + entry.type, () => h.process(entry))
+                    let ctx: OutboxProcessContext | undefined
+                    if (this.options.transport) {
+                        ctx = { result: await this.options.transport.send(entry) }
+                    }
+                    await flow.span("process " + entry.type, () => h.process(entry, ctx))
                 } catch (err) {
                     let errMsg = err instanceof Error ? err.message : String(err)
                     let attempts = entry.attempts
