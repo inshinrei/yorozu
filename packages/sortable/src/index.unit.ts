@@ -29,5 +29,6 @@ describe("package barrel", () => {
         expect("readFlowRectSnapshot" in sortable).toBe(false)
         expect("shiftFlowRects" in sortable).toBe(false)
         expect("flowShiftDestIndex" in sortable).toBe(false)
+        expect("flowRectDelta" in sortable).toBe(false)
     })
 })

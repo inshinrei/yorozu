@@ -51,7 +51,7 @@ function paint(): void {
 
 ## Wrapping flow
 
-For a wrapping flex / chip strip (items reflow in 2d, not a fixed grid), use `createSortableBothAxis` and `paintSortableFlowTransforms`. Offsets are `{x, y}` from `session.getOffset(key)`.
+For a wrapping flex / chip strip (items reflow in 2d, not a fixed grid), use `createSortableBothAxis` and `paintSortableFlowTransforms`. Offsets are `{x, y}` from `session.getOffset(key)`. Hosts must register every key in `getItems()`; missing nodes are omitted from the layout snapshot, not estimated.
 
 ```ts
 import {
@@ -93,12 +93,12 @@ function paint(): void {
 
 ## Activation
 
-| Token                | `delayMs` | When to use                                                                                                                |
-| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `POINTER_ACTIVATION` | `0`       | Default. Drag starts after `moveThresholdPx` (10) along the session axis.                                                  |
-| `HOLD_ACTIVATION`    | `200`     | Press-and-hold. Move more than `delayFailPx` (4, euclidean) before the timer aborts pending so the strip can still scroll. |
+| Token                | `delayMs` | When to use                                                                                                                                 |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POINTER_ACTIVATION` | `0`       | Default. Drag starts after `moveThresholdPx` (10) along the session axis (1d) or euclidean distance (`hypot`) for `createSortableBothAxis`. |
+| `HOLD_ACTIVATION`    | `200`     | Press-and-hold. Move more than `delayFailPx` (4, euclidean) before the timer aborts pending so the strip can still scroll.                  |
 
-Pass `activation` on `createSortableSession`. `pointerDown` is the threshold / hold path; `activate(key, clientX, clientY)` arms immediately without waiting for DOM move events. Optional `canDragKey` is checked on `pointerDown`, `activate`, and again when the drag becomes active.
+Pass `activation` on `createSortableSession` or `createSortableBothAxis` (same tokens). `pointerDown` is the threshold / hold path; `activate(key, clientX, clientY)` arms immediately without waiting for DOM move events. Optional `canDragKey` is checked on `pointerDown`, `activate`, and again when the drag becomes active.
 
 ## Auto-scroll
 
