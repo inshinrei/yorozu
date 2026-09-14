@@ -10,7 +10,7 @@ export default defineConfig(async () => {
     return {
         plugins: [
             ...buildPlugins,
-            dts({ tsconfigPath: "tsconfig.json", exclude: ["**/*.unit.ts"] }),
+            dts({ tsconfigPath: "tsconfig.json", exclude: ["**/*.unit.ts", "**/playground/**"] }),
         ],
         test: {
             include: ["packages/**/*.unit.ts"],

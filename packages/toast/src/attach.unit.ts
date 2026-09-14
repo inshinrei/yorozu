@@ -12,7 +12,8 @@ import {
 } from "./session"
 
 async function flushMicrotasks(): Promise<void> {
-    for (let i = 0; i < 16; i++) await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
 }
 
 describe("attachToastRoot", () => {
@@ -249,5 +250,27 @@ describe("attachToastRoot", () => {
         expect(receding.getAttribute("data-stack-depth")).toBe("1")
         expect(receding.style.getPropertyValue("transform")).toBe("translateY(-8px) scale(0.95)")
         expect(receding.style.getPropertyValue("transform")).not.toBe("scale(1)")
+        expect(receding.getAttribute("aria-hidden")).toBe("true")
+        let close = receding.querySelector("[data-yorozu-toast-close]") as HTMLElement
+        expect(close.getAttribute("tabindex")).toBe("-1")
+        let front = [...root.querySelectorAll("[data-yorozu-toast]")].find(
+            (el) => el.querySelector("[data-yorozu-toast-content]")?.textContent === "B",
+        ) as HTMLElement
+        expect(front.getAttribute("aria-hidden")).toBeNull()
+        expect(front.querySelector("[data-yorozu-toast-close]")!.getAttribute("tabindex")).toBeNull()
+    })
+
+    it("paints an already-exiting behind toast so hide can run", () => {
+        session.show("behind")
+        session.show("front")
+        session.dismiss("id-1")
+        stop!()
+        stop = attachToastRoot(session, root)
+        let behind = [...root.querySelectorAll("[data-yorozu-toast]")].find(
+            (el) => el.querySelector("[data-yorozu-toast-content]")?.textContent === "behind",
+        ) as HTMLElement
+        expect(behind).toBeTruthy()
+        expect(behind.getAttribute("data-stack-depth")).toBe(String(TOAST_STACK_MAX_BEHIND + 1))
+        expect(behind.classList.contains("exiting")).toBe(true)
     })
 })

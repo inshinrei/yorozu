@@ -4,7 +4,7 @@ export default {
         taggingSchema: "semver",
     },
     jsr: {
-        exclude: ["**/*.unit.ts", "**/__fixtures__/**"],
+        exclude: ["**/*.unit.ts", "**/__fixtures__/**", "**/playground/**"],
         sourceDir: "src",
     },
 }

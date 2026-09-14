@@ -42,6 +42,8 @@ describe("findProjectChangedPackages", () => {
         await writeFile(join(utilsDir, "index.ts"), "export const n = 1\n")
         await writeFile(join(utilsDir, "index.unit.ts"), "export {}\n")
         await writeFile(join(utilsDir, "notes.md"), "# notes\n")
+        await mkdir(join(utilsDir, "playground", "src"), { recursive: true })
+        await writeFile(join(utilsDir, "playground", "src", "main.ts"), "export {}\n")
         await writeFile(join(ioDir, "readme.md"), "# io\n")
         await git(dir, ["add", "."])
         await git(dir, ["commit", "-m", "feat: change files"])
@@ -58,7 +60,7 @@ describe("findProjectChangedPackages", () => {
             since,
             params: { shouldInclude: () => true },
         })
-        expect(files.map(file => `${file.package.json.name}:${file.file}`)).toEqual(["@yorozu/utils:index.ts"])
+        expect(files.map((file) => `${file.package.json.name}:${file.file}`)).toEqual(["@yorozu/utils:index.ts"])
 
         let packages = await findProjectChangedPackages({
             workspace,
@@ -66,7 +68,7 @@ describe("findProjectChangedPackages", () => {
             since,
             params: { shouldInclude: () => true },
         })
-        expect(packages.map(pkg => pkg.json.name)).toEqual(["@yorozu/utils"])
+        expect(packages.map((pkg) => pkg.json.name)).toEqual(["@yorozu/utils"])
     })
 
     it("includes .ts files when there is no tsconfig instead of throwing", async () => {
@@ -97,6 +99,6 @@ describe("findProjectChangedPackages", () => {
             root: dir,
             since,
         })
-        expect(files.map(file => `${file.package.json.name}:${file.file}`)).toEqual(["@yorozu/utils:index.ts"])
+        expect(files.map((file) => `${file.package.json.name}:${file.file}`)).toEqual(["@yorozu/utils:index.ts"])
     })
 })

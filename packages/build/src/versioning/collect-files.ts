@@ -13,7 +13,7 @@ export interface ProjectChangedFile {
     root: string
 }
 
-const DEFAULT_EXCLUDE = ["**/*.unit.ts", "**/*.md"]
+const DEFAULT_EXCLUDE = ["**/*.unit.ts", "**/*.md", "**/playground/**"]
 
 async function defaultShouldInclude(file: ProjectChangedFile): Promise<boolean> {
     if (!file.file.endsWith(".ts")) return true
@@ -55,8 +55,8 @@ export async function findProjectChangedFiles(params: {
     if (!changed.length) return []
 
     let packages = (params.workspace ?? (await collectPackageJsons(root)))
-        .filter(pkg => !pkg.root)
-        .map(pkg => ({ pkg, relPath: relative(root, pkg.path) }))
+        .filter((pkg) => !pkg.root)
+        .map((pkg) => ({ pkg, relPath: relative(root, pkg.path) }))
         .sort((a, b) => b.relPath.length - a.relPath.length)
 
     let files: Array<ProjectChangedFile> = []
@@ -65,7 +65,7 @@ export async function findProjectChangedFiles(params: {
     let excludeGlobs = exclude == null ? null : picomatch(exclude)
 
     for (let file of changed) {
-        let match = packages.find(item => fileBelongsToPackage(file, item.relPath))
+        let match = packages.find((item) => fileBelongsToPackage(file, item.relPath))
         if (!match) continue
 
         let relPath = relative(match.relPath, file)

@@ -7,12 +7,7 @@ import { findPreferProtectedIssues, rewritePreferProtected, validatePreferProtec
 describe("findPreferProtectedIssues", () => {
     it("flags a private class field", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export class Lock {",
-                "    private _queue = 1",
-                "}",
-                "",
-            ].join("\n"),
+            ["export class Lock {", "    private _queue = 1", "}", ""].join("\n"),
             "lock.ts",
         )
 
@@ -30,12 +25,7 @@ describe("findPreferProtectedIssues", () => {
 
     it("flags a private class method", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export class Docs {",
-                "    private _forward(): void {}",
-                "}",
-                "",
-            ].join("\n"),
+            ["export class Docs {", "    private _forward(): void {}", "}", ""].join("\n"),
             "docs.ts",
         )
 
@@ -49,12 +39,7 @@ describe("findPreferProtectedIssues", () => {
 
     it("flags a private constructor parameter property", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export class Fake {",
-                "    constructor(private readonly address: string) {}",
-                "}",
-                "",
-            ].join("\n"),
+            ["export class Fake {", "    constructor(private readonly address: string) {}", "}", ""].join("\n"),
             "fake.ts",
         )
 
@@ -102,12 +87,7 @@ describe("findPreferProtectedIssues", () => {
 
     it("flags a #method declaration", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export class Reader {",
-                "    #fill(): void {}",
-                "}",
-                "",
-            ].join("\n"),
+            ["export class Reader {", "    #fill(): void {}", "}", ""].join("\n"),
             "reader.ts",
         )
 
@@ -121,13 +101,9 @@ describe("findPreferProtectedIssues", () => {
 
     it("does not flag interface or object keys named private", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export interface Config {",
-                "    private?: boolean",
-                "}",
-                "export let json = { private: true }",
-                "",
-            ].join("\n"),
+            ["export interface Config {", "    private?: boolean", "}", "export let json = { private: true }", ""].join(
+                "\n",
+            ),
             "types.ts",
         )
 
@@ -136,10 +112,7 @@ describe("findPreferProtectedIssues", () => {
 
     it("does not flag #__PURE__ comments", () => {
         let errors = findPreferProtectedIssues(
-            [
-                "export let value = /* #__PURE__ */ Number(1)",
-                "",
-            ].join("\n"),
+            ["export let value = /* #__PURE__ */ Number(1)", ""].join("\n"),
             "pure.ts",
         )
 
@@ -219,22 +192,14 @@ describe("rewritePreferProtected", () => {
     })
 
     it("does not double-prefix an already underscored #name", () => {
-        let source = [
-            "export class Box {",
-            "    #_value = 1",
-            "    get value() { return this.#_value }",
-            "}",
-            "",
-        ].join("\n")
+        let source = ["export class Box {", "    #_value = 1", "    get value() { return this.#_value }", "}", ""].join(
+            "\n",
+        )
 
         expect(rewritePreferProtected(source)).toBe(
-            [
-                "export class Box {",
-                "    protected _value = 1",
-                "    get value() { return this._value }",
-                "}",
-                "",
-            ].join("\n"),
+            ["export class Box {", "    protected _value = 1", "    get value() { return this._value }", "}", ""].join(
+                "\n",
+            ),
         )
     })
 })
@@ -244,14 +209,10 @@ describe("validatePreferProtected", () => {
         let root = await mkdtemp(join(tmpdir(), "yorozu-prefer-protected-"))
         await mkdir(join(root, "src"), { recursive: true })
         await mkdir(join(root, "skip"), { recursive: true })
-        await writeFile(
-            join(root, "src", "lock.ts"),
-            "export class Lock { private _queue = 1 }\n",
-        )
-        await writeFile(
-            join(root, "skip", "ignored.ts"),
-            "export class Ignored { #hidden = 1 }\n",
-        )
+        await mkdir(join(root, "playground"), { recursive: true })
+        await writeFile(join(root, "src", "lock.ts"), "export class Lock { private _queue = 1 }\n")
+        await writeFile(join(root, "skip", "ignored.ts"), "export class Ignored { #hidden = 1 }\n")
+        await writeFile(join(root, "playground", "demo.ts"), "export class Demo { private _x = 1 }\n")
 
         let errors = await validatePreferProtected({
             workspaceRoot: root,

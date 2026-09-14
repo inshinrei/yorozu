@@ -1,3 +1,5 @@
+import { STACK_LAYER_MAX_BEHIND } from "@yorozu/animations"
+
 export type ToastPlacement = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right"
 
 export const TOAST_DURATION_MS: number = 5000
@@ -6,7 +8,7 @@ export const TOAST_RESUME_MIN_MS: number = 50
 export const TOAST_ENTER_MS: number = 150
 export const TOAST_SCALE: number = 0.85
 export const TOAST_PLACEMENT_DEFAULT: ToastPlacement = "bottom-left"
-export const TOAST_STACK_MAX_BEHIND: number = 4
+export const TOAST_STACK_MAX_BEHIND: number = STACK_LAYER_MAX_BEHIND
 
 export type ToastMount = (container: HTMLElement) => void | (() => void)
 export type ToastContent = string | ToastMount

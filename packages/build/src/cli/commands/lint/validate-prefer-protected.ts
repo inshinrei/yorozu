@@ -21,7 +21,7 @@ interface Replacement {
     text: string
 }
 
-let IGNORE = ["**/node_modules/**", "**/dist/**", "**/__fixtures__/**"]
+let IGNORE = ["**/node_modules/**", "**/dist/**", "**/__fixtures__/**", "**/playground/**"]
 
 export function findPreferProtectedIssues(source: string, fileName = "file.ts"): Array<PreferProtectedError> {
     let file = ts.createSourceFile(fileName, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS)
@@ -136,7 +136,7 @@ export async function validatePreferProtected(params: {
 
 function privateModifier(node: ts.Node): ts.Modifier | undefined {
     if (!ts.canHaveModifiers(node)) return undefined
-    return ts.getModifiers(node)?.find(item => item.kind === ts.SyntaxKind.PrivateKeyword)
+    return ts.getModifiers(node)?.find((item) => item.kind === ts.SyntaxKind.PrivateKeyword)
 }
 
 function memberName(node: ts.Node): string {

@@ -1,3 +1,4 @@
+import { STACK_LAYER_MAX_BEHIND } from "@yorozu/animations"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
     TOAST_DURATION_MS,
@@ -35,7 +36,7 @@ describe("createToastSession", () => {
         expect(TOAST_EXIT_MS).toBe(200)
         expect(TOAST_SCALE).toBe(0.85)
         expect(TOAST_PLACEMENT_DEFAULT).toBe("bottom-left")
-        expect(TOAST_STACK_MAX_BEHIND).toBe(4)
+        expect(TOAST_STACK_MAX_BEHIND).toBe(STACK_LAYER_MAX_BEHIND)
     })
 
     it("default generateId returns a non-empty id", () => {

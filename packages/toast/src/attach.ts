@@ -60,6 +60,17 @@ function placeChild(parent: HTMLElement, child: HTMLElement, index: number): voi
     parent.insertBefore(child, current ?? null)
 }
 
+function syncStackItem(el: HTMLElement, depth: number): void {
+    el.setAttribute("data-stack-depth", String(depth))
+    let close = el.querySelector("[data-yorozu-toast-close]")
+    if (close instanceof HTMLElement) {
+        if (depth === 0) close.removeAttribute("tabindex")
+        else close.setAttribute("tabindex", "-1")
+    }
+    if (depth === 0) el.removeAttribute("aria-hidden")
+    else el.setAttribute("aria-hidden", "true")
+}
+
 function createToastEl<T extends ToastContent>(
     record: ToastRecord<T>,
 ): {
@@ -131,7 +142,7 @@ export function attachToastRoot<T extends ToastContent>(
 
     function hideStacked(id: string, item: Painted, axis: StackAxis, layerMs: number, slot: number): void {
         let hideDepth = TOAST_STACK_MAX_BEHIND + 1
-        item.el.setAttribute("data-stack-depth", String(hideDepth))
+        syncStackItem(item.el, hideDepth)
         item.depth = hideDepth
         placeChild(stackLane, item.el, slot)
         if (item.hiding) return
@@ -146,6 +157,7 @@ export function attachToastRoot<T extends ToastContent>(
         item.playback?.cancel()
         item.playback = null
         item.depth = depth
+        syncStackItem(item.el, depth)
         stack.set(item.el, depth, { axis, durationMs })
     }
 
@@ -200,18 +212,35 @@ export function attachToastRoot<T extends ToastContent>(
         for (let index = 0; index < visible.length; index++) {
             let record = visible[index]!
             let depth = visible.length - 1 - index
+            let existing = items.get(record.id)
             if (record.exiting && depth > 0) {
-                let stacked = items.get(record.id)
-                if (stacked) stacked.el.classList.add("exiting")
+                if (!existing) {
+                    let created = createToastEl(record)
+                    syncStackItem(created.el, depth)
+                    let popover = createMenuPopover()
+                    existing = {
+                        el: created.el,
+                        unbind: bindToastItem(created.el, session, record.id),
+                        unmount: created.unmount,
+                        popover,
+                        playback: null,
+                        closing: true,
+                        hiding: false,
+                        lane: "stack",
+                        depth,
+                    }
+                    items.set(record.id, existing)
+                    placeChild(stackLane, created.el, index)
+                }
+                existing.el.classList.add("exiting")
                 continue
             }
             seen.add(record.id)
-            let existing = items.get(record.id)
             if (existing) {
                 existing.hiding = false
                 existing.lane = "stack"
                 existing.el.classList.toggle("exiting", record.exiting)
-                existing.el.setAttribute("data-stack-depth", String(depth))
+                syncStackItem(existing.el, depth)
                 placeChild(stackLane, existing.el, index)
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
@@ -225,7 +254,7 @@ export function attachToastRoot<T extends ToastContent>(
                 continue
             }
             let created = createToastEl(record)
-            created.el.setAttribute("data-stack-depth", String(depth))
+            syncStackItem(created.el, depth)
             let popover = createMenuPopover()
             let painted: Painted = {
                 el: created.el,

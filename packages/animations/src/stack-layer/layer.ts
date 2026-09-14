@@ -110,7 +110,7 @@ export function createStackLayer(config?: StackLayerConfig): StackLayer {
         let runEasing = options?.easing ?? easing
         let existing = entries.get(el)
 
-        if (existing && existing.depth === depth && !existing.anim && !existing.resolve) {
+        if (existing && existing.depth === depth && existing.axis === axis && !existing.anim && !existing.resolve) {
             let { playback, resolve } = createPlayback()
             resolve(true)
             return playback

@@ -37,8 +37,8 @@ function boot(): void {
 
     function recreate(next: ToastPlacement): void {
         placement = next
-        session.destroy()
         stop()
+        session.destroy()
         session = createToastSession({ placement })
         stop = attachToastRoot(session, toastRoot, {
             prefersReducedMotion: () => getAnimationLevel() === "low",

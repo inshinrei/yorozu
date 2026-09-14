@@ -23,7 +23,7 @@ const DEFAULT_CONFIG: Partial<td.TypeDocOptions> = {
     excludeProtected: true,
     excludeExternals: true,
     excludeInternal: true,
-    exclude: ["**/*/node_modules", "**/*.unit.ts", "**/*.test.ts", "**/*.test-utils.ts"],
+    exclude: ["**/*/node_modules", "**/*.unit.ts", "**/*.test.ts", "**/*.test-utils.ts", "**/playground/**"],
 }
 
 class YorozuTypedocReader implements td.OptionsReader {
@@ -72,7 +72,7 @@ class YorozuTypedocReader implements td.OptionsReader {
         let rootConfig = asNonNull(this._rootConfig)
         if (rootConfig.typedoc != null) this._forwardOptions(options, rootConfig.typedoc, cwd)
 
-        let pkg = asNonNull(this._workspace?.find(item => item.path.replace(/\/$/, "") === cwd.replace(/\/$/, "")))
+        let pkg = asNonNull(this._workspace?.find((item) => item.path.replace(/\/$/, "") === cwd.replace(/\/$/, "")))
         let pkgConfig = await loadBuildConfig<CustomBuildConfigObject>(cwd)
 
         let hookContext: BuildHookContext = {
@@ -148,7 +148,7 @@ export let generateDocsCli = bc.command({
     options: {
         root: bc.string().desc("path to the root of the workspace (default: cwd)"),
     },
-    handler: async args => {
+    handler: async (args) => {
         await generateDocs({
             workspaceRoot: resolveWorkspaceRoot(args.root),
         })

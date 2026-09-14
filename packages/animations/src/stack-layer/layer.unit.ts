@@ -136,6 +136,18 @@ describe("createStackLayer", () => {
         layer.destroy()
     })
 
+    it("same depth with a new axis re-animates", async () => {
+        let el = createFakeEl()
+        let layer = createStackLayer()
+        await layer.set(el as unknown as HTMLElement, 1).done
+        animate.mockClear()
+        layer.set(el as unknown as HTMLElement, 1, { axis: "down" })
+        expect(animate).toHaveBeenCalledOnce()
+        expect(animate.mock.calls[0]![0]).toEqual([stackLayerFrame(1), stackLayerFrame(1, { axis: "down" })])
+        expect(el.style.getPropertyValue("transform-origin")).toBe("center top")
+        layer.destroy()
+    })
+
     it("a new set on the same el cancels the in-flight playback", async () => {
         let cancel = vi.fn()
         animate = createFakeAnimate(() => ({
@@ -177,6 +189,9 @@ describe("createStackLayer", () => {
         expect(await playback.done).toBe(false)
         expect(el.style.getPropertyValue("will-change")).toBe("")
         expect(el.style.getPropertyValue("z-index")).toBe("")
+        expect(el.style.getPropertyValue("transform")).toBe("")
+        expect(el.style.getPropertyValue("opacity")).toBe("")
+        expect(el.style.getPropertyValue("transform-origin")).toBe("")
         layer.destroy()
         expect(() => layer.destroy()).not.toThrow()
     })
