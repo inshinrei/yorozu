@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/virtual-list",
-    "version": "1.0.53",
+    "version": "1.0.54",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",
