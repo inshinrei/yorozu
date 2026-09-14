@@ -101,6 +101,25 @@ export {
 export type { Fade, FadeOptions } from "./fade/fade"
 export { FADE_MS, FADE_EASING, createFade } from "./fade/fade"
 
+export type {
+    StackAxis,
+    StackLayer,
+    StackLayerConfig,
+    StackLayerFrame,
+    StackLayerFrameOptions,
+    StackLayerSetOptions,
+} from "./stack-layer/layer"
+export {
+    STACK_LAYER_EASING,
+    STACK_LAYER_MAX_BEHIND,
+    STACK_LAYER_MS,
+    STACK_LAYER_OFFSET_PX,
+    STACK_LAYER_OPACITY_STEP,
+    STACK_LAYER_SCALE_STEP,
+    createStackLayer,
+    stackLayerFrame,
+} from "./stack-layer/layer"
+
 export type { Dock, DockConfig, DockEdge, DockHandle, DockMode, DockPanelState, DockTransforms } from "./dock/dock"
 export { DOCK_EASING, DOCK_FADE_OFFSET, DOCK_MS, createDock, dockTransforms } from "./dock/dock"
 
