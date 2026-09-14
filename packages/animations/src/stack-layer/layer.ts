@@ -5,7 +5,7 @@ import type { Playback } from "../core/types"
 
 export const STACK_LAYER_MS: number = MOTION_UI_MS
 export const STACK_LAYER_EASING: string = MOTION_EASE
-export const STACK_LAYER_MAX_BEHIND: number = 4
+export const STACK_LAYER_MAX_BEHIND: number = 3
 export const STACK_LAYER_SCALE_STEP: number = 0.05
 export const STACK_LAYER_OPACITY_STEP: number = 0.2
 export const STACK_LAYER_OFFSET_PX: number = 8

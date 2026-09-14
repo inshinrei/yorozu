@@ -65,11 +65,11 @@
 }
 
 [data-yorozu-toast-root][data-placement^="bottom"] [data-yorozu-toast-lane="stack"] {
-    padding-block-start: calc(var(--yorozu-toast-stack-offset) * 4);
+    padding-block-start: calc(var(--yorozu-toast-stack-offset) * 3);
 }
 
 [data-yorozu-toast-root][data-placement^="top"] [data-yorozu-toast-lane="stack"] {
-    padding-block-end: calc(var(--yorozu-toast-stack-offset) * 4);
+    padding-block-end: calc(var(--yorozu-toast-stack-offset) * 3);
 }
 
 [data-yorozu-toast-lane="stack"] [data-stack-depth="0"] {

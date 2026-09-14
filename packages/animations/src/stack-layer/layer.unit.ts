@@ -64,7 +64,7 @@ describe("createStackLayer", () => {
     it("stackLayerFrame depth 0 is identity", () => {
         expect(STACK_LAYER_MS).toBe(200)
         expect(STACK_LAYER_EASING).toBe("cubic-bezier(0.25, 0.1, 0.25, 1)")
-        expect(STACK_LAYER_MAX_BEHIND).toBe(4)
+        expect(STACK_LAYER_MAX_BEHIND).toBe(3)
         expect(STACK_LAYER_SCALE_STEP).toBe(0.05)
         expect(STACK_LAYER_OPACITY_STEP).toBe(0.2)
         expect(STACK_LAYER_OFFSET_PX).toBe(8)
@@ -75,13 +75,13 @@ describe("createStackLayer", () => {
         expect(stackLayerFrame(1)).toEqual({ transform: "translateY(-8px) scale(0.95)", opacity: "0.8" })
     })
 
-    it("stackLayerFrame depth 4 is the last visible behind card", () => {
-        expect(stackLayerFrame(4)).toEqual({ transform: "translateY(-32px) scale(0.8)", opacity: "0.2" })
+    it("stackLayerFrame depth 3 is the last visible behind card", () => {
+        expect(stackLayerFrame(3)).toEqual({ transform: "translateY(-24px) scale(0.85)", opacity: "0.4" })
     })
 
-    it("stackLayerFrame depth 5 is opacity 0", () => {
-        expect(stackLayerFrame(5).opacity).toBe("0")
-        expect(stackLayerFrame(5).transform).toBe("translateY(-40px) scale(0.75)")
+    it("stackLayerFrame depth 4 is opacity 0", () => {
+        expect(stackLayerFrame(4).opacity).toBe("0")
+        expect(stackLayerFrame(4).transform).toBe("translateY(-32px) scale(0.8)")
     })
 
     it("axis down peeks with positive Y", () => {
@@ -94,7 +94,7 @@ describe("createStackLayer", () => {
         let playback = layer.set(el as unknown as HTMLElement, 1)
         expect(el.style.getPropertyValue("transform-origin")).toBe("center bottom")
         expect(el.style.getPropertyValue("z-index")).toBe("99")
-        expect(animate.mock.calls[0]![0]).toEqual([stackLayerFrame(5), stackLayerFrame(1)])
+        expect(animate.mock.calls[0]![0]).toEqual([stackLayerFrame(4), stackLayerFrame(1)])
         expect(animate.mock.calls[0]![1]).toMatchObject({
             duration: 200,
             easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",

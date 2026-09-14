@@ -140,11 +140,10 @@ export function attachToastRoot<T extends ToastContent>(
         items.delete(id)
     }
 
-    function hideStacked(id: string, item: Painted, axis: StackAxis, layerMs: number, slot: number): void {
+    function hideStacked(id: string, item: Painted, axis: StackAxis, layerMs: number): void {
         let hideDepth = TOAST_STACK_MAX_BEHIND + 1
         syncStackItem(item.el, hideDepth)
         item.depth = hideDepth
-        placeChild(stackLane, item.el, slot)
         if (item.hiding) return
         item.hiding = true
         item.playback?.cancel()
@@ -279,7 +278,6 @@ export function attachToastRoot<T extends ToastContent>(
             }
         }
 
-        let hideSlot = 0
         for (let [id, item] of [...items]) {
             if (seen.has(id)) continue
             let stillInSession = records.some((record) => record.id === id)
@@ -289,8 +287,7 @@ export function attachToastRoot<T extends ToastContent>(
                 items.delete(id)
                 continue
             }
-            hideStacked(id, item, axis, layerMs, hideSlot)
-            hideSlot += 1
+            hideStacked(id, item, axis, layerMs)
         }
     }
 
