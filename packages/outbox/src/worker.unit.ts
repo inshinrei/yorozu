@@ -719,7 +719,7 @@ describe("OutboxWorker", () => {
         expect(ric.mock.calls[0]?.[1]).toEqual({ timeout: 1 })
     })
 
-    it("transport.send result is passed to process; omitted transport calls process with one arg", async () => {
+    it("transport.send result is passed to process", async () => {
         let clock: Clock = { now: () => Date.now() }
         let { store } = makeRepo([makeEntry({ id: "e1", type: "test/msg", attempts: 0 })], clock)
         let seen: unknown[] = []
@@ -742,6 +742,28 @@ describe("OutboxWorker", () => {
         await drainWorker()
         expect(send).toHaveBeenCalledTimes(1)
         expect(seen).toEqual([{ id: "e1", ctx: { result: { ok: true, id: "e1" } } }])
+    })
+
+    it("omitted transport calls process with ctx omitted", async () => {
+        let clock: Clock = { now: () => Date.now() }
+        let { store } = makeRepo([makeEntry({ id: "e1", type: "test/msg", attempts: 0 })], clock)
+        let seen: unknown[] = []
+        handlers["test/msg"] = {
+            process: async (entry, ctx) => {
+                seen.push({ id: entry.id, ctx })
+            },
+        }
+        workers.push(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog(),
+                pollIntervalMs: 60_000,
+                yieldEvery: 0,
+                clock,
+            }),
+        )
+        workers.at(-1)!.start()
+        await drainWorker()
+        expect(seen).toEqual([{ id: "e1", ctx: undefined }])
     })
 
     it("transport.send throw uses retry path and does not call process", async () => {

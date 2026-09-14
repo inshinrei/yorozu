@@ -235,11 +235,13 @@ export class OutboxWorker {
                 }
 
                 try {
-                    let ctx: OutboxProcessContext | undefined
-                    if (this.options.transport) {
-                        ctx = { result: await this.options.transport.send(entry) }
-                    }
-                    await flow.span("process " + entry.type, () => h.process(entry, ctx))
+                    await flow.span("process " + entry.type, async () => {
+                        let ctx: OutboxProcessContext | undefined
+                        if (this.options.transport) {
+                            ctx = { result: await this.options.transport.send(entry) }
+                        }
+                        await h.process(entry, ctx)
+                    })
                 } catch (err) {
                     let errMsg = err instanceof Error ? err.message : String(err)
                     let attempts = entry.attempts

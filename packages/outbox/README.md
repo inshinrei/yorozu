@@ -73,7 +73,7 @@ Worker drains on `start` / `resume` / `wake()` / store `subscribe` (enqueue, ret
 
 `yieldEvery` defaults to 1 (await `requestIdle` with `{ timeout: 1 }` after each handled entry so a long drain yields the event loop even in a background tab). `0` disables.
 
-`OutboxWorker` is a claim/lease class, not a Web Worker, unless the host passes `transport` whose `send` posts to a dedicated worker. Domain `process` / `rollback` / `onExhausted` always run on the page thread. Payloads must already be structured-cloneable. This package does not spawn workers. When `transport` is set: `result = await transport.send(entry)` then `process(entry, { result })`; send and process errors share the existing retry / offline / exhaust path.
+`OutboxWorker` is a claim/lease class, not a Web Worker, unless the host passes `transport` whose `send` posts to a dedicated worker. Domain `process` / `rollback` / `onExhausted` always run on the page thread. Payloads must already be structured-cloneable. This package does not spawn workers. When `transport` is set: `result = await transport.send(entry)` then `process(entry, { result })`; send and process errors share the existing retry / offline / exhaust path. `transport.send` and `process` must be idempotent — a `process` throw after a successful send retries the pair.
 
 Cross-tab: this package does not open `BroadcastChannel`. Host should `bc.onmessage → worker.wake()` and post on local enqueue. Without that, other-tab enqueue waits up to the watchdog. Lease steal on **this** tab is the due timer (not worse than the old 2s poll).
 
