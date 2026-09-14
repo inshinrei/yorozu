@@ -135,4 +135,52 @@ describe("attachToastRoot", () => {
         let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
         expect(item.style.getPropertyValue("transform-origin")).toBe("center top")
     })
+
+    it("permanent toasts live in the permanent lane before the stack", () => {
+        session.show("stay", { permanent: true })
+        session.show("temp")
+        let lanes = [...root.children] as HTMLElement[]
+        expect(lanes.map((el) => el.getAttribute("data-yorozu-toast-lane"))).toEqual(["permanent", "stack"])
+        expect(root.querySelector('[data-yorozu-toast-lane="permanent"] [data-permanent]')).toBeTruthy()
+        expect(
+            root.querySelector('[data-yorozu-toast-lane="stack"] [data-yorozu-toast]:not([data-permanent])'),
+        ).toBeTruthy()
+    })
+
+    it("stacks newest timed in front and older behind up to 4", () => {
+        for (let i = 0; i < 6; i++) session.show(`t-${i}`)
+        let stacked = [...root.querySelectorAll("[data-yorozu-toast-lane=stack] [data-yorozu-toast]")] as HTMLElement[]
+        expect(stacked).toHaveLength(5)
+        expect(stacked.map((el) => el.getAttribute("data-stack-depth"))).toEqual(["4", "3", "2", "1", "0"])
+        expect(stacked.at(-1)!.querySelector("[data-yorozu-toast-content]")!.textContent).toBe("t-5")
+        expect(root.textContent).not.toContain("t-0")
+    })
+
+    it("restacks and pops a waiting toast behind after the front is removed", () => {
+        for (let i = 0; i < 6; i++) session.show(`t-${i}`)
+        session.dismiss("id-6") // t-5, newest
+        vi.advanceTimersByTime(TOAST_EXIT_MS)
+        let stacked = [...root.querySelectorAll("[data-yorozu-toast-lane=stack] [data-yorozu-toast]")] as HTMLElement[]
+        expect(stacked).toHaveLength(5)
+        expect(stacked.at(-1)!.querySelector("[data-yorozu-toast-content]")!.textContent).toBe("t-4")
+        expect(stacked[0]!.querySelector("[data-yorozu-toast-content]")!.textContent).toBe("t-0")
+        expect(stacked[0]!.getAttribute("data-stack-depth")).toBe("4")
+    })
+
+    it("animates depth changes on stacked toasts", () => {
+        session.show("a")
+        animate.mockClear()
+        session.show("b")
+        let depths = animate.mock.calls.map((c) => c[0])
+        expect(depths.some((frames) => JSON.stringify(frames).includes("scale(0.95)"))).toBe(true)
+    })
+
+    it("duration 0 when prefersReducedMotion", () => {
+        stop!()
+        stop = attachToastRoot(session, root, { prefersReducedMotion: () => true })
+        animate.mockClear()
+        session.show("x")
+        session.show("y")
+        expect(animate).not.toHaveBeenCalled()
+    })
 })

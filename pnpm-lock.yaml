@@ -267,6 +267,9 @@ importers:
 
   packages/toast:
     dependencies:
+      '@yorozu/animations':
+        specifier: workspace:^
+        version: link:../animations
       '@yorozu/context-menu':
         specifier: workspace:^
         version: link:../context-menu

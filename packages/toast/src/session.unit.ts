@@ -6,6 +6,7 @@ import {
     TOAST_PLACEMENT_DEFAULT,
     TOAST_RESUME_MIN_MS,
     TOAST_SCALE,
+    TOAST_STACK_MAX_BEHIND,
     createToastSession,
     type ToastSession,
 } from "./session"
@@ -34,6 +35,7 @@ describe("createToastSession", () => {
         expect(TOAST_EXIT_MS).toBe(200)
         expect(TOAST_SCALE).toBe(0.85)
         expect(TOAST_PLACEMENT_DEFAULT).toBe("bottom-left")
+        expect(TOAST_STACK_MAX_BEHIND).toBe(4)
     })
 
     it("default generateId returns a non-empty id", () => {

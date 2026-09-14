@@ -27,6 +27,7 @@ let tokenNames = [
     "--yorozu-toast-close-color",
     "--yorozu-toast-close-hover",
     "--yorozu-toast-close-size",
+    "--yorozu-toast-stack-offset",
 ]
 
 describe("default iOS liquid-glass toast styles", () => {
@@ -39,6 +40,7 @@ describe("default iOS liquid-glass toast styles", () => {
         expect(css).toContain("--yorozu-toast-blur: 20px")
         expect(css).toContain("--yorozu-toast-saturate: 180%")
         expect(css).toContain("--yorozu-toast-bg: rgba(255, 255, 255, 0.72)")
+        expect(css).toContain("--yorozu-toast-stack-offset: 8px")
         expect(css).toContain("prefers-color-scheme: dark")
     })
 
@@ -54,6 +56,11 @@ describe("default iOS liquid-glass toast styles", () => {
         expect(css).toContain("[data-yorozu-toast-content]")
         expect(css).toContain("[data-yorozu-toast-close]")
         expect(css).toContain("[data-yorozu-toast][data-permanent] [data-yorozu-toast-close]")
+        expect(css).toContain('[data-yorozu-toast-lane="permanent"]')
+        expect(css).toContain('[data-yorozu-toast-lane="stack"]')
+        expect(css).toContain('[data-stack-depth="0"]')
+        expect(css).toContain("padding-block-start")
+        expect(css).toContain("padding-block-end")
         expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-left"]')
         expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-center"]')
         expect(css).toContain('[data-yorozu-toast-root][data-placement="bottom-right"]')

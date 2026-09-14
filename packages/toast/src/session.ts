@@ -6,6 +6,7 @@ export const TOAST_RESUME_MIN_MS: number = 50
 export const TOAST_ENTER_MS: number = 150
 export const TOAST_SCALE: number = 0.85
 export const TOAST_PLACEMENT_DEFAULT: ToastPlacement = "bottom-left"
+export const TOAST_STACK_MAX_BEHIND: number = 4
 
 export type ToastMount = (container: HTMLElement) => void | (() => void)
 export type ToastContent = string | ToastMount
