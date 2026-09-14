@@ -49,6 +49,48 @@ function paint(): void {
 }
 ```
 
+## Wrapping flow
+
+For a wrapping flex / chip strip (items reflow in 2d, not a fixed grid), use `createSortableBothAxis` and `paintSortableFlowTransforms`. Offsets are `{x, y}` from `session.getOffset(key)`.
+
+```ts
+import {
+    createSortableBothAxis,
+    paintSortableFlowTransforms,
+    HOLD_ACTIVATION,
+    type SortableBothAxis,
+} from "@yorozu/sortable"
+
+let items = ["a", "b", "c", "d"]
+let nodes = new Map<string, HTMLElement>()
+
+let session: SortableBothAxis = createSortableBothAxis({
+    getItems: () => items,
+    getKey: (item) => item,
+    // HOLD_ACTIVATION when the wrapping strip itself scrolls so a press can scroll
+    // without starting a drag.
+    activation: HOLD_ACTIVATION,
+    onReorder: (next) => {
+        items = next
+        render()
+    },
+})
+
+session.subscribe(() => paint())
+
+function bindChip(node: HTMLElement, key: string): void {
+    let handle = session.registerItem(node, key)
+    nodes.set(key, node)
+    node.addEventListener("pointerdown", (e) => session.pointerDown(key, e))
+    // later: handle.update(newKey) / handle.destroy(); nodes.delete(key)
+}
+
+function paint(): void {
+    paintSortableFlowTransforms(session, nodes)
+    // Overlay (if any) still uses session.getOverlayOffset() separately.
+}
+```
+
 ## Activation
 
 | Token                | `delayMs` | When to use                                                                                                                |
@@ -95,6 +137,6 @@ mode.exit()
 
 - Not a general drag-and-drop toolkit
 - No nested sortables
-- No 2d grid reordering
+- No grid occupancy (tetris). Wrapping flex flow is `createSortableBothAxis`; 1d lists stay on `createSortableSession`.
 - No multi-item drag
 - No domain order logic (hosts own persistence and constraints)

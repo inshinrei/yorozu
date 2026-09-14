@@ -24,5 +24,13 @@ export { findScrollParent, createSortableSession } from "./session"
 
 export { paintSortableTransforms } from "./paint"
 
+export type { FlowOffset, FlowRectSnapshot } from "./flow-geometry"
+export { computeInsertIndexFlow } from "./flow-geometry"
+
+export type { SortableBothAxisOptions, SortableBothAxis } from "./both-axis"
+export { createSortableBothAxis } from "./both-axis"
+
+export { paintSortableFlowTransforms } from "./paint-flow"
+
 export type { ReorderMode } from "./reorder-mode"
 export { createReorderMode } from "./reorder-mode"
