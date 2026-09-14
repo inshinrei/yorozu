@@ -1,3 +1,4 @@
+import { unknownToError } from "../types"
 import { requestIdle, type IdleHandle } from "./idle"
 
 export type BitmapPri = "visible" | "preload"
@@ -12,6 +13,12 @@ export type BitmapWorkJob = {
 export type BitmapWorkQueueStats = {
     active: number
     queued: number
+}
+
+export type BitmapWorkQueueOptions = {
+    concurrency?: number
+    idle?: boolean
+    onError?: (error: Error, id: string) => void
 }
 
 export type BitmapWorkQueue = {
@@ -38,6 +45,10 @@ type ActiveJob = {
 
 const PRI_ORDER: BitmapPri[] = ["visible", "preload"]
 
+function isAbortError(err: unknown): boolean {
+    return err instanceof Error && err.name === "AbortError"
+}
+
 function resolveConcurrency(value: number | undefined): number {
     if (value === undefined) return 1
     let n = Math.floor(value)
@@ -52,7 +63,7 @@ function emptyLanes(): Record<BitmapPri, QueuedJob[]> {
     }
 }
 
-export function createBitmapWorkQueue(opts?: { concurrency?: number; idle?: boolean }): BitmapWorkQueue {
+export function createBitmapWorkQueue(opts?: BitmapWorkQueueOptions): BitmapWorkQueue {
     let concurrency = resolveConcurrency(opts?.concurrency)
     let useIdle = opts?.idle !== false
     let lanes = emptyLanes()
@@ -114,26 +125,54 @@ export function createBitmapWorkQueue(opts?: { concurrency?: number; idle?: bool
 
     function startJob(job: QueuedJob): void {
         let controller = new AbortController()
-        active.set(job.id, { id: job.id, controller })
+        let token: ActiveJob = { id: job.id, controller }
+        active.set(job.id, token)
 
         void (async () => {
+            let bitmap: ImageBitmap | undefined
+            let reported: Error | undefined
             try {
                 let signal = controller.signal
                 if (signal.aborted) return
-                let bitmap = await createImageBitmap(job.source)
-                if (signal.aborted) {
+                bitmap = await createImageBitmap(job.source, { signal })
+                if (active.get(job.id) !== token || signal.aborted) {
                     bitmap.close()
+                    bitmap = undefined
                     return
                 }
                 if (job.run) {
-                    await job.run({ signal, bitmap })
+                    let owned = bitmap
+                    bitmap = undefined
+                    await job.run({ signal, bitmap: owned })
                 } else {
                     bitmap.close()
+                    bitmap = undefined
                 }
-            } catch {
-                // decode / run errors and AbortError are swallowed
+            } catch (err) {
+                if (bitmap) {
+                    try {
+                        bitmap.close()
+                    } catch {
+                        // ignore close errors on failed decode
+                    }
+                    bitmap = undefined
+                }
+                if (!isAbortError(err) && !controller.signal.aborted) {
+                    reported = unknownToError(err)
+                }
             } finally {
-                active.delete(job.id)
+                if (active.get(job.id) === token) {
+                    active.delete(job.id)
+                } else {
+                    reported = undefined
+                }
+            }
+            if (reported) {
+                try {
+                    opts?.onError?.(reported, job.id)
+                } catch {
+                    // host onError must not reject the worker
+                }
             }
             pump()
         })()
@@ -164,12 +203,15 @@ export function createBitmapWorkQueue(opts?: { concurrency?: number; idle?: bool
             let running = active.get(id)
             if (!running) return false
             running.controller.abort()
+            active.delete(id)
+            pump()
             return true
         },
         pause(): void {
             paused = true
         },
         resume(): void {
+            if (!paused) return
             paused = false
             pump()
         },

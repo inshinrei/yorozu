@@ -349,4 +349,101 @@ describe("createBitmapWorkQueue", () => {
         expect(seen).toBe(handed)
         expect(handed.close).not.toHaveBeenCalled()
     })
+
+    it("passes abort signal into createImageBitmap", async () => {
+        let seen: AbortSignal | undefined
+        vi.stubGlobal("createImageBitmap", async (_src: unknown, opts?: { signal?: AbortSignal }) => {
+            seen = opts?.signal
+            return fakeBitmap()
+        })
+        let q = createBitmapWorkQueue({ idle: false })
+        q.enqueue({ id: "a", pri: "visible", source: new Blob() })
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(seen).toBeInstanceOf(AbortSignal)
+        expect(seen?.aborted).toBe(false)
+    })
+
+    it("decode throw calls onError and does not call run; AbortError is silent", async () => {
+        let decodeErr = new Error("bad decode")
+        vi.stubGlobal("createImageBitmap", async () => {
+            throw decodeErr
+        })
+        let errors: Array<{ error: Error; id: string }> = []
+        let ran = false
+        let q = createBitmapWorkQueue({
+            idle: false,
+            onError: (error, id) => {
+                errors.push({ error, id })
+            },
+        })
+        q.enqueue({
+            id: "boom",
+            pri: "visible",
+            source: new Blob(),
+            run: async () => {
+                ran = true
+            },
+        })
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(ran).toBe(false)
+        expect(errors).toEqual([{ error: decodeErr, id: "boom" }])
+        expect(q.stats.active).toBe(0)
+
+        let abortErr = new Error("Aborted")
+        abortErr.name = "AbortError"
+        vi.stubGlobal("createImageBitmap", async () => {
+            throw abortErr
+        })
+        errors.length = 0
+        q.enqueue({ id: "aborted", pri: "visible", source: new Blob() })
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(errors).toEqual([])
+    })
+
+    it("cancel of a running decode frees the id for enqueue before createImageBitmap settles", async () => {
+        let bmp1 = fakeBitmap()
+        let bmp2 = fakeBitmap()
+        let release!: (value: ImageBitmap) => void
+        let calls = 0
+        vi.stubGlobal("createImageBitmap", (_src: unknown, _opts?: { signal?: AbortSignal }) => {
+            calls++
+            if (calls === 1) {
+                return new Promise<ImageBitmap>((resolve) => {
+                    release = (value) => {
+                        resolve(value)
+                    }
+                })
+            }
+            return Promise.resolve(bmp2)
+        })
+        let q = createBitmapWorkQueue({ idle: false })
+        let secondRan = false
+        expect(q.enqueue({ id: "same", pri: "visible", source: new Blob() })).toBe(true)
+        await Promise.resolve()
+        expect(q.stats.active).toBe(1)
+        expect(q.cancel("same")).toBe(true)
+        expect(q.stats.active).toBe(0)
+        expect(
+            q.enqueue({
+                id: "same",
+                pri: "visible",
+                source: new Blob(),
+                run: async () => {
+                    secondRan = true
+                },
+            }),
+        ).toBe(true)
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(secondRan).toBe(true)
+        expect(q.stats.active).toBe(0)
+        release(bmp1)
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(bmp1.close).toHaveBeenCalled()
+        expect(q.stats.active).toBe(0)
+    })
 })

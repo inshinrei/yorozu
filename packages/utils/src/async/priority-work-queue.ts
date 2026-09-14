@@ -23,7 +23,10 @@ export type PriorityWorkQueue = {
     enqueue(job: PriorityWorkJob): boolean
     cancel(id: string): boolean
     cancelAll(): void
+    pause(): void
+    resume(): void
     isBusy(id: string): boolean
+    isRunning(id: string): boolean
     get stats(): PriorityWorkQueueStats
 }
 
@@ -61,6 +64,7 @@ export function createPriorityWorkQueue(opts?: PriorityWorkQueueOptions): Priori
     let queuedPri = new Map<string, WorkPri>()
     let active = new Map<string, ActiveJob>()
     let maxActive = 0
+    let paused = false
 
     function queuedCount(): number {
         return queuedPri.size
@@ -90,6 +94,7 @@ export function createPriorityWorkQueue(opts?: PriorityWorkQueueOptions): Priori
     }
 
     function pump(): void {
+        if (paused) return
         while (active.size < concurrency) {
             let job = pickNext()
             if (!job) return
@@ -145,8 +150,19 @@ export function createPriorityWorkQueue(opts?: PriorityWorkQueueOptions): Priori
                 running.controller.abort()
             }
         },
+        pause(): void {
+            paused = true
+        },
+        resume(): void {
+            if (!paused) return
+            paused = false
+            pump()
+        },
         isBusy(id: string): boolean {
             return active.has(id) || queuedPri.has(id)
+        },
+        isRunning(id: string): boolean {
+            return active.has(id)
         },
         get stats(): PriorityWorkQueueStats {
             return {

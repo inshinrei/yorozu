@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/outbox",
-    "version": "1.0.31",
+    "version": "1.0.32",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

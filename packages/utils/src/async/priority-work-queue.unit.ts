@@ -677,4 +677,65 @@ describe("createPriorityWorkQueue", () => {
         infGates[1]!.resolve()
         await tick()
     })
+
+    it("pause blocks new starts including visible; running jobs finish; resume pumps", async () => {
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+        let g = gate()
+        let started: string[] = []
+        q.enqueue({
+            id: "run",
+            pri: "visible",
+            run: async () => {
+                started.push("run")
+                await g.promise
+            },
+        })
+        await tick()
+        q.pause()
+        q.pause()
+        q.enqueue({
+            id: "held",
+            pri: "visible",
+            run: async () => {
+                started.push("held")
+            },
+        })
+        g.resolve()
+        await tick()
+        expect(started).toEqual(["run"])
+        expect(q.isBusy("held")).toBe(true)
+        expect(q.isRunning("held")).toBe(false)
+        expect(q.isRunning("run")).toBe(false)
+        q.resume()
+        q.resume()
+        await tick()
+        expect(started).toEqual(["run", "held"])
+        expect(q.isRunning("held")).toBe(false)
+    })
+
+    it("isRunning is only the executing id; isBusy includes queued", async () => {
+        let q = createPriorityWorkQueue({ concurrency: 1 })
+        let g = gate()
+        q.enqueue({
+            id: "run",
+            pri: "preload",
+            run: async () => {
+                await g.promise
+            },
+        })
+        q.enqueue({
+            id: "queued",
+            pri: "preload",
+            run: async () => {},
+        })
+        await tick()
+        expect(q.isRunning("run")).toBe(true)
+        expect(q.isBusy("run")).toBe(true)
+        expect(q.isRunning("queued")).toBe(false)
+        expect(q.isBusy("queued")).toBe(true)
+        g.resolve()
+        await tick()
+        expect(q.isRunning("run")).toBe(false)
+        expect(q.isBusy("queued")).toBe(false)
+    })
 })
