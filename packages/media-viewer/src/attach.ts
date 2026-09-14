@@ -95,7 +95,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let filmstripIds: string | null = null
     let filmstripCenteredIndex: number | null = null
     let filmstripList: VirtualList<string> | null = null
-    let filmstripListItemSize: number | null = null
+    let filmstripListNeighborSize: number | null = null
+    let filmstripListCurrentSize: number | null = null
     let shell: MediaShell | null = null
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
@@ -681,6 +682,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 image.src = poster
                 image.alt = ""
                 image.draggable = false
+                let key = paneKeys.get(pane)
+                image.onerror = (): void => {
+                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
+                    pane.replaceChildren()
+                }
                 pane.append(image)
                 return
             }
@@ -695,6 +701,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             image.src = item.src
             image.alt = ""
             image.draggable = false
+            let key = paneKeys.get(pane)
+            image.onerror = (): void => {
+                if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
+                pane.replaceChildren()
+            }
             pane.append(image)
             return
         }
@@ -774,6 +785,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         image.src = src
         image.alt = "alt" in item && item.alt ? item.alt : ""
         image.draggable = false
+        let key = paneKeys.get(pane)
+        image.onerror = (): void => {
+            if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
+            host.replaceChildren()
+        }
         if (zoomable) image.addEventListener("load", () => measureZoom())
         host.append(image)
         if (zoomable && image.complete) measureZoom()
@@ -936,16 +952,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let loading = btn.querySelector("[data-yorozu-media-loading]")
         if (src) {
             loading?.remove()
+            let key = `${item.id}:${src}`
+            thumbDecodeKeys.set(btn, key)
+            let onThumbError = (): void => {
+                if (detached || !btn.isConnected || thumbDecodeKeys.get(btn) !== key) return
+                btn.replaceChildren()
+            }
             if (image instanceof HTMLImageElement) {
                 if (image.getAttribute("src") !== src) image.src = src
                 image.alt = item.alt ?? ""
                 image.draggable = false
+                image.onerror = onThumbError
                 return
             }
             let next = document.createElement("img")
             next.src = src
             next.alt = item.alt ?? ""
             next.draggable = false
+            next.onerror = onThumbError
             btn.append(next)
             return
         }
@@ -959,7 +983,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function destroyFilmstripList(): void {
         filmstripList?.destroy()
         filmstripList = null
-        filmstripListItemSize = null
+        filmstripListNeighborSize = null
+        filmstripListCurrentSize = null
     }
 
     function filmstripSlice(viewportWidth: number): number {
@@ -980,16 +1005,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function ensureFilmstripList(): VirtualList<string> {
-        let itemSizePx = viewer.filmstripItemSizePx()
-        if (filmstripList && filmstripListItemSize === itemSizePx) {
+        let sizes = viewer.filmstripItemSizes()
+        if (
+            filmstripList &&
+            filmstripListNeighborSize === sizes.neighbor &&
+            filmstripListCurrentSize === sizes.current
+        ) {
             filmstripList.setListSlice(filmstripSlice(filmstripEl?.clientWidth ?? 0))
             return filmstripList
         }
         destroyFilmstripList()
-        filmstripListItemSize = itemSizePx
+        filmstripListNeighborSize = sizes.neighbor
+        filmstripListCurrentSize = sizes.current
         filmstripList = createVirtualList({
             getItems: (): readonly string[] => viewer.snapshot().items.map((item) => item.id),
-            itemSize: itemSizePx,
+            itemSize: (index: number): number => {
+                let live = viewer.filmstripItemSizes()
+                return index === viewer.snapshot().index ? live.current : live.neighbor
+            },
             listSlice: filmstripSlice(filmstripEl?.clientWidth ?? 0),
             onChange: onFilmstripWindowChange,
             // Idle trim re-slices with LIST_SLICE_MIN (16); skip so a compact strip can stay smaller.
@@ -1088,11 +1121,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (!filmstripEl) return
         if (viewer.filmstripVirtualize()) {
             let index = viewer.snapshot().index
-            let itemSizePx = viewer.filmstripItemSizePx()
+            let currentPitch = viewer.filmstripItemSizePx()
             let viewportWidth = filmstripEl.clientWidth
-            let left = index * itemSizePx + itemSizePx / 2 - viewportWidth / 2
+            let rowTop =
+                filmstripList != null ? filmstripList.rowTop(index) : index * viewer.filmstripItemSizes().neighbor
+            let left = rowTop + currentPitch / 2 - viewportWidth / 2
             let totalSize =
-                filmstripList != null ? filmstripList.totalSize() : viewer.snapshot().items.length * itemSizePx
+                filmstripList != null ? filmstripList.totalSize() : viewer.snapshot().items.length * currentPitch
             let maxLeft = Math.max(0, totalSize - viewportWidth)
             if (left < 0) left = 0
             if (left > maxLeft) left = maxLeft

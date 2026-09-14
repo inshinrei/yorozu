@@ -4,6 +4,7 @@ import {
     createMediaViewer,
     DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
     DEFAULT_FILMSTRIP_OVERSCAN,
+    filmstripItemSizes,
     MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
     type MediaViewer,
     type MediaViewerItem,
@@ -362,6 +363,22 @@ describe("createMediaViewer", () => {
         expect(viewer!.filmstripVirtualize()).toBe(true)
         expect(viewer!.filmstripItemSizePx()).toBe(40)
         expect(viewer!.filmstripThumbSrc()?.(img("a"))).toBe("thumb:a")
+    })
+
+    it("virtualize without itemSizePx uses mixed default pitches; number stays uniform", () => {
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: { virtualize: true } })
+        expect(viewer!.filmstripVirtualize()).toBe(true)
+        expect(viewer!.filmstripItemSizes()).toEqual(filmstripItemSizes())
+        expect(viewer!.filmstripItemSizePx()).toBe(filmstripItemSizes().current)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: { virtualize: true, itemSizePx: 40 } })
+        expect(viewer!.filmstripItemSizes()).toEqual({ neighbor: 40, current: 40 })
+        expect(viewer!.filmstripItemSizePx()).toBe(40)
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 20, current: 30 } },
+        })
+        expect(viewer!.filmstripItemSizes()).toEqual({ neighbor: 20, current: 30 })
+        expect(viewer!.filmstripItemSizePx()).toBe(30)
     })
 
     it("filmstrip object defaults and boolean paths do not virtualize", () => {

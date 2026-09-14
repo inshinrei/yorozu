@@ -2,9 +2,13 @@ export {
     createMediaViewer,
     MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT,
     DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+    DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX,
+    DEFAULT_FILMSTRIP_GAP_PX,
     DEFAULT_FILMSTRIP_OVERSCAN,
+    filmstripItemSizes,
 } from "./session"
 export type {
+    FilmstripItemSizes,
     MediaFilmstripOpts,
     MediaKind,
     MediaViewer,

@@ -8,7 +8,7 @@ import {
     MEDIA_GHOST_EASING,
     MEDIA_GHOST_MS,
 } from "./ghost"
-import { createMediaViewer, type MediaViewer } from "./session"
+import { createMediaViewer, filmstripItemSizes, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin, MediaVisibleIds } from "./types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
@@ -1415,6 +1415,64 @@ describe("attachMediaViewer", () => {
         })
         let thumbImg = root.querySelector("[data-yorozu-media-thumb] img")
         expect(thumbImg?.getAttribute("src")).toBe("thumb:a")
+    })
+
+    it("virtualize default mixed pitches: current cell is wider than neighbors", () => {
+        let items = Array.from({ length: 10 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 2, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
+        viewer.setItems(items, 2)
+        let sizes = filmstripItemSizes()
+        let current = nav.querySelector("[data-current]") as HTMLElement
+        expect(current.style.left).toBe(`${2 * sizes.neighbor}px`)
+        let neighbor = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "3",
+        ) as HTMLElement
+        expect(neighbor.style.left).toBe(`${2 * sizes.neighbor + sizes.current}px`)
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        expect(track.style.width).toBe(`${9 * sizes.neighbor + sizes.current}px`)
+    })
+
+    it("failed decode clears the peek spinner", async () => {
+        let decode = vi.fn(async (req: { role: string }) => {
+            if (req.role === "peek-newer") return null
+            return document.createElement("img")
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({
+            items: [img("a"), img("b")],
+            index: 0,
+            neighbors: {
+                older: null,
+                newer: { id: "b", kind: "image", src: "b.jpg" },
+            },
+        })
+        await vi.waitFor(() => {
+            let pane = root.querySelector('[data-side="newer"]') as HTMLElement
+            expect(pane).toBeTruthy()
+            expect(pane.querySelector("[data-yorozu-media-loading]")).toBeNull()
+            expect(pane.querySelector("img")).toBeNull()
+        })
+    })
+
+    it("compat img.src peek onerror clears the pane", async () => {
+        viewer.open({
+            items: [img("a"), img("b")],
+            index: 0,
+            neighbors: {
+                older: null,
+                newer: { id: "b", kind: "image", src: "b.jpg" },
+            },
+        })
+        let image = root.querySelector('[data-side="newer"] img') as HTMLImageElement
+        expect(image).toBeTruthy()
+        image.dispatchEvent(new Event("error"))
+        expect(root.querySelector('[data-side="newer"] img')).toBeNull()
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeNull()
     })
 
     it("applies compact filmstrip max-width by default and full width when set", () => {

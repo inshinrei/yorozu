@@ -6,6 +6,7 @@ import {
     type MediaDecodeRequest,
 } from "./decode"
 import type {
+    FilmstripItemSizes,
     MediaViewer,
     MediaViewerChromeSlots,
     MediaViewerItem,
@@ -20,9 +21,12 @@ import type {
 
 export const MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT: string = "36%"
 export const DEFAULT_FILMSTRIP_ITEM_SIZE_PX: number = 44
+export const DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX: number = 60
+export const DEFAULT_FILMSTRIP_GAP_PX: number = 1
 export const DEFAULT_FILMSTRIP_OVERSCAN: number = 4
 
 export type {
+    FilmstripItemSizes,
     MediaFilmstripOpts,
     MediaKind,
     MediaViewer,
@@ -38,6 +42,34 @@ export type {
     MediaViewerSnapshot,
     MediaVisibleIds,
 } from "./types"
+
+export function filmstripItemSizes(opts?: { neighbor?: number; current?: number; gap?: number }): FilmstripItemSizes {
+    let gap = opts?.gap ?? DEFAULT_FILMSTRIP_GAP_PX
+    return {
+        neighbor: (opts?.neighbor ?? DEFAULT_FILMSTRIP_ITEM_SIZE_PX) + gap,
+        current: (opts?.current ?? DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX) + gap,
+    }
+}
+
+function isPositiveFinite(n: unknown): n is number {
+    return typeof n === "number" && Number.isFinite(n) && n > 0
+}
+
+function resolveFilmstripItemSizes(itemSizePx: unknown, virtualize: boolean): FilmstripItemSizes {
+    if (typeof itemSizePx === "number" && isPositiveFinite(itemSizePx)) {
+        return { neighbor: itemSizePx, current: itemSizePx }
+    }
+    if (itemSizePx != null && typeof itemSizePx === "object") {
+        let raw = itemSizePx as { neighbor?: unknown; current?: unknown }
+        let defaults = filmstripItemSizes()
+        return {
+            neighbor: isPositiveFinite(raw.neighbor) ? raw.neighbor : defaults.neighbor,
+            current: isPositiveFinite(raw.current) ? raw.current : defaults.current,
+        }
+    }
+    if (virtualize) return filmstripItemSizes()
+    return { neighbor: DEFAULT_FILMSTRIP_ITEM_SIZE_PX, current: DEFAULT_FILMSTRIP_ITEM_SIZE_PX }
+}
 
 function areIdArraysEqual(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
     if (a === b) return true
@@ -82,7 +114,10 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     let navFrom: MediaViewerNavFrom | null = null
     let filmstripWanted = true
     let filmstripVirtualizeFlag = false
-    let filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+    let filmstripSizes: FilmstripItemSizes = {
+        neighbor: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+        current: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+    }
     let filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
     let filmstripThumbSrcFn: ((item: MediaViewerItem) => string | null) | undefined
     let filmstripMaxWidth = MEDIA_FILMSTRIP_MAX_WIDTH_DEFAULT
@@ -128,22 +163,25 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         if (f === false) {
             filmstripWanted = false
             filmstripVirtualizeFlag = false
-            filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+            filmstripSizes = {
+                neighbor: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+                current: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+            }
             filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
             return
         }
         filmstripWanted = true
         if (f === true || f === undefined) {
             filmstripVirtualizeFlag = false
-            filmstripItemSizePxValue = DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+            filmstripSizes = {
+                neighbor: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+                current: DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
+            }
             filmstripOverscanValue = DEFAULT_FILMSTRIP_OVERSCAN
             return
         }
         filmstripVirtualizeFlag = f.virtualize === true
-        filmstripItemSizePxValue =
-            typeof f.itemSizePx === "number" && Number.isFinite(f.itemSizePx) && f.itemSizePx > 0
-                ? f.itemSizePx
-                : DEFAULT_FILMSTRIP_ITEM_SIZE_PX
+        filmstripSizes = resolveFilmstripItemSizes(f.itemSizePx, filmstripVirtualizeFlag)
         filmstripOverscanValue =
             typeof f.overscan === "number" && Number.isFinite(f.overscan) && f.overscan >= 0
                 ? f.overscan
@@ -320,7 +358,11 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
     }
 
     function filmstripItemSizePx(): number {
-        return filmstripItemSizePxValue
+        return filmstripSizes.current
+    }
+
+    function filmstripItemSizesGetter(): FilmstripItemSizes {
+        return { neighbor: filmstripSizes.neighbor, current: filmstripSizes.current }
     }
 
     function filmstripOverscan(): number {
@@ -405,6 +447,7 @@ export function createMediaViewer(opts?: MediaViewerSessionOpts): MediaViewer {
         setFilmstripMaxWidth,
         filmstripVirtualize,
         filmstripItemSizePx,
+        filmstripItemSizes: filmstripItemSizesGetter,
         filmstripOverscan,
         filmstripThumbSrc,
         chrome,

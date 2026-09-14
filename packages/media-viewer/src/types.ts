@@ -54,9 +54,14 @@ export type MediaViewerChromeSlots = {
     overlay?: MediaViewerChrome
 }
 
+export type FilmstripItemSizes = {
+    neighbor: number
+    current: number
+}
+
 export type MediaFilmstripOpts = {
     virtualize?: boolean
-    itemSizePx?: number
+    itemSizePx?: number | FilmstripItemSizes
     overscan?: number
 }
 
@@ -121,6 +126,7 @@ export type MediaViewer = {
     setFilmstripMaxWidth: (width: string) => void
     filmstripVirtualize: () => boolean
     filmstripItemSizePx: () => number
+    filmstripItemSizes: () => FilmstripItemSizes
     filmstripOverscan: () => number
     filmstripThumbSrc: () => ((item: MediaViewerItem) => string | null) | undefined
     chrome: () => MediaViewerChromeSlots | null
