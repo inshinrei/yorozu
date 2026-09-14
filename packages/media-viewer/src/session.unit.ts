@@ -379,6 +379,16 @@ describe("createMediaViewer", () => {
         })
         expect(viewer!.filmstripItemSizes()).toEqual({ neighbor: 20, current: 30 })
         expect(viewer!.filmstripItemSizePx()).toBe(30)
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 0, current: Number.NaN } },
+        })
+        expect(viewer!.filmstripItemSizes()).toEqual(filmstripItemSizes())
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 20, current: -1 } },
+        })
+        expect(viewer!.filmstripItemSizes()).toEqual({ neighbor: 20, current: filmstripItemSizes().current })
     })
 
     it("filmstrip object defaults and boolean paths do not virtualize", () => {

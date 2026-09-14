@@ -679,7 +679,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (typeof poster === "string" && poster.length > 0) {
                 let image = document.createElement("img")
                 image.setAttribute("data-yorozu-media-peek", "")
-                image.src = poster
                 image.alt = ""
                 image.draggable = false
                 let key = paneKeys.get(pane)
@@ -688,6 +687,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                     pane.replaceChildren()
                 }
                 pane.append(image)
+                image.src = poster
                 return
             }
             let loading = document.createElement("div")
@@ -698,7 +698,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (item.src) {
             let image = document.createElement("img")
             image.setAttribute("data-yorozu-media-peek", "")
-            image.src = item.src
             image.alt = ""
             image.draggable = false
             let key = paneKeys.get(pane)
@@ -707,6 +706,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 pane.replaceChildren()
             }
             pane.append(image)
+            image.src = item.src
             return
         }
         let loading = document.createElement("div")
@@ -782,7 +782,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         let image = document.createElement("img")
         image.setAttribute("data-yorozu-media-stage", "")
-        image.src = src
         image.alt = "alt" in item && item.alt ? item.alt : ""
         image.draggable = false
         let key = paneKeys.get(pane)
@@ -792,6 +791,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         if (zoomable) image.addEventListener("load", () => measureZoom())
         host.append(image)
+        image.src = src
         if (zoomable && image.complete) measureZoom()
     }
 
@@ -959,18 +959,18 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 btn.replaceChildren()
             }
             if (image instanceof HTMLImageElement) {
-                if (image.getAttribute("src") !== src) image.src = src
                 image.alt = item.alt ?? ""
                 image.draggable = false
                 image.onerror = onThumbError
+                if (image.getAttribute("src") !== src) image.src = src
                 return
             }
             let next = document.createElement("img")
-            next.src = src
             next.alt = item.alt ?? ""
             next.draggable = false
             next.onerror = onThumbError
             btn.append(next)
+            next.src = src
             return
         }
         image?.remove()
@@ -1124,11 +1124,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let index = viewer.snapshot().index
             let currentPitch = viewer.filmstripItemSizePx()
             let viewportWidth = filmstripEl.clientWidth
-            let rowTop =
-                filmstripList != null ? filmstripList.rowTop(index) : index * viewer.filmstripItemSizes().neighbor
+            let sizes = viewer.filmstripItemSizes()
+            let count = viewer.snapshot().items.length
+            let rowTop = filmstripList != null ? filmstripList.rowTop(index) : index * sizes.neighbor
             let left = rowTop + currentPitch / 2 - viewportWidth / 2
-            let totalSize =
-                filmstripList != null ? filmstripList.totalSize() : viewer.snapshot().items.length * currentPitch
+            let totalSize = 0
+            if (filmstripList != null) totalSize = filmstripList.totalSize()
+            else if (count > 0) totalSize = (count - 1) * sizes.neighbor + sizes.current
             let maxLeft = Math.max(0, totalSize - viewportWidth)
             if (left < 0) left = 0
             if (left > maxLeft) left = maxLeft

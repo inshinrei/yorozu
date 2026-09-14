@@ -1352,6 +1352,25 @@ describe("attachMediaViewer", () => {
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
     })
 
+    it("virtualized mixed-pitch centerCurrentThumb uses rowTop and current pitch", () => {
+        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        let scrollTo = vi.fn()
+        nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
+        viewer.goTo(20)
+        let sizes = filmstripItemSizes()
+        let rowTop = 20 * sizes.neighbor
+        let left = rowTop + sizes.current / 2 - 100
+        let totalSize = 39 * sizes.neighbor + sizes.current
+        let maxLeft = Math.max(0, totalSize - 200)
+        if (left < 0) left = 0
+        if (left > maxLeft) left = maxLeft
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left }))
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
+    })
+
     it("virtualized centerCurrentThumb clamps left at the last index", () => {
         let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
         viewer.open({
@@ -1485,6 +1504,25 @@ describe("attachMediaViewer", () => {
         image.dispatchEvent(new Event("error"))
         expect(root.querySelector('[data-side="newer"] img')).toBeNull()
         expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeNull()
+    })
+
+    it("compat img.src active onerror clears the stage", () => {
+        viewer.open({ items: [img("a")] })
+        let image = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(image).toBeTruthy()
+        image.dispatchEvent(new Event("error"))
+        expect(root.querySelector("[data-yorozu-media-stage]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-loading]")).toBeNull()
+    })
+
+    it("compat img.src thumb onerror clears the thumb", () => {
+        viewer.open({ items: [img("a"), img("b")], filmstrip: true })
+        let btn = root.querySelector("[data-yorozu-media-thumb]") as HTMLElement
+        let image = btn.querySelector("img") as HTMLImageElement
+        expect(image).toBeTruthy()
+        image.dispatchEvent(new Event("error"))
+        expect(btn.querySelector("img")).toBeNull()
+        expect(btn.querySelector("[data-yorozu-media-loading]")).toBeNull()
     })
 
     it("applies compact filmstrip max-width by default and full width when set", () => {
