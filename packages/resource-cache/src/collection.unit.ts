@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { openMemoryDb } from "@yorozu/db"
 import { attachBytesLedger, listEvictItems } from "./collection"
-import { BY_EVICT_INDEX, resourceCollectionDef, resourceSchema, type ResourceRow } from "./row"
+import { BY_EVICT_CLASS_INDEX, BY_EVICT_INDEX, resourceCollectionDef, resourceSchema, type ResourceRow } from "./row"
 
 function blobOf(n: number): Blob {
     return new Blob([new Uint8Array(n)])
@@ -22,19 +22,23 @@ async function filesCol() {
 }
 
 describe("resourceSchema", () => {
-    it("builds by-evict collections with default version 1", () => {
+    it("builds by-evict + by-evict-class collections with default version 2", () => {
         expect(resourceCollectionDef("files")).toEqual({
             name: "files",
             keyPath: "key",
-            indexes: [{ name: BY_EVICT_INDEX, keyPath: ["storedAt", "bytes"] }],
+            indexes: [
+                { name: BY_EVICT_INDEX, keyPath: ["storedAt", "bytes"] },
+                { name: BY_EVICT_CLASS_INDEX, keyPath: ["storedAt", "bytes", "class"] },
+            ],
         })
         expect(resourceSchema("t", ["files", "avatars"])).toEqual({
             name: "t",
-            version: 1,
+            version: 2,
             collections: [resourceCollectionDef("files"), resourceCollectionDef("avatars")],
         })
         expect(resourceSchema("t", ["files"], 3).version).toBe(3)
         expect(BY_EVICT_INDEX).toBe("by-evict")
+        expect(BY_EVICT_CLASS_INDEX).toBe("by-evict-class")
     })
 })
 
@@ -72,13 +76,22 @@ describe("listEvictItems", () => {
         expect(items).toEqual([{ key: "a", storedAt: 1, bytes: 1 }])
     })
 
-    it("includeClass scans values and copies row.class", async () => {
+    it("includeClass stays keysOnly and copies class from by-evict-class", async () => {
         let col = await filesCol()
-        await col.put(rec({ key: "a", storedAt: 1, bytes: 4, class: "thumb" }))
+        await col.put(rec({ key: "a", storedAt: 1, bytes: 4, class: "thumb", blob: blobOf(4) }))
+        await col.put(rec({ key: "b", storedAt: 2, bytes: 8, blob: blobOf(8) }))
         let scan = vi.spyOn(col, "scan")
         let items = await listEvictItems(col, { includeClass: true })
-        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: false })
-        expect(items).toEqual([{ key: "a", storedAt: 1, bytes: 4, class: "thumb" }])
+        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: true })
+        expect(scan).toHaveBeenCalledWith("by-evict-class", { keysOnly: true })
+        expect(items).toEqual([
+            { key: "a", storedAt: 1, bytes: 4, class: "thumb" },
+            { key: "b", storedAt: 2, bytes: 8 },
+        ])
+        let classHits = await col.scan("by-evict-class", { keysOnly: true })
+        expect(classHits).toHaveLength(1)
+        expect("value" in classHits[0]!).toBe(false)
+        expect(classHits[0]?.indexKey).toEqual([1, 4, "thumb"])
     })
 })
 

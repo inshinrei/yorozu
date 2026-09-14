@@ -62,12 +62,14 @@ Omitted caps turn that policy off. `dropDelete` removes rows. `dropStripBlob()` 
 
 ## Classed bytes trim
 
-Optional `class` on put (`"thumb"` | `"original"` | any string). Pass `preferDrop: ["thumb"]` so bytes trim drops matching classes first (in array order, oldest within each class), then the rest by age. Two collections (blobs + thumbs) remain valid and are not required. When `preferDrop` is set, bytes trim reads row values (`includeClass`) so it can see `class`; omit / empty `preferDrop` keeps the keysOnly path.
+Optional `class` on put (`"thumb"` | `"original"` | any string). Pass `preferDrop: ["thumb"]` so bytes trim drops matching classes first (in array order, oldest within each class), then the rest by age. Two collections (blobs + thumbs) remain valid and are not required. Classed trim stays keysOnly: it scans covering `by-evict` then joins `class` from side index `by-evict-class` (`["storedAt","bytes","class"]`) — never values. Rows without a string `class` are absent from `by-evict-class` but still appear on `by-evict`. Omit / empty `preferDrop` stays a single `by-evict` keysOnly walk.
+
+Default `resourceSchema` version is **2** so hosts that call it pick up `by-evict-class` on upgrade. Callers who pass an explicit version keep that number. Hosts must bump their `DbSchema.version` to create the new index (IDB skips an index name that already exists, so `by-evict` keyPath stays `["storedAt","bytes"]`).
 
 ## Musts
 
 - Port is `Collection`. Host opens memory / IDB / SQLite via a `DbDriver` and passes `db.collection(...)`.
-- Covering index `by-evict` is `["storedAt", "bytes"]`. TTL/count eviction walks `scan("by-evict", { keysOnly: true, limit?: n })`. Count trim passes `limit: extra`; seed / ledger rebuild omit `limit`. Bytes trim is keysOnly unless `preferDrop` is set (then values so `class` is visible). Never `getAll()` on blob collections.
+- Covering index `by-evict` is `["storedAt", "bytes"]`. Side index `by-evict-class` is `["storedAt", "bytes", "class"]`. TTL/count eviction walks `scan("by-evict", { keysOnly: true, limit?: n })`. Count trim passes `limit: extra`; seed / ledger rebuild omit `limit`. Bytes trim is always keysOnly; with `preferDrop` it also keysOnly-scans `by-evict-class` and joins class by primary key. Never `getAll()` on blob collections.
 - Bytes: `getBytesTotal` then ordered pick. Under cap: do not scan for the pick.
 - `put` bytes come from `blob.size`. If `maxBytes` is set and `bytes > maxBytes`, put is a no-op.
 - Tests in this package use `openMemoryDb` only. Do not import `@yorozu/db-idb` or `@yorozu/db-sqlite` here.

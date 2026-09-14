@@ -292,6 +292,25 @@ describe("createResourceCache", () => {
         expect(await col.get("orig")).not.toBeNull()
     })
 
+    it("preferDrop bytes trim scans keysOnly and does not pass includeClass as values", async () => {
+        let col = await filesCol()
+        let scan = vi.spyOn(col, "scan")
+        let cache = createResourceCache({
+            collection: col,
+            drop: dropDelete,
+            caps: { maxBytes: 10 },
+            preferDrop: ["thumb"],
+        })
+        await cache.put({ key: "orig", storedAt: 1, blob: blobOf(10), class: "original", meta: {} })
+        scan.mockClear()
+        await cache.put({ key: "thumb", storedAt: 2, blob: blobOf(10), class: "thumb", meta: {} })
+        expect(scan.mock.calls.some((c) => c[1]?.keysOnly === false)).toBe(false)
+        expect(scan).toHaveBeenCalledWith("by-evict", expect.objectContaining({ keysOnly: true }))
+        expect(scan).toHaveBeenCalledWith("by-evict-class", expect.objectContaining({ keysOnly: true }))
+        expect(await col.get("thumb")).toBeNull()
+        expect(await col.get("orig")).not.toBeNull()
+    })
+
     it("without preferDrop, oldest storedAt still wins even if it is original", async () => {
         let col = await filesCol()
         let cache = createResourceCache({

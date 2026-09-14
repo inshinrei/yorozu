@@ -1,13 +1,13 @@
 import type { Collection, PutOpts, ScanBound, ScanHit } from "@yorozu/db"
 import { BlobBytesLedger } from "./blob-bytes-ledger"
 import type { BytesCapItem } from "./bytes-cap"
-import { BY_EVICT_INDEX, type ResourceRow } from "./row"
+import { BY_EVICT_CLASS_INDEX, BY_EVICT_INDEX, type ResourceRow } from "./row"
 
 export async function listEvictItems<Meta = unknown>(
     col: Collection<ResourceRow<Meta>>,
     opts?: { beforeStoredAt?: number; limit?: number; includeClass?: boolean },
 ): Promise<BytesCapItem[]> {
-    let bound: ScanBound = { keysOnly: opts?.includeClass !== true }
+    let bound: ScanBound = { keysOnly: true }
     if (opts?.beforeStoredAt != null) bound.lt = [opts.beforeStoredAt]
     if (opts?.limit != null) bound.limit = opts.limit
     let hits = await col.scan(BY_EVICT_INDEX, bound)
@@ -16,12 +16,19 @@ export async function listEvictItems<Meta = unknown>(
         let indexKey = hit.indexKey
         let storedAt = Array.isArray(indexKey) ? Number(indexKey[0]) : 0
         let bytes = Array.isArray(indexKey) ? Number(indexKey[1] ?? 0) : 0
-        let item: BytesCapItem = { key: String(hit.primaryKey), storedAt, bytes }
-        if (opts?.includeClass === true) {
-            let cls = hit.value?.class
-            if (cls != null) item.class = cls
+        out.push({ key: String(hit.primaryKey), storedAt, bytes })
+    }
+    if (opts?.includeClass === true) {
+        let classBound: ScanBound = { keysOnly: true }
+        if (opts.beforeStoredAt != null) classBound.lt = [opts.beforeStoredAt]
+        let classHits = await col.scan(BY_EVICT_CLASS_INDEX, classBound)
+        let byKey = new Map(out.map((item) => [item.key, item]))
+        for (let hit of classHits) {
+            let item = byKey.get(String(hit.primaryKey))
+            if (item == null) continue
+            let cls = Array.isArray(hit.indexKey) ? hit.indexKey[2] : undefined
+            if (typeof cls === "string" && cls.length > 0) item.class = cls
         }
-        out.push(item)
     }
     return out
 }
