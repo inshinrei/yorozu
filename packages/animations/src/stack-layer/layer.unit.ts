@@ -67,25 +67,25 @@ describe("createStackLayer", () => {
         expect(STACK_LAYER_MAX_BEHIND).toBe(3)
         expect(STACK_LAYER_SCALE_STEP).toBe(0.05)
         expect(STACK_LAYER_OPACITY_STEP).toBe(0.2)
-        expect(STACK_LAYER_OFFSET_PX).toBe(8)
+        expect(STACK_LAYER_OFFSET_PX).toBe(0)
         expect(stackLayerFrame(0)).toEqual({ transform: "translateY(0px) scale(1)", opacity: "1" })
     })
 
-    it("stackLayerFrame depth 1 peeks up by default", () => {
-        expect(stackLayerFrame(1)).toEqual({ transform: "translateY(-8px) scale(0.95)", opacity: "0.8" })
+    it("stackLayerFrame depth 1 scales without a Y peek", () => {
+        expect(stackLayerFrame(1)).toEqual({ transform: "translateY(0px) scale(0.95)", opacity: "0.8" })
     })
 
     it("stackLayerFrame depth 3 is the last visible behind card", () => {
-        expect(stackLayerFrame(3)).toEqual({ transform: "translateY(-24px) scale(0.85)", opacity: "0.4" })
+        expect(stackLayerFrame(3)).toEqual({ transform: "translateY(0px) scale(0.85)", opacity: "0.4" })
     })
 
     it("stackLayerFrame depth 4 is opacity 0", () => {
         expect(stackLayerFrame(4).opacity).toBe("0")
-        expect(stackLayerFrame(4).transform).toBe("translateY(-32px) scale(0.8)")
+        expect(stackLayerFrame(4).transform).toBe("translateY(0px) scale(0.8)")
     })
 
-    it("axis down peeks with positive Y", () => {
-        expect(stackLayerFrame(2, { axis: "down" }).transform).toBe("translateY(16px) scale(0.9)")
+    it("axis down peeks with positive Y only when offsetPx is set", () => {
+        expect(stackLayerFrame(2, { axis: "down", offsetPx: 8 }).transform).toBe("translateY(16px) scale(0.9)")
     })
 
     it("set animates from hidden to depth and sets origin/z-index", async () => {
