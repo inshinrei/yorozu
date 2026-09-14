@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/db",
-    "version": "1.0.50",
+    "version": "1.0.51",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

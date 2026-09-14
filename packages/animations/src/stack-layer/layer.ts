@@ -8,7 +8,7 @@ export const STACK_LAYER_EASING: string = MOTION_EASE
 export const STACK_LAYER_MAX_BEHIND: number = 3
 export const STACK_LAYER_SCALE_STEP: number = 0.05
 export const STACK_LAYER_OPACITY_STEP: number = 0.2
-export const STACK_LAYER_OFFSET_PX: number = 0
+export const STACK_LAYER_OFFSET_PX: number = 8
 
 const STYLE_KEYS: readonly string[] = ["will-change", "transform", "opacity", "z-index", "transform-origin"]
 const FINISH_CLEAR_KEYS: readonly string[] = ["will-change"]

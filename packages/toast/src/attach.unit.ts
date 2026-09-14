@@ -259,7 +259,7 @@ describe("attachToastRoot", () => {
         await flushMicrotasks()
 
         expect(receding.getAttribute("data-stack-depth")).toBe("1")
-        expect(receding.style.getPropertyValue("transform")).toBe("translateY(0px) scale(0.95)")
+        expect(receding.style.getPropertyValue("transform")).toBe("translateY(-8px) scale(0.95)")
         expect(receding.style.getPropertyValue("transform")).not.toBe("scale(1)")
         expect(receding.getAttribute("aria-hidden")).toBe("true")
         let close = receding.querySelector("[data-yorozu-toast-close]") as HTMLElement
