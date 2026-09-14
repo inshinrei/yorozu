@@ -1093,6 +1093,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             btn.setAttribute("data-index", String(index))
             btn.style.position = "absolute"
             btn.style.left = `${filmstripList.rowTop(index)}px`
+            btn.style.width = `${filmstripList.rowHeight(index)}px`
             markThumbCurrent(btn, index === snap.index)
             fillThumb(btn, item)
             next.push(btn)

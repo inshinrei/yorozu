@@ -1426,10 +1426,22 @@ describe("attachMediaViewer", () => {
         let sizes = filmstripItemSizes()
         let current = nav.querySelector("[data-current]") as HTMLElement
         expect(current.style.left).toBe(`${2 * sizes.neighbor}px`)
+        expect(current.style.width).toBe(`${sizes.current}px`)
         let neighbor = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
             (el) => el.getAttribute("data-index") === "3",
         ) as HTMLElement
         expect(neighbor.style.left).toBe(`${2 * sizes.neighbor + sizes.current}px`)
+        expect(neighbor.style.width).toBe(`${sizes.neighbor}px`)
+        expect(Number.parseFloat(current.style.left) + Number.parseFloat(current.style.width)).toBe(
+            Number.parseFloat(neighbor.style.left),
+        )
+        let before = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "1",
+        ) as HTMLElement
+        expect(before.style.width).toBe(`${sizes.neighbor}px`)
+        expect(Number.parseFloat(before.style.left) + Number.parseFloat(before.style.width)).toBe(
+            Number.parseFloat(current.style.left),
+        )
         let track = nav.querySelector('[role="list"]') as HTMLElement
         expect(track.style.width).toBe(`${9 * sizes.neighbor + sizes.current}px`)
     })
