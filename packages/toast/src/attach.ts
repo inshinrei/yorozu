@@ -26,6 +26,7 @@ type Painted = {
     closing: boolean
     hiding: boolean
     lane: LaneKind
+    depth: number | undefined
 }
 
 function popoverOrigin(placement: ToastPlacement): string {
@@ -154,6 +155,7 @@ export function attachToastRoot<T extends ToastContent>(
                 closing: record.exiting,
                 hiding: false,
                 lane: "permanent",
+                depth: undefined,
             }
             items.set(record.id, painted)
             placeChild(permanentLane, created.el, index)
@@ -177,7 +179,9 @@ export function attachToastRoot<T extends ToastContent>(
                     existing.closing = true
                     existing.playback?.cancel()
                     existing.playback = existing.popover.playClose(existing.el, { origin, durationMs: closeMs })
-                } else if (!record.exiting) {
+                    existing.depth = depth
+                } else if (!record.exiting && existing.depth !== depth) {
+                    existing.depth = depth
                     stack.set(existing.el, depth, { axis, durationMs: layerMs })
                 }
                 continue
@@ -194,6 +198,7 @@ export function attachToastRoot<T extends ToastContent>(
                 closing: record.exiting,
                 hiding: false,
                 lane: "stack",
+                depth,
             }
             items.set(record.id, painted)
             placeChild(stackLane, created.el, index)
@@ -207,6 +212,8 @@ export function attachToastRoot<T extends ToastContent>(
             }
         }
 
+        let hideSlot = 0
+        let hideDepth = TOAST_STACK_MAX_BEHIND + 1
         for (let [id, item] of [...items]) {
             if (seen.has(id)) continue
             let stillInSession = records.some((record) => record.id === id)
@@ -216,10 +223,13 @@ export function attachToastRoot<T extends ToastContent>(
                 items.delete(id)
                 continue
             }
+            item.el.setAttribute("data-stack-depth", String(hideDepth))
+            item.depth = hideDepth
+            placeChild(stackLane, item.el, hideSlot)
+            hideSlot += 1
             if (item.hiding) continue
             item.hiding = true
-            let playback = stack.set(item.el, TOAST_STACK_MAX_BEHIND + 1, { axis, durationMs: layerMs })
-            item.el.remove()
+            let playback = stack.set(item.el, hideDepth, { axis, durationMs: layerMs })
             void playback.done.then(() => {
                 if (!alive) return
                 if (items.get(id) !== item) return

@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachToastRoot } from "./attach"
 import { TOAST_ENTER_MS, TOAST_EXIT_MS, TOAST_SCALE, createToastSession, type ToastSession } from "./session"
 
+async function flushMicrotasks(): Promise<void> {
+    for (let i = 0; i < 16; i++) await Promise.resolve()
+}
+
 describe("attachToastRoot", () => {
     let seq: number
     let session: ToastSession
@@ -147,8 +151,11 @@ describe("attachToastRoot", () => {
         ).toBeTruthy()
     })
 
-    it("stacks newest timed in front and older behind up to 4", () => {
+    it("stacks newest timed in front and older behind up to 4", async () => {
         for (let i = 0; i < 6; i++) session.show(`t-${i}`)
+        let hiding = root.querySelector('[data-stack-depth="5"]') as HTMLElement | null
+        expect(hiding?.querySelector("[data-yorozu-toast-content]")?.textContent).toBe("t-0")
+        await flushMicrotasks()
         let stacked = [...root.querySelectorAll("[data-yorozu-toast-lane=stack] [data-yorozu-toast]")] as HTMLElement[]
         expect(stacked).toHaveLength(5)
         expect(stacked.map((el) => el.getAttribute("data-stack-depth"))).toEqual(["4", "3", "2", "1", "0"])
@@ -156,8 +163,9 @@ describe("attachToastRoot", () => {
         expect(root.textContent).not.toContain("t-0")
     })
 
-    it("restacks and pops a waiting toast behind after the front is removed", () => {
+    it("restacks and pops a waiting toast behind after the front is removed", async () => {
         for (let i = 0; i < 6; i++) session.show(`t-${i}`)
+        await flushMicrotasks()
         session.dismiss("id-6") // t-5, newest
         vi.advanceTimersByTime(TOAST_EXIT_MS)
         let stacked = [...root.querySelectorAll("[data-yorozu-toast-lane=stack] [data-yorozu-toast]")] as HTMLElement[]
