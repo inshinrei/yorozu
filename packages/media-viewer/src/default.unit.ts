@@ -111,10 +111,23 @@ describe("default media viewer styles", () => {
         expect(filmstripBlock).toContain("touch-action: pan-x")
         expect(filmstripBlock).toContain("overscroll-behavior: none")
         expect(filmstripBlock).toContain("overflow-x: auto")
-        expect(filmstripBlock).toContain("width: min(100%, var(--yorozu-media-filmstrip-max-width))")
-        expect(filmstripBlock).toContain("margin-inline: auto")
+        expect(filmstripBlock).not.toContain("clip-path")
         let overlayBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewer\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(overlayBlock).toContain("touch-action: none")
+    })
+
+    it("filmstrip clip-path lives on a non-scrolling clip host", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain("[data-yorozu-media-filmstrip-clip]")
+        let clipBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\s*\{[^}]*clip-path:[^}]*\}/)?.[0] ?? ""
+        expect(clipBlock).toContain("clip-path: inset(100% 0 0 0)")
+        expect(clipBlock).toContain("overflow: hidden")
+        expect(clipBlock).not.toContain("overflow-x: auto")
+        expect(clipBlock).toContain("width: min(100%, var(--yorozu-media-filmstrip-max-width))")
+        expect(clipBlock).toContain("margin-inline: auto")
+        expect(css).toContain(
+            '[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip-clip]',
+        )
     })
 
     it("virtualized filmstrip track does not flex-shrink so the sizer can scroll", () => {
@@ -167,7 +180,7 @@ describe("default media viewer styles", () => {
             css.match(
                 /\[data-yorozu-media-viewer\]\[data-phase="open"\]:not\(\[data-swipe-dismiss\]\) \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/,
             )?.[0] ?? ""
-        expect(chromeGroup).toContain("[data-yorozu-media-filmstrip]")
+        expect(chromeGroup).toContain("[data-yorozu-media-filmstrip-clip]")
         expect(chromeGroup).not.toContain("[data-yorozu-media-backdrop]")
         let backdropBlock = css.match(/(?:^|\n)\[data-yorozu-media-backdrop\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(backdropBlock).toContain("clip-path: inset(100% 0 100% 0)")
@@ -210,7 +223,7 @@ describe("default media viewer styles", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let filmstripBlock =
             css.match(
-                /(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\{[^}]*height:\s*var\(--yorozu-media-filmstrip-current-h\)[^}]*\}/,
+                /(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\s*\{[^}]*height:\s*var\(--yorozu-media-filmstrip-current-h\)[^}]*\}/,
             )?.[0] ?? ""
         expect(filmstripBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
         let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""

@@ -1189,7 +1189,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function removeFilmstrip(): void {
         destroyFilmstripList()
-        filmstripEl?.remove()
+        let clip = filmstripEl?.parentElement
+        if (clip?.hasAttribute("data-yorozu-media-filmstrip-clip")) clip.remove()
+        else filmstripEl?.remove()
         filmstripEl = null
         filmstripIds = null
         filmstripCenteredIndex = null
@@ -1215,7 +1217,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             filmstripEl.append(track)
             filmstripEl.addEventListener("click", onFilmstripClick, abort ? { signal: abort.signal } : undefined)
             filmstripEl.addEventListener("scroll", onFilmstripScroll, abort ? { signal: abort.signal } : undefined)
-            overlay.append(filmstripEl)
+            let clip = document.createElement("div")
+            clip.setAttribute("data-yorozu-media-filmstrip-clip", "")
+            clip.append(filmstripEl)
+            overlay.append(clip)
             filmstripIds = null
         }
         if (virtualize) {

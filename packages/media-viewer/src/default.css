@@ -122,7 +122,7 @@
 [data-yorozu-media-header],
 [data-yorozu-media-footer],
 [data-yorozu-media-chrome],
-[data-yorozu-media-filmstrip] {
+[data-yorozu-media-filmstrip-clip] {
     pointer-events: none;
     z-index: 1;
     transition: clip-path var(--yorozu-media-chrome-ms) var(--yorozu-media-chrome-hide-ease);
@@ -170,7 +170,7 @@
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-header],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-footer],
 [data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-chrome],
-[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip] {
+[data-yorozu-media-viewer][data-phase="open"]:not([data-swipe-dismiss]) [data-yorozu-media-filmstrip-clip] {
     clip-path: inset(0 0 0 0);
     transition-timing-function: var(--yorozu-media-chrome-ease);
 }
@@ -187,17 +187,24 @@ html.yorozu-media-ghost-animating [data-yorozu-media-viewport] {
     visibility: hidden;
 }
 
-[data-yorozu-media-filmstrip] {
+[data-yorozu-media-filmstrip-clip] {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 1;
     box-sizing: border-box;
     width: min(100%, var(--yorozu-media-filmstrip-max-width));
     max-width: min(100%, var(--yorozu-media-filmstrip-max-width));
     height: var(--yorozu-media-filmstrip-current-h);
     margin-inline: auto;
+    overflow: hidden;
+    clip-path: inset(100% 0 0 0);
+}
+
+[data-yorozu-media-filmstrip] {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
     pointer-events: auto;
     touch-action: pan-x;
     overscroll-behavior: none;
@@ -207,7 +214,6 @@ html.yorozu-media-ghost-animating [data-yorozu-media-viewport] {
     overflow-y: hidden;
     scrollbar-width: none;
     background: var(--yorozu-media-filmstrip-bg);
-    clip-path: inset(100% 0 0 0);
 }
 
 [data-yorozu-media-filmstrip]::-webkit-scrollbar {
@@ -281,7 +287,7 @@ html.yorozu-media-ghost-animating [data-yorozu-media-viewport] {
     [data-yorozu-media-header],
     [data-yorozu-media-footer],
     [data-yorozu-media-chrome],
-    [data-yorozu-media-filmstrip],
+    [data-yorozu-media-filmstrip-clip],
     [data-yorozu-media-backdrop],
     [data-yorozu-media-viewer] {
         transition: none;

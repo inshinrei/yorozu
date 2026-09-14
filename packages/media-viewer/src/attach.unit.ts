@@ -1133,7 +1133,8 @@ describe("attachMediaViewer", () => {
         expect(nav).toBeTruthy()
         expect(nav.getAttribute("role")).toBe("navigation")
         expect(nav.getAttribute("aria-label")).toBe("Gallery items")
-        expect(nav.parentElement).toBe(footer.parentElement)
+        expect(nav.parentElement?.hasAttribute("data-yorozu-media-filmstrip-clip")).toBe(true)
+        expect(nav.parentElement?.parentElement).toBe(footer.parentElement)
         expect(root.querySelector("[data-yorozu-media-viewport] [data-yorozu-media-filmstrip]")).toBeNull()
         let track = nav.querySelector('[role="list"]') as HTMLElement
         expect(track).toBeTruthy()
