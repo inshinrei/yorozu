@@ -86,6 +86,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let unbindKeys: (() => void) | null = null
 
     let overlay: HTMLElement | null = null
+    let originCover: { el: HTMLElement; prev: string } | null = null
     let viewport: HTMLElement | null = null
     let strip: HTMLElement | null = null
     let header: HTMLElement | null = null
@@ -356,6 +357,20 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
     }
 
+    function coverOriginEl(el: HTMLElement | null): void {
+        if (!el) return
+        if (originCover?.el === el) return
+        uncoverOriginEl()
+        originCover = { el, prev: el.style.visibility }
+        el.style.visibility = "hidden"
+    }
+
+    function uncoverOriginEl(): void {
+        if (!originCover) return
+        originCover.el.style.visibility = originCover.prev
+        originCover = null
+    }
+
     async function runOpenGhost(hooks: { onLand: () => void | Promise<void> }): Promise<boolean> {
         let snap = viewer.snapshot()
         let seed = snap.origin
@@ -366,6 +381,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         applyOverlayAttrs()
         let stage = paintedStageEl() ?? viewport
         let to = computeStageFitRectFromElement(stage, naturalForFit(snap))
+        coverOriginEl(queryMediaOriginEl(seed.id))
         let handle = ghost.playOpen({
             host: ghostHost(),
             seed,
@@ -379,7 +395,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 applyOverlayAttrs()
             },
         })
-        if (!handle) return false
+        if (!handle) {
+            uncoverOriginEl()
+            return false
+        }
         let ran = await handle.done
         applyOverlayAttrs()
         return ran
@@ -1532,6 +1551,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         clearWheelZoomRelease()
         lastWheelZoomOrigin = null
         ghost.cancel()
+        uncoverOriginEl()
         swipe.reset()
         viewer.setGesturing(false)
         zoom.reset()

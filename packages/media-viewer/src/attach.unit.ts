@@ -854,6 +854,57 @@ describe("attachMediaViewer", () => {
         expect(document.documentElement.classList.contains("yorozu-media-ghost-animating")).toBe(true)
     })
 
+    it("hides the origin thumb after ghost takeoff and restores it after close", async () => {
+        let api: MediaViewerChromeApi | undefined
+        let thumb = document.createElement("img")
+        thumb.setAttribute("data-media-origin", "a")
+        thumb.style.visibility = "visible"
+        document.body.append(thumb)
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(true)
+            })
+            expect(thumb.style.visibility).toBe("hidden")
+
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            expect(thumb.style.visibility).toBe("hidden")
+
+            api!.close()
+            expect(thumb.style.visibility).toBe("hidden")
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+            })
+            expect(thumb.style.visibility).toBe("visible")
+        } finally {
+            thumb.remove()
+        }
+    })
+
+    it("does not hide the origin thumb when ghost is skipped", () => {
+        let thumb = document.createElement("img")
+        thumb.setAttribute("data-media-origin", "a")
+        thumb.style.visibility = "visible"
+        document.body.append(thumb)
+        try {
+            viewer.open({ items: [img("a")], origin, ghost: false })
+            expect(thumb.style.visibility).toBe("visible")
+        } finally {
+            thumb.remove()
+        }
+    })
+
     it("no-ghost open ends data-phase open with data-scrim", () => {
         viewer.open({ items: [img("a")], origin, ghost: false })
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
