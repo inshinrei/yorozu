@@ -403,6 +403,31 @@ describe("createBitmapWorkQueue", () => {
         expect(errors).toEqual([])
     })
 
+    it("run throw calls onError after active is clear", async () => {
+        let runErr = new Error("run failed")
+        vi.stubGlobal("createImageBitmap", async () => fakeBitmap())
+        let errors: Array<{ error: Error; id: string; active: number }> = []
+        let q = createBitmapWorkQueue({
+            idle: false,
+            onError: (error, id) => {
+                errors.push({ error, id, active: q.stats.active })
+            },
+        })
+        q.enqueue({
+            id: "boom",
+            pri: "visible",
+            source: new Blob(),
+            run: async () => {
+                throw runErr
+            },
+        })
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(errors).toEqual([{ error: runErr, id: "boom", active: 0 }])
+        expect(q.stats.active).toBe(0)
+    })
+
     it("cancel of a running decode frees the id for enqueue before createImageBitmap settles", async () => {
         let bmp1 = fakeBitmap()
         let bmp2 = fakeBitmap()
@@ -420,7 +445,9 @@ describe("createBitmapWorkQueue", () => {
             return Promise.resolve(bmp2)
         })
         let q = createBitmapWorkQueue({ idle: false })
-        let secondRan = false
+        let secondStarted = false
+        let secondDone = false
+        let hold = gate()
         expect(q.enqueue({ id: "same", pri: "visible", source: new Blob() })).toBe(true)
         await Promise.resolve()
         expect(q.stats.active).toBe(1)
@@ -432,18 +459,26 @@ describe("createBitmapWorkQueue", () => {
                 pri: "visible",
                 source: new Blob(),
                 run: async () => {
-                    secondRan = true
+                    secondStarted = true
+                    await hold.promise
+                    secondDone = true
                 },
             }),
         ).toBe(true)
         await Promise.resolve()
         await Promise.resolve()
-        expect(secondRan).toBe(true)
-        expect(q.stats.active).toBe(0)
+        expect(secondStarted).toBe(true)
+        expect(q.stats.active).toBe(1)
         release(bmp1)
         await Promise.resolve()
         await Promise.resolve()
         expect(bmp1.close).toHaveBeenCalled()
+        expect(q.stats.active).toBe(1)
+        expect(secondDone).toBe(false)
+        hold.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(secondDone).toBe(true)
         expect(q.stats.active).toBe(0)
     })
 })
