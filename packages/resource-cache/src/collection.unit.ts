@@ -93,6 +93,19 @@ describe("listEvictItems", () => {
         expect("value" in classHits[0]!).toBe(false)
         expect(classHits[0]?.indexKey).toEqual([1, 4, "thumb"])
     })
+
+    it("includeClass forwards lt to the class scan and does not copy limit", async () => {
+        let col = await filesCol()
+        await col.put(rec({ key: "old", storedAt: 10, bytes: 4, class: "thumb" }))
+        await col.put(rec({ key: "mid", storedAt: 20, bytes: 4, class: "original" }))
+        await col.put(rec({ key: "new", storedAt: 30, bytes: 4, class: "thumb" }))
+        let scan = vi.spyOn(col, "scan")
+        let items = await listEvictItems(col, { includeClass: true, beforeStoredAt: 25, limit: 1 })
+        expect(scan).toHaveBeenCalledWith("by-evict", { keysOnly: true, lt: [25], limit: 1 })
+        expect(scan).toHaveBeenCalledWith("by-evict-class", { keysOnly: true, lt: [25] })
+        expect(scan.mock.calls.find((c) => c[0] === "by-evict-class")?.[1]).not.toHaveProperty("limit")
+        expect(items).toEqual([{ key: "old", storedAt: 10, bytes: 4, class: "thumb" }])
+    })
 })
 
 describe("attachBytesLedger", () => {
