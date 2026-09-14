@@ -41,6 +41,8 @@ function viewportDelta(
 export type SortableAutoScroll = {
     begin(viewport: HTMLElement | null): void
     kick(): void
+    tick(): boolean
+    pending(): boolean
     stop(): void
     get scrollDelta(): number
 }
@@ -71,11 +73,8 @@ export function createSortableAutoScroll(opts: {
         return Math.max(0, Math.min(scrollMaxAtStart, next))
     }
 
-    function step(): void {
-        if (!opts.isDragging() || !viewport) {
-            stop()
-            return
-        }
+    function tick(): boolean {
+        if (!opts.isDragging() || !viewport) return false
         let vp = viewport
         let delta = viewportDelta(opts.axis, opts.getPointer(), vp, opts.zone, opts.maxStep)
         let applied = false
@@ -93,17 +92,27 @@ export function createSortableAutoScroll(opts: {
             scrollDelta = readAxisScroll(vp, opts.axis) - startScroll
             opts.onScrolled(scrollDelta)
         }
-        if (opts.isDragging() && applied && clientSpan(vp, opts.axis) >= 5) {
+        return applied && clientSpan(vp, opts.axis) >= 5
+    }
+
+    function step(): void {
+        let cont = tick()
+        if (cont && opts.isDragging()) {
             frame = requestAnimationFrame(step)
         } else {
             frame = null
         }
     }
 
+    function pending(): boolean {
+        if (!opts.isDragging() || !viewport) return false
+        if (clientSpan(viewport, opts.axis) < 5) return false
+        if (scrollMaxAtStart === 0) return false
+        return viewportDelta(opts.axis, opts.getPointer(), viewport, opts.zone, opts.maxStep) !== 0
+    }
+
     function kick(): void {
-        if (frame != null || !opts.isDragging() || !viewport) return
-        if (clientSpan(viewport, opts.axis) < 5) return
-        if (viewportDelta(opts.axis, opts.getPointer(), viewport, opts.zone, opts.maxStep) === 0) return
+        if (frame != null || !pending()) return
         frame = requestAnimationFrame(step)
     }
 
@@ -118,6 +127,8 @@ export function createSortableAutoScroll(opts: {
     return {
         begin,
         kick,
+        tick,
+        pending,
         stop,
         get scrollDelta(): number {
             return scrollDelta

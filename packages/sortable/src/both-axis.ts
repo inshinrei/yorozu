@@ -62,6 +62,7 @@ export function createSortableBothAxis<T>(options: SortableBothAxisOptions<T>): 
     let captureEl: Element | null = null
     let delayTimer: ReturnType<typeof setTimeout> | null = null
     let documentCleanup: (() => void) | null = null
+    let autoFrame: number | null = null
 
     function notify(): void {
         for (let listener of listeners) listener()
@@ -135,10 +136,29 @@ export function createSortableBothAxis<T>(options: SortableBothAxisOptions<T>): 
         return findScrollParent(first, "y") ?? findScrollParent(first, "x")
     }
 
+    function stopAutoFrame(): void {
+        if (autoFrame != null) {
+            cancelAnimationFrame(autoFrame)
+            autoFrame = null
+        }
+    }
+
     function beginAutoScroll(vp: HTMLElement | null): void {
-        // Skip an axis with no overflow so kick() does not queue a no-op rAF.
-        autoX.begin(vp && vp.scrollWidth > vp.clientWidth ? vp : null)
-        autoY.begin(vp && vp.scrollHeight > vp.clientHeight ? vp : null)
+        stopAutoFrame()
+        autoX.begin(vp)
+        autoY.begin(vp)
+    }
+
+    function kickAutoScroll(): void {
+        if (autoFrame != null || draggingKey == null) return
+        if (!autoX.pending() && !autoY.pending()) return
+        autoFrame = requestAnimationFrame(() => {
+            autoFrame = null
+            if (draggingKey == null) return
+            let contX = autoX.tick()
+            let contY = autoY.tick()
+            if (contX || contY) kickAutoScroll()
+        })
     }
 
     function getOffset(key: string | number): FlowOffset {
@@ -167,6 +187,7 @@ export function createSortableBothAxis<T>(options: SortableBothAxisOptions<T>): 
     }
 
     function reset(): void {
+        stopAutoFrame()
         autoX.stop()
         autoX.begin(null)
         autoY.stop()
@@ -240,8 +261,7 @@ export function createSortableBothAxis<T>(options: SortableBothAxisOptions<T>): 
         beginAutoScroll(resolveViewport())
         insertIndex = computeInsertIndexNow()
         notify()
-        autoX.kick()
-        autoY.kick()
+        kickAutoScroll()
     }
 
     function activate(key: string | number, clientX: number, clientY: number): void {
@@ -288,8 +308,7 @@ export function createSortableBothAxis<T>(options: SortableBothAxisOptions<T>): 
             let nextIdx = computeInsertIndexNow()
             if (nextIdx !== insertIndex) insertIndex = nextIdx
             notify()
-            autoX.kick()
-            autoY.kick()
+            kickAutoScroll()
         }
 
         let handleUp = (e: PointerEvent) => {

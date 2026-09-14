@@ -307,20 +307,81 @@ describe("createSortableBothAxis", () => {
     })
 })
 
+function makeBothOverflowViewport() {
+    let start = 100
+    let client = 160
+    let scrollSize = 800
+    let scrollTop = 0
+    let scrollLeft = 0
+    let vp = document.createElement("div")
+    vi.spyOn(vp, "getBoundingClientRect").mockReturnValue({
+        top: start,
+        bottom: start + client,
+        left: start,
+        right: start + client,
+        width: client,
+        height: client,
+        x: start,
+        y: start,
+        toJSON: () => ({}),
+    } as DOMRect)
+    Object.defineProperty(vp, "clientHeight", { configurable: true, get: () => client })
+    Object.defineProperty(vp, "scrollHeight", { configurable: true, get: () => scrollSize })
+    Object.defineProperty(vp, "clientWidth", { configurable: true, get: () => client })
+    Object.defineProperty(vp, "scrollWidth", { configurable: true, get: () => scrollSize })
+    Object.defineProperty(vp, "scrollTop", {
+        configurable: true,
+        get: () => scrollTop,
+        set: (v: number) => {
+            scrollTop = Math.max(0, Math.min(v, Math.max(0, scrollSize - client)))
+        },
+    })
+    Object.defineProperty(vp, "scrollLeft", {
+        configurable: true,
+        get: () => scrollLeft,
+        set: (v: number) => {
+            scrollLeft = Math.max(0, Math.min(v, Math.max(0, scrollSize - client)))
+        },
+    })
+    return { vp, getScrollTop: () => scrollTop, getScrollLeft: () => scrollLeft }
+}
+
 describe("createSortableBothAxis auto-scroll", () => {
     it("Y zone writes scrollTop and shifts insert index as rects move", () => {
         let { vp, getScrollTop } = makeViewport()
         let raf = mockRaf()
         rafRestore = raf.restore
         let { session } = setup({ getViewport: () => vp })
-        registerWrap(session)
-        session.activate("a", 24, 24)
+        session.registerItem(fakeEl(0, 160, 48, 48), "a")
+        session.registerItem(fakeEl(52, 160, 48, 48), "b")
+        session.registerItem(fakeEl(0, 212, 48, 48), "c")
+        session.registerItem(fakeEl(52, 212, 48, 48), "d")
+        session.activate("a", 24, 184)
         moveTo(24, 250)
+        expect(session.insertIndex).toBe(3)
         let start = getScrollTop()
         raf.flush(5)
         expect(getScrollTop()).toBeGreaterThan(start)
         let expected = computeAutoScrollDelta(250, { top: 100, bottom: 260 }, 60, 8)
         expect(expected).toBeGreaterThan(0)
+        expect(session.insertIndex).toBe(4)
+    })
+
+    it("corner zone writes scrollLeft and scrollTop on one rAF", () => {
+        let { vp, getScrollTop, getScrollLeft } = makeBothOverflowViewport()
+        let raf = mockRaf()
+        rafRestore = raf.restore
+        let { session } = setup({ getViewport: () => vp })
+        registerWrap(session)
+        session.activate("a", 24, 24)
+        moveTo(250, 250)
+        raf.flush(1)
+        let expectedX = computeAutoScrollDeltaX(250, { left: 100, right: 260 }, 60, 8)
+        let expectedY = computeAutoScrollDelta(250, { top: 100, bottom: 260 }, 60, 8)
+        expect(expectedX).toBeGreaterThan(0)
+        expect(expectedY).toBeGreaterThan(0)
+        expect(getScrollLeft()).toBe(expectedX)
+        expect(getScrollTop()).toBe(expectedY)
     })
 
     it("X zone writes scrollLeft", () => {
