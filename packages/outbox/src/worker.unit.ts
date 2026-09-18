@@ -698,7 +698,11 @@ describe("OutboxWorker", () => {
     })
 
     it("requestIdleCallback yield uses a positive timeout", async () => {
-        let ric = vi.fn((cb: (deadline: { didTimeout: boolean; timeRemaining(): number }) => void) => {
+        type Ric = (
+            fn: (deadline: { didTimeout: boolean; timeRemaining(): number }) => void,
+            opts?: { timeout?: number },
+        ) => number
+        let ric = vi.fn<Ric>((cb) => {
             queueMicrotask(() => {
                 cb({
                     didTimeout: true,
