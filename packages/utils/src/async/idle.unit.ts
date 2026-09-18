@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { requestIdle } from "./idle"
+import { requestIdle, type IdleDeadline } from "./idle"
+
+type Ric = (fn: (deadline: IdleDeadline) => void, opts?: { timeout?: number }) => number
 
 afterEach(() => {
     vi.unstubAllGlobals()
@@ -50,7 +52,7 @@ describe("requestIdle", () => {
     })
 
     it("uses requestIdleCallback when present and cancelIdleCallback on cancel", () => {
-        let ric = vi.fn((_cb: (d: { didTimeout: boolean; timeRemaining(): number }) => void) => 7)
+        let ric = vi.fn<Ric>((_cb) => 7)
         let cancel = vi.fn()
         vi.stubGlobal("requestIdleCallback", ric)
         vi.stubGlobal("cancelIdleCallback", cancel)
@@ -64,7 +66,7 @@ describe("requestIdle", () => {
     })
 
     it("forwards timeout 0 to ric as 1 so the deadline is positive", () => {
-        let ric = vi.fn(() => 1)
+        let ric = vi.fn<Ric>(() => 1)
         vi.stubGlobal("requestIdleCallback", ric)
         vi.stubGlobal("cancelIdleCallback", vi.fn())
         requestIdle(() => {}, { timeout: 0 })
@@ -72,7 +74,7 @@ describe("requestIdle", () => {
     })
 
     it("omits ric options when timeout is not passed", () => {
-        let ric = vi.fn(() => 1)
+        let ric = vi.fn<Ric>(() => 1)
         vi.stubGlobal("requestIdleCallback", ric)
         vi.stubGlobal("cancelIdleCallback", vi.fn())
         requestIdle(() => {})

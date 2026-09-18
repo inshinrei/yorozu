@@ -124,6 +124,10 @@ export function createBitmapWorkQueue(opts?: BitmapWorkQueueOptions): BitmapWork
     }
 
     function startJob(job: QueuedJob): void {
+        let decodeBitmap = createImageBitmap as (
+            image: ImageBitmapSource,
+            options?: ImageBitmapOptions & { signal?: AbortSignal },
+        ) => Promise<ImageBitmap>
         let controller = new AbortController()
         let token: ActiveJob = { id: job.id, controller }
         active.set(job.id, token)
@@ -134,7 +138,7 @@ export function createBitmapWorkQueue(opts?: BitmapWorkQueueOptions): BitmapWork
             try {
                 let signal = controller.signal
                 if (signal.aborted) return
-                bitmap = await createImageBitmap(job.source, { signal })
+                bitmap = await decodeBitmap(job.source, { signal })
                 if (active.get(job.id) !== token || signal.aborted) {
                     bitmap.close()
                     bitmap = undefined
