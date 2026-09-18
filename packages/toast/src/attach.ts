@@ -35,6 +35,7 @@ type Painted = {
     progressAnim: Animation | null
     lastRemaining: number | undefined
     seenDuration: number | undefined
+    progressStartedAt: number | undefined
 }
 
 function popoverOrigin(placement: ToastPlacement): string {
@@ -81,9 +82,29 @@ function syncStackItem(el: HTMLElement, depth: number): void {
     else el.setAttribute("aria-hidden", "true")
 }
 
+function clearStackItem(el: HTMLElement): void {
+    el.removeAttribute("data-stack-depth")
+    el.removeAttribute("aria-hidden")
+    let close = el.querySelector("[data-yorozu-toast-close]")
+    if (close instanceof HTMLElement) close.removeAttribute("tabindex")
+}
+
 function syncPermanent(el: HTMLElement, permanent: boolean): void {
-    if (permanent) el.setAttribute("data-permanent", "")
-    else el.removeAttribute("data-permanent")
+    let close = el.querySelector("[data-yorozu-toast-close]")
+    if (permanent) {
+        el.setAttribute("data-permanent", "")
+        if (close instanceof HTMLElement) {
+            close.setAttribute("tabindex", "-1")
+            close.setAttribute("aria-hidden", "true")
+        }
+        return
+    }
+    el.removeAttribute("data-permanent")
+    if (!(close instanceof HTMLElement)) return
+    close.removeAttribute("aria-hidden")
+    let depth = el.getAttribute("data-stack-depth")
+    if (depth != null && depth !== "0") close.setAttribute("tabindex", "-1")
+    else close.removeAttribute("tabindex")
 }
 
 function syncSize<T>(el: HTMLElement, record: ToastRecord<T>): void {
@@ -128,6 +149,7 @@ function syncProgress<T>(item: Painted, record: ToastRecord<T>, remainingMs: num
         item.progressEl = null
         item.lastRemaining = undefined
         item.seenDuration = undefined
+        item.progressStartedAt = undefined
         return
     }
     if (!item.progressEl) {
@@ -137,19 +159,31 @@ function syncProgress<T>(item: Painted, record: ToastRecord<T>, remainingMs: num
         item.el.append(bar)
         item.progressEl = bar
     }
-    if (record.permanent || record.exiting) {
+    if (record.exiting) {
+        item.progressAnim?.cancel()
+        item.progressAnim = null
+        item.progressEl.style.transform = record.permanent ? "scaleX(1)" : "scaleX(0)"
+        item.lastRemaining = 0
+        item.seenDuration = record.duration
+        item.progressStartedAt = undefined
+        return
+    }
+    if (record.permanent) {
         item.progressAnim?.cancel()
         item.progressAnim = null
         item.progressEl.style.transform = "scaleX(1)"
         item.lastRemaining = 0
         item.seenDuration = record.duration
+        item.progressStartedAt = undefined
         return
     }
     let rem = remainingMs
     let running = item.progressAnim != null
     let remainingDecreasedOrHeld = running && item.lastRemaining != null && rem <= item.lastRemaining
     let durationSame = item.seenDuration === record.duration
-    if (remainingDecreasedOrHeld && durationSame) {
+    let remainingResetToDuration =
+        rem === record.duration && item.progressStartedAt != null && Date.now() > item.progressStartedAt
+    if (remainingDecreasedOrHeld && durationSame && !remainingResetToDuration) {
         item.lastRemaining = rem
         return
     }
@@ -161,9 +195,11 @@ function syncProgress<T>(item: Painted, record: ToastRecord<T>, remainingMs: num
         easing: "linear",
         fill: "forwards",
     })
+    void anim.finished.catch(() => {})
     item.progressAnim = anim
     item.lastRemaining = rem
     item.seenDuration = record.duration
+    item.progressStartedAt = Date.now()
     if (item.el.matches(":hover")) anim?.pause()
 }
 
@@ -214,7 +250,6 @@ function createToastEl<T extends ToastContent>(
 } {
     let el = document.createElement("div")
     el.setAttribute("data-yorozu-toast", "")
-    syncPermanent(el, record.permanent)
     syncSize(el, record)
     if (record.exiting) el.classList.add("exiting")
 
@@ -236,6 +271,7 @@ function createToastEl<T extends ToastContent>(
     close.setAttribute("aria-label", "Close")
     close.textContent = "×"
     el.append(close)
+    syncPermanent(el, record.permanent)
     return { el, unmount }
 }
 
@@ -313,6 +349,13 @@ export function attachToastRoot<T extends ToastContent>(
             seen.add(record.id)
             let existing = items.get(record.id)
             if (existing) {
+                if (existing.lane === "stack") {
+                    stack.forget(existing.el)
+                    clearStackItem(existing.el)
+                }
+                existing.lane = "permanent"
+                existing.depth = undefined
+                existing.hiding = false
                 existing.el.classList.toggle("exiting", record.exiting)
                 placeChild(permanentLane, existing.el, index)
                 syncPermanent(existing.el, record.permanent)
@@ -347,6 +390,7 @@ export function attachToastRoot<T extends ToastContent>(
                 progressAnim: null,
                 lastRemaining: undefined,
                 seenDuration: undefined,
+                progressStartedAt: undefined,
             }
             items.set(record.id, painted)
             placeChild(permanentLane, created.el, index)
@@ -384,6 +428,7 @@ export function attachToastRoot<T extends ToastContent>(
                         progressAnim: null,
                         lastRemaining: undefined,
                         seenDuration: undefined,
+                        progressStartedAt: undefined,
                     }
                     existing = painted
                     items.set(record.id, existing)
@@ -395,6 +440,7 @@ export function attachToastRoot<T extends ToastContent>(
             }
             seen.add(record.id)
             if (existing) {
+                let firstStackInsert = existing.lane === "permanent" || existing.depth == null
                 existing.hiding = false
                 existing.lane = "stack"
                 existing.el.classList.toggle("exiting", record.exiting)
@@ -411,7 +457,7 @@ export function attachToastRoot<T extends ToastContent>(
                     existing.playback = existing.popover.playClose(existing.el, { origin, durationMs: closeMs })
                     existing.depth = 0
                 } else if (!record.exiting && existing.depth !== depth) {
-                    restack(existing, depth, axis, layerMs)
+                    restack(existing, depth, axis, firstStackInsert ? 0 : layerMs)
                 }
                 continue
             }
@@ -437,6 +483,7 @@ export function attachToastRoot<T extends ToastContent>(
                 progressAnim: null,
                 lastRemaining: undefined,
                 seenDuration: undefined,
+                progressStartedAt: undefined,
             }
             items.set(record.id, painted)
             placeChild(stackLane, created.el, index)

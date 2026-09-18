@@ -311,6 +311,10 @@ describe("attachToastRoot", () => {
         expect(item.getAttribute("data-stack-depth")).toBe("0")
         let openFrames = animate.mock.calls.filter((c) => JSON.stringify(c[0]).includes("scale(0.85)"))
         expect(openFrames).toHaveLength(0)
+        let hideBehind = animate.mock.calls.filter((c) => JSON.stringify(c[0]).includes("translateY(-32px)"))
+        expect(hideBehind).toHaveLength(0)
+        expect(item.style.getPropertyValue("transform")).toBe("translateY(0px) scale(1)")
+        expect(item.style.getPropertyValue("opacity")).toBe("1")
         let close = item.querySelector("[data-yorozu-toast-close]") as HTMLButtonElement
         close.click()
         expect(item.classList.contains("exiting")).toBe(true)
@@ -515,5 +519,89 @@ describe("attachToastRoot", () => {
         session.show("Hello", { progress: true, duration: 1000 })
         expect(scaleXCalls()).toHaveLength(1)
         expect(scaleXCalls()[0]![1]).toMatchObject({ duration: 1000, easing: "linear" })
+    })
+
+    it("making a stacked toast permanent forgets stack chrome", async () => {
+        session.show("behind")
+        session.show("front")
+        await flushMicrotasks()
+        let behind = [...root.querySelectorAll("[data-yorozu-toast]")].find(
+            (el) => el.querySelector("[data-yorozu-toast-content]")?.textContent === "behind",
+        ) as HTMLElement
+        expect(behind.getAttribute("data-stack-depth")).toBe("1")
+        expect(behind.getAttribute("aria-hidden")).toBe("true")
+        expect(behind.style.getPropertyValue("transform")).toBe("translateY(-8px) scale(0.95)")
+        session.update("id-1", { permanent: true })
+        expect(behind.parentElement?.getAttribute("data-yorozu-toast-lane")).toBe("permanent")
+        expect(behind.hasAttribute("data-permanent")).toBe(true)
+        expect(behind.hasAttribute("data-stack-depth")).toBe(false)
+        expect(behind.getAttribute("aria-hidden")).toBeNull()
+        expect(behind.style.getPropertyValue("transform")).toBe("")
+        expect(behind.style.getPropertyValue("opacity")).toBe("")
+        let close = behind.querySelector("[data-yorozu-toast-close]") as HTMLElement
+        expect(close.getAttribute("tabindex")).toBe("-1")
+        expect(close.getAttribute("aria-hidden")).toBe("true")
+    })
+
+    it("dismissed progress hairline does not refill to full", () => {
+        session.show("Hello", { progress: true, duration: 1000 })
+        vi.advanceTimersByTime(400)
+        session.dismiss("id-1")
+        let bar = root.querySelector("[data-yorozu-toast-progress]") as HTMLElement
+        expect(bar).toBeTruthy()
+        expect(bar.style.transform).not.toBe("scaleX(1)")
+        expect(bar.style.transform).toBe("scaleX(0)")
+    })
+
+    it("update duration to the same value retargets the hairline", () => {
+        session.show("Hello", { progress: true, duration: 5000 })
+        expect(scaleXCalls()).toHaveLength(1)
+        vi.advanceTimersByTime(1000)
+        session.update("id-1", { duration: 5000 })
+        expect(session.remaining("id-1")).toBe(5000)
+        expect(scaleXCalls()).toHaveLength(2)
+        expect(scaleXCalls()[1]![0]).toEqual([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }])
+        expect(scaleXCalls()[1]![1]).toMatchObject({ duration: 5000, easing: "linear" })
+    })
+
+    it("permanent close is not in the tab order and is restored on release", () => {
+        session.show("stay", { permanent: true })
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        let close = item.querySelector("[data-yorozu-toast-close]") as HTMLElement
+        expect(close.getAttribute("tabindex")).toBe("-1")
+        expect(close.getAttribute("aria-hidden")).toBe("true")
+        session.update("id-1", { permanent: false, duration: 5000 })
+        expect(close.getAttribute("tabindex")).toBeNull()
+        expect(close.getAttribute("aria-hidden")).toBeNull()
+    })
+
+    it("hairline cancel swallows Animation.finished rejection", async () => {
+        let catchCalls = 0
+        animate.mockImplementation(() => {
+            let rejectFinished: ((reason: unknown) => void) | undefined
+            let inner = new Promise<void>((_, reject) => {
+                rejectFinished = reject
+            })
+            let finished = {
+                then: inner.then.bind(inner),
+                catch: (onrejected?: (reason: unknown) => unknown) => {
+                    catchCalls += 1
+                    return inner.catch(onrejected)
+                },
+            }
+            return {
+                finished,
+                cancel: () => {
+                    rejectFinished?.(Object.assign(new Error("Aborted"), { name: "AbortError" }))
+                },
+                pause: vi.fn(),
+                play: vi.fn(),
+            }
+        })
+        session.show("Hello", { progress: true, duration: 1000 })
+        expect(catchCalls).toBeGreaterThan(0)
+        session.update("id-1", { progress: false })
+        await flushMicrotasks()
+        expect(root.querySelector("[data-yorozu-toast-progress]")).toBeNull()
     })
 })

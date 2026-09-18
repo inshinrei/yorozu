@@ -210,6 +210,7 @@ export function createToastSession<T = ToastContent>(opts?: ToastSessionOpts): T
         let record = slot.record
         let changed = false
         let released = false
+        let wasPaused = slot.timer == null && !record.permanent
 
         if ("content" in patch && !Object.is(patch.content, record.content)) {
             record.content = patch.content as T
@@ -242,12 +243,12 @@ export function createToastSession<T = ToastContent>(opts?: ToastSessionOpts): T
             released = true
             changed = true
             moveToEnd(slot)
-            armTimer(slot)
+            if (!wasPaused) armTimer(slot)
         }
         if (!record.permanent && !released && typeof patch.duration === "number" && patch.duration >= 0) {
             record.duration = patch.duration
             slot.remaining = patch.duration
-            armTimer(slot)
+            if (!wasPaused) armTimer(slot)
             changed = true
         }
         if (changed) notify()
