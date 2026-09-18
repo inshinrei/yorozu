@@ -17,4 +17,5 @@ export {
     type ToastSession,
     type ToastSessionOpts,
     type ToastShowOpts,
+    type ToastUpdateOpts,
 } from "./session"
