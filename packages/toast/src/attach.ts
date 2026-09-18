@@ -71,6 +71,16 @@ function syncStackItem(el: HTMLElement, depth: number): void {
     else el.setAttribute("aria-hidden", "true")
 }
 
+function syncPermanent(el: HTMLElement, permanent: boolean): void {
+    if (permanent) el.setAttribute("data-permanent", "")
+    else el.removeAttribute("data-permanent")
+}
+
+function syncSize<T>(el: HTMLElement, record: ToastRecord<T>): void {
+    if (record.width != null) el.style.width = `${record.width}px`
+    if (record.height != null) el.style.height = `${record.height}px`
+}
+
 function createToastEl<T extends ToastContent>(
     record: ToastRecord<T>,
 ): {
@@ -79,7 +89,8 @@ function createToastEl<T extends ToastContent>(
 } {
     let el = document.createElement("div")
     el.setAttribute("data-yorozu-toast", "")
-    if (record.permanent) el.setAttribute("data-permanent", "")
+    syncPermanent(el, record.permanent)
+    syncSize(el, record)
     if (record.exiting) el.classList.add("exiting")
 
     let contentEl = document.createElement("div")
@@ -94,14 +105,12 @@ function createToastEl<T extends ToastContent>(
     }
     el.append(contentEl)
 
-    if (!record.permanent) {
-        let close = document.createElement("button")
-        close.type = "button"
-        close.setAttribute("data-yorozu-toast-close", "")
-        close.setAttribute("aria-label", "Close")
-        close.textContent = "×"
-        el.append(close)
-    }
+    let close = document.createElement("button")
+    close.type = "button"
+    close.setAttribute("data-yorozu-toast-close", "")
+    close.setAttribute("aria-label", "Close")
+    close.textContent = "×"
+    el.append(close)
     return { el, unmount }
 }
 
@@ -181,6 +190,8 @@ export function attachToastRoot<T extends ToastContent>(
             if (existing) {
                 existing.el.classList.toggle("exiting", record.exiting)
                 placeChild(permanentLane, existing.el, index)
+                syncPermanent(existing.el, record.permanent)
+                syncSize(existing.el, record)
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
@@ -241,6 +252,8 @@ export function attachToastRoot<T extends ToastContent>(
                 existing.el.classList.toggle("exiting", record.exiting)
                 syncStackItem(existing.el, depth)
                 placeChild(stackLane, existing.el, index)
+                syncPermanent(existing.el, record.permanent)
+                syncSize(existing.el, record)
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()

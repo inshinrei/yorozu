@@ -77,11 +77,14 @@ describe("attachToastRoot", () => {
         expect(root.querySelector("[data-yorozu-toast]")).toBeNull()
     })
 
-    it("permanent toast has no close button and data-permanent", () => {
+    it("permanent toast keeps a close button and data-permanent; click does not dismiss", () => {
         session.show("stay", { permanent: true })
         let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
         expect(item.hasAttribute("data-permanent")).toBe(true)
-        expect(item.querySelector("[data-yorozu-toast-close]")).toBeNull()
+        let close = item.querySelector("[data-yorozu-toast-close]") as HTMLButtonElement
+        expect(close).toBeTruthy()
+        close.click()
+        expect(item.classList.contains("exiting")).toBe(false)
         vi.advanceTimersByTime(10_000)
         expect(root.querySelector("[data-yorozu-toast]")).toBeTruthy()
         session.dismiss("id-1")
@@ -283,5 +286,31 @@ describe("attachToastRoot", () => {
         expect(behind).toBeTruthy()
         expect(behind.getAttribute("data-stack-depth")).toBe(String(TOAST_STACK_MAX_BEHIND + 1))
         expect(behind.classList.contains("exiting")).toBe(true)
+    })
+
+    it("applies width and height as inline px and keeps the same node on update", () => {
+        session.show("Hello", { width: 320, height: 72 })
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        expect(item.style.width).toBe("320px")
+        expect(item.style.height).toBe("72px")
+        session.update("id-1", { width: 280, height: 80, content: "Next" })
+        expect(root.querySelector("[data-yorozu-toast]")).toBe(item)
+        expect(item.style.width).toBe("280px")
+        expect(item.style.height).toBe("80px")
+    })
+
+    it("releasing a permanent toast drops data-permanent, moves the node into the stack, and close dismisses", () => {
+        session.show("stay", { permanent: true })
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        animate.mockClear()
+        session.update("id-1", { permanent: false, duration: 5000 })
+        expect(item.hasAttribute("data-permanent")).toBe(false)
+        expect(item.parentElement?.getAttribute("data-yorozu-toast-lane")).toBe("stack")
+        expect(item.getAttribute("data-stack-depth")).toBe("0")
+        let openFrames = animate.mock.calls.filter((c) => JSON.stringify(c[0]).includes("scale(0.85)"))
+        expect(openFrames).toHaveLength(0)
+        let close = item.querySelector("[data-yorozu-toast-close]") as HTMLButtonElement
+        close.click()
+        expect(item.classList.contains("exiting")).toBe(true)
     })
 })
