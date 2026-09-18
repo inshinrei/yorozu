@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { attachMediaViewer } from "./attach"
 import {
     MEDIA_GHOST_ANIMATING_CLASS,
@@ -10,8 +10,18 @@ import {
 } from "./ghost"
 import { createMediaViewer, filmstripItemSizes, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
-import type { MediaViewerChromeApi, MediaViewerItem, MediaViewerOrigin, MediaVisibleIds } from "./types"
+import type {
+    MediaViewerChromeApi,
+    MediaViewerItem,
+    MediaViewerOrigin,
+    MediaViewerSessionOpts,
+    MediaVisibleIds,
+} from "./types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
+
+type IndexChangeFn = NonNullable<MediaViewerSessionOpts["onIndexChange"]>
+type RequestFn = NonNullable<MediaViewerSessionOpts["onRequestOlder"]>
+type DecodeFn = NonNullable<MediaViewerSessionOpts["decode"]>
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
@@ -43,7 +53,7 @@ describe("attachMediaViewer", () => {
     let root: HTMLElement
     let stop: (() => void) | undefined
     let animate: ReturnType<typeof vi.fn>
-    let onIndexChange: ReturnType<typeof vi.fn>
+    let onIndexChange: Mock<IndexChangeFn>
 
     beforeEach(() => {
         animate = vi.fn(() => ({
@@ -61,7 +71,7 @@ describe("attachMediaViewer", () => {
             removeEventListener: vi.fn(),
             dispatchEvent: vi.fn(),
         })) as unknown as typeof window.matchMedia
-        onIndexChange = vi.fn()
+        onIndexChange = vi.fn<IndexChangeFn>()
         viewer = createMediaViewer({ onIndexChange })
         root = document.createElement("div")
         document.body.append(root)
@@ -109,7 +119,7 @@ describe("attachMediaViewer", () => {
         let imgItem = img
         let decoded = document.createElement("img")
         decoded.src = "blob:decoded"
-        let decode = vi.fn(async (req: { id: string; role: string }) => {
+        let decode = vi.fn<DecodeFn>(async (req) => {
             if (req.role === "peek-newer" && req.id === "b") return decoded
             let other = document.createElement("img")
             other.src = `blob:${req.role}:${req.id}`
@@ -143,7 +153,7 @@ describe("attachMediaViewer", () => {
 
     it("close aborts leftover decode so a later open is not stuck behind it", async () => {
         let started: string[] = []
-        let decode = vi.fn((req: { id: string; role: string; signal: AbortSignal }) => {
+        let decode = vi.fn<DecodeFn>((req) => {
             started.push(`${req.role}:${req.id}`)
             return new Promise<CanvasImageSource | null>((resolve) => {
                 req.signal.addEventListener("abort", () => resolve(null))
@@ -172,7 +182,7 @@ describe("attachMediaViewer", () => {
 
     it("does not start peek decode while swipe is gesturing; resumes after settle", async () => {
         let started: string[] = []
-        let decode = vi.fn(async (req: { id: string; role: string }) => {
+        let decode = vi.fn<DecodeFn>(async (req) => {
             started.push(`${req.role}:${req.id}`)
             return document.createElement("img")
         })
@@ -487,7 +497,7 @@ describe("attachMediaViewer", () => {
     it("gif decode uses active role and does not wrap zoom", async () => {
         let decoded = document.createElement("img")
         decoded.src = "blob:gif"
-        let decode = vi.fn(async (req: { id: string; role: string; src: string }) => {
+        let decode = vi.fn<DecodeFn>(async (req) => {
             if (req.role === "active" && req.id === "g") return decoded
             let other = document.createElement("img")
             other.src = `blob:${req.role}:${req.id}`
@@ -513,7 +523,7 @@ describe("attachMediaViewer", () => {
     it("gif decode under reduced motion uses poster", async () => {
         let decoded = document.createElement("img")
         decoded.src = "blob:gif-poster"
-        let decode = vi.fn(async () => decoded)
+        let decode = vi.fn<DecodeFn>(async () => decoded)
         viewer.destroy()
         viewer = createMediaViewer({ decode, onIndexChange })
         stop?.()
@@ -955,7 +965,7 @@ describe("attachMediaViewer", () => {
     })
 
     it("pagination-edge swipe requests newer without rebasing the strip", async () => {
-        let onRequestNewer = vi.fn()
+        let onRequestNewer = vi.fn<RequestFn>()
         stop?.()
         viewer.destroy()
         viewer = createMediaViewer({ onIndexChange, onRequestNewer })
@@ -1528,7 +1538,7 @@ describe("attachMediaViewer", () => {
     })
 
     it("failed decode clears the peek spinner", async () => {
-        let decode = vi.fn(async (req: { role: string }) => {
+        let decode = vi.fn<DecodeFn>(async (req) => {
             if (req.role === "peek-newer") return null
             return document.createElement("img")
         })

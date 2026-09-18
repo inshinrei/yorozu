@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { DEFAULT_DECODE_BUDGET_ACTIVE, DEFAULT_DECODE_BUDGET_PEEK, DEFAULT_DECODE_BUDGET_THUMB } from "./decode"
 import {
     createMediaViewer,
@@ -10,6 +10,11 @@ import {
     type MediaViewerItem,
     type MediaVisibleIds,
 } from "./session"
+import type { MediaViewerSessionOpts } from "./types"
+
+type CloseFn = NonNullable<MediaViewerSessionOpts["onClose"]>
+type IndexChangeFn = NonNullable<MediaViewerSessionOpts["onIndexChange"]>
+type RequestFn = NonNullable<MediaViewerSessionOpts["onRequestOlder"]>
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
@@ -17,16 +22,16 @@ function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
 
 describe("createMediaViewer", () => {
     let viewer: MediaViewer | undefined
-    let onClose: ReturnType<typeof vi.fn>
-    let onIndexChange: ReturnType<typeof vi.fn>
-    let onRequestOlder: ReturnType<typeof vi.fn>
-    let onRequestNewer: ReturnType<typeof vi.fn>
+    let onClose: Mock<CloseFn>
+    let onIndexChange: Mock<IndexChangeFn>
+    let onRequestOlder: Mock<RequestFn>
+    let onRequestNewer: Mock<RequestFn>
 
     beforeEach(() => {
-        onClose = vi.fn()
-        onIndexChange = vi.fn()
-        onRequestOlder = vi.fn()
-        onRequestNewer = vi.fn()
+        onClose = vi.fn<CloseFn>()
+        onIndexChange = vi.fn<IndexChangeFn>()
+        onRequestOlder = vi.fn<RequestFn>()
+        onRequestNewer = vi.fn<RequestFn>()
         viewer = createMediaViewer({ onClose, onIndexChange, onRequestOlder, onRequestNewer })
     })
 
