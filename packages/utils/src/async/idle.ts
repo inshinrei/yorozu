@@ -7,11 +7,11 @@ export type IdleHandle = {
     cancel(): void
 }
 
-type Ric = (fn: (deadline: IdleDeadline) => void, opts?: { timeout?: number }) => number
+export type IdleScheduler = (fn: (deadline: IdleDeadline) => void, opts?: { timeout?: number }) => number
 
 export function requestIdle(fn: (deadline: IdleDeadline) => void, opts?: { timeout?: number }): IdleHandle {
     let g = globalThis as unknown as {
-        requestIdleCallback?: Ric
+        requestIdleCallback?: IdleScheduler
         cancelIdleCallback?: (id: number) => void
     }
     let timeout = opts?.timeout

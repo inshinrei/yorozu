@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestLog, expectFlowStory } from "@yorozu/log"
-import { timers } from "@yorozu/utils"
+import { timers, type IdleScheduler } from "@yorozu/utils"
 import { mutableClock } from "./_contract"
 import { openMemoryOutbox } from "./memory"
 import { OUTBOX_MAX_FAILED_AGE_MS } from "./prune"
@@ -698,11 +698,7 @@ describe("OutboxWorker", () => {
     })
 
     it("requestIdleCallback yield uses a positive timeout", async () => {
-        type Ric = (
-            fn: (deadline: { didTimeout: boolean; timeRemaining(): number }) => void,
-            opts?: { timeout?: number },
-        ) => number
-        let ric = vi.fn<Ric>((cb) => {
+        let ric = vi.fn<IdleScheduler>((cb) => {
             queueMicrotask(() => {
                 cb({
                     didTimeout: true,
