@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { MENU_FOCUSABLE_SELECTOR, moveMenuFocus } from "./keyboard"
 
 describe("moveMenuFocus", () => {
@@ -7,10 +7,10 @@ describe("moveMenuFocus", () => {
     let first: HTMLElement
     let disabled: HTMLElement
     let last: HTMLElement
-    let scrollIntoView: ReturnType<typeof vi.fn>
+    let scrollIntoView: Mock<HTMLElement["scrollIntoView"]>
 
     beforeEach(() => {
-        scrollIntoView = vi.fn()
+        scrollIntoView = vi.fn<HTMLElement["scrollIntoView"]>()
         HTMLElement.prototype.scrollIntoView = scrollIntoView
 
         root = document.createElement("div")
