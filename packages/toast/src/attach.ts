@@ -103,10 +103,12 @@ function swapContent<T extends ToastContent>(
     alive: () => boolean,
 ): void {
     if (Object.is(item.content, record.content)) return
-    item.fadeGen += 1
-    let gen = item.fadeGen
     let contentEl = item.el.querySelector("[data-yorozu-toast-content]")
     if (!(contentEl instanceof HTMLElement)) return
+    item.fadeGen += 1
+    let gen = item.fadeGen
+    let next = record.content
+    item.content = next
     if (item.fade && item.fadeMs !== fadeMs) {
         item.fade.destroy()
         item.fade = null
@@ -115,12 +117,10 @@ function swapContent<T extends ToastContent>(
         item.fade = createFade(contentEl, { durationMs: fadeMs })
         item.fadeMs = fadeMs
     }
-    void item.fade.setVisible(false).done.then((ran) => {
-        if (!alive() || item.fadeGen !== gen) return
+    void item.fade.setVisible(false).done.then(() => {
+        if (!alive() || !item.el.isConnected || item.fadeGen !== gen) return
         item.unmount?.()
-        item.unmount = paintContent(contentEl, record.content as ToastContent)
-        item.content = record.content
-        if (!ran && fadeMs > 0 && item.fadeGen !== gen) return
+        item.unmount = paintContent(contentEl, next as ToastContent)
         item.fade?.setVisible(true)
     })
 }

@@ -371,4 +371,80 @@ describe("attachToastRoot", () => {
         expect(root.querySelector("[data-yorozu-toast-content]")!.textContent).toBe("World")
         expect(animate).not.toHaveBeenCalled()
     })
+
+    it("does not restart an in-flight content fade when painted again with the same payload", async () => {
+        let cleaned = 0
+        let two = (el: HTMLElement): void => {
+            el.textContent = "two"
+        }
+        session.show((el) => {
+            el.textContent = "one"
+            return () => {
+                cleaned += 1
+            }
+        })
+        let content = root.querySelector("[data-yorozu-toast-content]") as HTMLElement
+        animate.mockClear()
+        let resolveFade: (() => void) | undefined
+        let fadeFinished = new Promise<void>((resolve) => {
+            resolveFade = resolve
+        })
+        let fadeCancel = vi.fn()
+        let fadeOuts = 0
+        animate.mockImplementation((frames) => {
+            if (JSON.stringify(frames) === JSON.stringify([{ opacity: "1" }, { opacity: "0" }])) {
+                fadeOuts += 1
+                return { finished: fadeFinished, cancel: fadeCancel }
+            }
+            return { finished: Promise.resolve(), cancel: vi.fn() }
+        })
+        session.update("id-1", { content: two })
+        expect(fadeOuts).toBe(1)
+        session.show("other")
+        session.update("id-1", { content: two, progress: true })
+        expect(fadeCancel).not.toHaveBeenCalled()
+        expect(fadeOuts).toBe(1)
+        expect(content.textContent).toBe("one")
+        resolveFade!()
+        await flushMicrotasks()
+        expect(content.textContent).toBe("two")
+        expect(cleaned).toBe(1)
+        expect(content.isConnected).toBe(true)
+    })
+
+    it("does not remount content after the toast is dropped mid-fade", async () => {
+        let mounts = 0
+        let cleaned = 0
+        session.show((el) => {
+            el.textContent = "one"
+            return () => {
+                cleaned += 1
+            }
+        })
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        animate.mockClear()
+        let fadeFinished = new Promise<void>(() => undefined)
+        animate.mockImplementation((frames) => {
+            if (JSON.stringify(frames) === JSON.stringify([{ opacity: "1" }, { opacity: "0" }])) {
+                return { finished: fadeFinished, cancel: vi.fn() }
+            }
+            return { finished: Promise.resolve(), cancel: vi.fn() }
+        })
+        session.update("id-1", {
+            content: (el) => {
+                mounts += 1
+                el.textContent = "two"
+            },
+        })
+        expect(mounts).toBe(0)
+        session.dismiss("id-1")
+        vi.advanceTimersByTime(TOAST_EXIT_MS)
+        expect(root.querySelector("[data-yorozu-toast]")).toBeNull()
+        expect(item.isConnected).toBe(false)
+        expect(cleaned).toBe(1)
+        await flushMicrotasks()
+        expect(mounts).toBe(0)
+        expect(cleaned).toBe(1)
+        expect(item.isConnected).toBe(false)
+    })
 })
