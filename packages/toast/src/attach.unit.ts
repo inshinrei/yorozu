@@ -30,6 +30,8 @@ describe("attachToastRoot", () => {
         animate = vi.fn(() => ({
             finished: Promise.resolve(),
             cancel: vi.fn(),
+            pause: vi.fn(),
+            play: vi.fn(),
         }))
         HTMLElement.prototype.animate = animate as unknown as typeof HTMLElement.prototype.animate
         session = createToastSession({ generateId: () => `id-${++seq}` })
@@ -446,5 +448,72 @@ describe("attachToastRoot", () => {
         expect(mounts).toBe(0)
         expect(cleaned).toBe(1)
         expect(item.isConnected).toBe(false)
+    })
+
+    function scaleXCalls(): unknown[][] {
+        return animate.mock.calls.filter((c) => JSON.stringify(c[0]).includes("scaleX"))
+    }
+
+    it("paints a remaining hairline and depletes scaleX over remaining ms", () => {
+        session.show("Hello", { progress: true, duration: 1000 })
+        let bar = root.querySelector("[data-yorozu-toast-progress]") as HTMLElement
+        expect(bar).toBeTruthy()
+        expect(bar.getAttribute("aria-hidden")).toBe("true")
+        expect(scaleXCalls()[0]![0]).toEqual([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }])
+        expect(scaleXCalls()[0]![1]).toMatchObject({ duration: 1000, easing: "linear", fill: "forwards" })
+    })
+
+    it("permanent progress is frozen full and starts depleting on release", () => {
+        session.show("stay", { permanent: true, progress: true })
+        expect(root.querySelector("[data-yorozu-toast-progress]")).toBeTruthy()
+        expect(scaleXCalls()).toHaveLength(0)
+        expect((root.querySelector("[data-yorozu-toast-progress]") as HTMLElement).style.transform).toBe("scaleX(1)")
+        animate.mockClear()
+        session.update("id-1", { permanent: false, duration: 4000 })
+        expect(scaleXCalls()[0]![0]).toEqual([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }])
+        expect(scaleXCalls()[0]![1]).toMatchObject({ duration: 4000, easing: "linear" })
+    })
+
+    it("progress false removes the hairline; enabling mid-life starts at the current ratio", () => {
+        session.show("Hello", { duration: 1000 })
+        expect(root.querySelector("[data-yorozu-toast-progress]")).toBeNull()
+        vi.advanceTimersByTime(400)
+        session.update("id-1", { progress: true })
+        expect(scaleXCalls()[0]![0]).toEqual([{ transform: "scaleX(0.6)" }, { transform: "scaleX(0)" }])
+        expect(scaleXCalls()[0]![1]).toMatchObject({ duration: 600, easing: "linear" })
+        session.update("id-1", { progress: false })
+        expect(root.querySelector("[data-yorozu-toast-progress]")).toBeNull()
+    })
+
+    it("hover pauses and resumes the hairline animation without recreating it", () => {
+        session.show("Hello", { progress: true, duration: 1000 })
+        let started = scaleXCalls().length
+        let idx = animate.mock.calls.findIndex((c) => JSON.stringify(c[0]).includes("scaleX"))
+        let anim = animate.mock.results[idx]!.value as {
+            pause: ReturnType<typeof vi.fn>
+            play: ReturnType<typeof vi.fn>
+        }
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        item.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }))
+        expect(anim.pause).toHaveBeenCalled()
+        item.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(anim.play).toHaveBeenCalled()
+        expect(scaleXCalls().length).toBe(started)
+    })
+
+    it("another toast show does not retarget a running hairline", () => {
+        session.show("Hello", { progress: true, duration: 5000 })
+        let started = scaleXCalls().length
+        session.show("Other")
+        expect(scaleXCalls().length).toBe(started)
+    })
+
+    it("hairline still depletes when prefersReducedMotion", () => {
+        stop!()
+        stop = attachToastRoot(session, root, { prefersReducedMotion: () => true })
+        animate.mockClear()
+        session.show("Hello", { progress: true, duration: 1000 })
+        expect(scaleXCalls()).toHaveLength(1)
+        expect(scaleXCalls()[0]![1]).toMatchObject({ duration: 1000, easing: "linear" })
     })
 })

@@ -31,6 +31,10 @@ type Painted = {
     fade: Fade | null
     fadeGen: number
     fadeMs: number
+    progressEl: HTMLElement | null
+    progressAnim: Animation | null
+    lastRemaining: number | undefined
+    seenDuration: number | undefined
 }
 
 function popoverOrigin(placement: ToastPlacement): string {
@@ -47,6 +51,7 @@ function motionMs(opts: AttachToastRootOpts | undefined, fallback: number): numb
 
 function dropItem(item: Painted): void {
     item.playback?.cancel()
+    item.progressAnim?.cancel()
     item.unbind()
     item.fade?.destroy()
     item.unmount?.()
@@ -84,6 +89,82 @@ function syncPermanent(el: HTMLElement, permanent: boolean): void {
 function syncSize<T>(el: HTMLElement, record: ToastRecord<T>): void {
     if (record.width != null) el.style.width = `${record.width}px`
     if (record.height != null) el.style.height = `${record.height}px`
+}
+
+function bindProgressHover(el: HTMLElement, getAnim: () => Animation | null): () => void {
+    function onEnter(): void {
+        getAnim()?.pause()
+    }
+    function onLeave(): void {
+        getAnim()?.play()
+    }
+    el.addEventListener("pointerenter", onEnter)
+    el.addEventListener("pointerleave", onLeave)
+    return () => {
+        el.removeEventListener("pointerenter", onEnter)
+        el.removeEventListener("pointerleave", onLeave)
+    }
+}
+
+function bindPainted<T>(
+    el: HTMLElement,
+    session: ToastSession<T>,
+    id: string,
+    getAnim: () => Animation | null,
+): () => void {
+    let unbindItem = bindToastItem(el, session, id)
+    let unprogress = bindProgressHover(el, getAnim)
+    return () => {
+        unbindItem()
+        unprogress()
+    }
+}
+
+function syncProgress<T>(item: Painted, record: ToastRecord<T>, remainingMs: number): void {
+    if (!record.progress) {
+        item.progressAnim?.cancel()
+        item.progressAnim = null
+        item.progressEl?.remove()
+        item.progressEl = null
+        item.lastRemaining = undefined
+        item.seenDuration = undefined
+        return
+    }
+    if (!item.progressEl) {
+        let bar = document.createElement("div")
+        bar.setAttribute("data-yorozu-toast-progress", "")
+        bar.setAttribute("aria-hidden", "true")
+        item.el.append(bar)
+        item.progressEl = bar
+    }
+    if (record.permanent || record.exiting) {
+        item.progressAnim?.cancel()
+        item.progressAnim = null
+        item.progressEl.style.transform = "scaleX(1)"
+        item.lastRemaining = 0
+        item.seenDuration = record.duration
+        return
+    }
+    let rem = remainingMs
+    let running = item.progressAnim != null
+    let remainingDecreasedOrHeld = running && item.lastRemaining != null && rem <= item.lastRemaining
+    let durationSame = item.seenDuration === record.duration
+    if (remainingDecreasedOrHeld && durationSame) {
+        item.lastRemaining = rem
+        return
+    }
+    item.progressAnim?.cancel()
+    let ratio = record.duration > 0 ? rem / record.duration : 1
+    item.progressEl.style.removeProperty("transform")
+    let anim = item.progressEl.animate([{ transform: `scaleX(${ratio})` }, { transform: "scaleX(0)" }], {
+        duration: rem,
+        easing: "linear",
+        fill: "forwards",
+    })
+    item.progressAnim = anim
+    item.lastRemaining = rem
+    item.seenDuration = record.duration
+    if (item.el.matches(":hover")) anim?.pause()
 }
 
 function paintContent(contentEl: HTMLElement, content: ToastContent): (() => void) | undefined {
@@ -237,6 +318,7 @@ export function attachToastRoot<T extends ToastContent>(
                 syncPermanent(existing.el, record.permanent)
                 syncSize(existing.el, record)
                 swapContent(existing, record, motionMs(opts, FADE_MS), () => alive)
+                syncProgress(existing, record, session.remaining(record.id))
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
@@ -246,9 +328,10 @@ export function attachToastRoot<T extends ToastContent>(
             }
             let created = createToastEl(record)
             let popover = createMenuPopover()
-            let painted: Painted = {
+            let painted: Painted
+            painted = {
                 el: created.el,
-                unbind: bindToastItem(created.el, session, record.id),
+                unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
                 unmount: created.unmount,
                 popover,
                 playback: null,
@@ -260,12 +343,17 @@ export function attachToastRoot<T extends ToastContent>(
                 fade: null,
                 fadeGen: 0,
                 fadeMs: 0,
+                progressEl: null,
+                progressAnim: null,
+                lastRemaining: undefined,
+                seenDuration: undefined,
             }
             items.set(record.id, painted)
             placeChild(permanentLane, created.el, index)
             painted.playback = record.exiting
                 ? popover.playClose(created.el, { origin, durationMs: closeMs })
                 : popover.playOpen(created.el, { origin, durationMs: openMs })
+            syncProgress(painted, record, session.remaining(record.id))
         }
 
         for (let index = 0; index < visible.length; index++) {
@@ -277,9 +365,10 @@ export function attachToastRoot<T extends ToastContent>(
                     let created = createToastEl(record)
                     syncStackItem(created.el, depth)
                     let popover = createMenuPopover()
-                    existing = {
+                    let painted: Painted
+                    painted = {
                         el: created.el,
-                        unbind: bindToastItem(created.el, session, record.id),
+                        unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
                         unmount: created.unmount,
                         popover,
                         playback: null,
@@ -291,11 +380,17 @@ export function attachToastRoot<T extends ToastContent>(
                         fade: null,
                         fadeGen: 0,
                         fadeMs: 0,
+                        progressEl: null,
+                        progressAnim: null,
+                        lastRemaining: undefined,
+                        seenDuration: undefined,
                     }
+                    existing = painted
                     items.set(record.id, existing)
                     placeChild(stackLane, created.el, index)
                 }
                 existing.el.classList.add("exiting")
+                syncProgress(existing, record, session.remaining(record.id))
                 continue
             }
             seen.add(record.id)
@@ -308,6 +403,7 @@ export function attachToastRoot<T extends ToastContent>(
                 syncPermanent(existing.el, record.permanent)
                 syncSize(existing.el, record)
                 swapContent(existing, record, motionMs(opts, FADE_MS), () => alive)
+                syncProgress(existing, record, session.remaining(record.id))
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
@@ -322,9 +418,10 @@ export function attachToastRoot<T extends ToastContent>(
             let created = createToastEl(record)
             syncStackItem(created.el, depth)
             let popover = createMenuPopover()
-            let painted: Painted = {
+            let painted: Painted
+            painted = {
                 el: created.el,
-                unbind: bindToastItem(created.el, session, record.id),
+                unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
                 unmount: created.unmount,
                 popover,
                 playback: null,
@@ -336,6 +433,10 @@ export function attachToastRoot<T extends ToastContent>(
                 fade: null,
                 fadeGen: 0,
                 fadeMs: 0,
+                progressEl: null,
+                progressAnim: null,
+                lastRemaining: undefined,
+                seenDuration: undefined,
             }
             items.set(record.id, painted)
             placeChild(stackLane, created.el, index)
@@ -347,6 +448,7 @@ export function attachToastRoot<T extends ToastContent>(
             } else {
                 stack.set(created.el, depth, { axis, durationMs: layerMs })
             }
+            syncProgress(painted, record, session.remaining(record.id))
         }
 
         for (let [id, item] of [...items]) {
