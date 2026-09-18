@@ -59,7 +59,7 @@ describe("bindToastItem", () => {
 
     it("pauses immediately when the item already matches :hover", () => {
         session.show("x", 1000)
-        el.matches = (selector: string) => selector === ":hover"
+        vi.spyOn(el, "matches").mockImplementation((selector: string): boolean => selector === ":hover")
         unbind = bindToastItem(el, session, "id-1")
         vi.advanceTimersByTime(5000)
         expect(session.toasts()[0]!.exiting).toBe(false)
