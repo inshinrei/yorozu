@@ -363,6 +363,15 @@ describe("createToastSession", () => {
         expect(session!.toasts()[0]!.exiting).toBe(false)
     })
 
+    it("remaining is 0 while exiting", () => {
+        let id = session!.show("x", 1000)
+        vi.advanceTimersByTime(400)
+        expect(session!.remaining(id)).toBe(600)
+        session!.dismiss(id)
+        expect(session!.toasts()[0]!.exiting).toBe(true)
+        expect(session!.remaining(id)).toBe(0)
+    })
+
     it("update duration while paused does not arm until resume", () => {
         let id = session!.show("x", 1000)
         vi.advanceTimersByTime(400)

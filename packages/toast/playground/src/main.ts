@@ -38,6 +38,7 @@ function boot(): void {
 
     function recreate(next: ToastPlacement): void {
         placement = next
+        lastId = ""
         stop()
         session.destroy()
         session = createToastSession({ placement })

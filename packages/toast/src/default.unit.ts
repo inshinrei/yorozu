@@ -29,6 +29,8 @@ let tokenNames = [
     "--yorozu-toast-close-size",
     "--yorozu-toast-close-gutter",
     "--yorozu-toast-close-inset",
+    "--yorozu-toast-close-ms",
+    "--yorozu-toast-close-ease",
     "--yorozu-toast-progress-size",
     "--yorozu-toast-progress",
     "--yorozu-toast-stack-offset",
@@ -46,6 +48,8 @@ describe("default iOS liquid-glass toast styles", () => {
         expect(css).toContain("--yorozu-toast-bg: rgba(255, 255, 255, 0.72)")
         expect(css).toContain("--yorozu-toast-close-gutter: 2.5rem")
         expect(css).toContain("--yorozu-toast-close-inset: 0.85rem")
+        expect(css).toContain("--yorozu-toast-close-ms: 200ms")
+        expect(css).toContain("--yorozu-toast-close-ease: cubic-bezier(0.25, 0.1, 0.25, 1)")
         expect(css).toContain("--yorozu-toast-progress-size: 2px")
         expect(css).toContain("--yorozu-toast-progress: currentColor")
         expect(css).toContain("--yorozu-toast-stack-offset: 8px")
@@ -67,6 +71,7 @@ describe("default iOS liquid-glass toast styles", () => {
         expect(css).toContain("overflow: hidden")
         expect(css).toContain("padding-inline-end: var(--yorozu-toast-close-gutter)")
         expect(css).toContain("inset-inline-end: var(--yorozu-toast-close-inset)")
+        expect(css).toContain("opacity var(--yorozu-toast-close-ms) var(--yorozu-toast-close-ease)")
         expect(css).toContain("[data-yorozu-toast-progress]")
         expect(css).toContain("pointer-events: none")
         expect(css).not.toMatch(/\[data-permanent\][^\n]*\[data-yorozu-toast-close\][^}]*display:\s*none/)

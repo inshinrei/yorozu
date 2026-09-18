@@ -24,6 +24,8 @@
     --yorozu-toast-close-size: 1.375rem;
     --yorozu-toast-close-gutter: 2.5rem;
     --yorozu-toast-close-inset: 0.85rem;
+    --yorozu-toast-close-ms: 200ms;
+    --yorozu-toast-close-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
     --yorozu-toast-progress-size: 2px;
     --yorozu-toast-progress: currentColor;
     --yorozu-toast-stack-offset: 8px;

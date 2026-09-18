@@ -145,7 +145,7 @@
     line-height: 1;
     cursor: pointer;
     opacity: 1;
-    transition: opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    transition: opacity var(--yorozu-toast-close-ms) var(--yorozu-toast-close-ease);
 }
 
 [data-yorozu-toast-close]:hover {

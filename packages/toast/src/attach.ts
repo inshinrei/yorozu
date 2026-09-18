@@ -213,6 +213,38 @@ function paintContent(contentEl: HTMLElement, content: ToastContent): (() => voi
     return typeof cleanup === "function" ? cleanup : undefined
 }
 
+function makePainted<T extends ToastContent>(
+    created: { el: HTMLElement; unmount: (() => void) | undefined },
+    session: ToastSession<T>,
+    record: ToastRecord<T>,
+    lane: LaneKind,
+    depth: number | undefined,
+    closing: boolean,
+): Painted {
+    let painted: Painted
+    painted = {
+        el: created.el,
+        unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
+        unmount: created.unmount,
+        popover: createMenuPopover(),
+        playback: null,
+        closing,
+        hiding: false,
+        lane,
+        depth,
+        content: record.content,
+        fade: null,
+        fadeGen: 0,
+        fadeMs: 0,
+        progressEl: null,
+        progressAnim: null,
+        lastRemaining: undefined,
+        seenDuration: undefined,
+        progressStartedAt: undefined,
+    }
+    return painted
+}
+
 function swapContent<T extends ToastContent>(
     item: Painted,
     record: ToastRecord<T>,
@@ -255,14 +287,7 @@ function createToastEl<T extends ToastContent>(
 
     let contentEl = document.createElement("div")
     contentEl.setAttribute("data-yorozu-toast-content", "")
-    let unmount: (() => void) | undefined
-    let content = record.content as ToastContent
-    if (typeof content === "string") {
-        contentEl.textContent = content
-    } else {
-        let cleanup = content(contentEl)
-        if (typeof cleanup === "function") unmount = cleanup
-    }
+    let unmount = paintContent(contentEl, record.content as ToastContent)
     el.append(contentEl)
 
     let close = document.createElement("button")
@@ -370,33 +395,12 @@ export function attachToastRoot<T extends ToastContent>(
                 continue
             }
             let created = createToastEl(record)
-            let popover = createMenuPopover()
-            let painted: Painted
-            painted = {
-                el: created.el,
-                unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
-                unmount: created.unmount,
-                popover,
-                playback: null,
-                closing: record.exiting,
-                hiding: false,
-                lane: "permanent",
-                depth: undefined,
-                content: record.content,
-                fade: null,
-                fadeGen: 0,
-                fadeMs: 0,
-                progressEl: null,
-                progressAnim: null,
-                lastRemaining: undefined,
-                seenDuration: undefined,
-                progressStartedAt: undefined,
-            }
+            let painted = makePainted(created, session, record, "permanent", undefined, record.exiting)
             items.set(record.id, painted)
             placeChild(permanentLane, created.el, index)
             painted.playback = record.exiting
-                ? popover.playClose(created.el, { origin, durationMs: closeMs })
-                : popover.playOpen(created.el, { origin, durationMs: openMs })
+                ? painted.popover.playClose(created.el, { origin, durationMs: closeMs })
+                : painted.popover.playOpen(created.el, { origin, durationMs: openMs })
             syncProgress(painted, record, session.remaining(record.id))
         }
 
@@ -408,29 +412,7 @@ export function attachToastRoot<T extends ToastContent>(
                 if (!existing) {
                     let created = createToastEl(record)
                     syncStackItem(created.el, depth)
-                    let popover = createMenuPopover()
-                    let painted: Painted
-                    painted = {
-                        el: created.el,
-                        unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
-                        unmount: created.unmount,
-                        popover,
-                        playback: null,
-                        closing: true,
-                        hiding: false,
-                        lane: "stack",
-                        depth,
-                        content: record.content,
-                        fade: null,
-                        fadeGen: 0,
-                        fadeMs: 0,
-                        progressEl: null,
-                        progressAnim: null,
-                        lastRemaining: undefined,
-                        seenDuration: undefined,
-                        progressStartedAt: undefined,
-                    }
-                    existing = painted
+                    existing = makePainted(created, session, record, "stack", depth, true)
                     items.set(record.id, existing)
                     placeChild(stackLane, created.el, index)
                 }
@@ -463,34 +445,13 @@ export function attachToastRoot<T extends ToastContent>(
             }
             let created = createToastEl(record)
             syncStackItem(created.el, depth)
-            let popover = createMenuPopover()
-            let painted: Painted
-            painted = {
-                el: created.el,
-                unbind: bindPainted(created.el, session, record.id, () => painted.progressAnim),
-                unmount: created.unmount,
-                popover,
-                playback: null,
-                closing: record.exiting,
-                hiding: false,
-                lane: "stack",
-                depth,
-                content: record.content,
-                fade: null,
-                fadeGen: 0,
-                fadeMs: 0,
-                progressEl: null,
-                progressAnim: null,
-                lastRemaining: undefined,
-                seenDuration: undefined,
-                progressStartedAt: undefined,
-            }
+            let painted = makePainted(created, session, record, "stack", depth, record.exiting)
             items.set(record.id, painted)
             placeChild(stackLane, created.el, index)
             if (record.exiting) {
-                painted.playback = popover.playClose(created.el, { origin, durationMs: closeMs })
+                painted.playback = painted.popover.playClose(created.el, { origin, durationMs: closeMs })
             } else if (depth === 0) {
-                painted.playback = popover.playOpen(created.el, { origin, durationMs: openMs })
+                painted.playback = painted.popover.playOpen(created.el, { origin, durationMs: openMs })
                 stack.set(created.el, 0, { axis, durationMs: 0 })
             } else {
                 stack.set(created.el, depth, { axis, durationMs: layerMs })

@@ -429,7 +429,10 @@ describe("attachToastRoot", () => {
         })
         let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
         animate.mockClear()
-        let fadeFinished = new Promise<void>(() => undefined)
+        let resolveFade: (() => void) | undefined
+        let fadeFinished = new Promise<void>((resolve) => {
+            resolveFade = resolve
+        })
         animate.mockImplementation((frames) => {
             if (JSON.stringify(frames) === JSON.stringify([{ opacity: "1" }, { opacity: "0" }])) {
                 return { finished: fadeFinished, cancel: vi.fn() }
@@ -448,6 +451,7 @@ describe("attachToastRoot", () => {
         expect(root.querySelector("[data-yorozu-toast]")).toBeNull()
         expect(item.isConnected).toBe(false)
         expect(cleaned).toBe(1)
+        resolveFade!()
         await flushMicrotasks()
         expect(mounts).toBe(0)
         expect(cleaned).toBe(1)
@@ -510,6 +514,18 @@ describe("attachToastRoot", () => {
         let started = scaleXCalls().length
         session.show("Other")
         expect(scaleXCalls().length).toBe(started)
+    })
+
+    it("remaining increase retargets the hairline", () => {
+        session.show("Hello", { progress: true, duration: 1000 })
+        vi.advanceTimersByTime(400)
+        session.show("Other")
+        expect(scaleXCalls()).toHaveLength(1)
+        session.update("id-1", { duration: 2000 })
+        expect(session.remaining("id-1")).toBe(2000)
+        expect(scaleXCalls()).toHaveLength(2)
+        expect(scaleXCalls()[1]![0]).toEqual([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }])
+        expect(scaleXCalls()[1]![1]).toMatchObject({ duration: 2000, easing: "linear" })
     })
 
     it("hairline still depletes when prefersReducedMotion", () => {
