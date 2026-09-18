@@ -27,6 +27,7 @@ function boot(): void {
     if (!app) return
 
     let n = 0
+    let lastId = ""
     let placement: ToastPlacement = "bottom-left"
     let session: ToastSession = createToastSession({ placement })
     let toastRoot = document.createElement("div")
@@ -79,21 +80,58 @@ function boot(): void {
     actions.append(
         button("Show toast", () => {
             n += 1
-            session.show("Saved " + n)
+            lastId = session.show("Saved " + n)
         }),
         button("Show permanent", () => {
             n += 1
-            session.show("Syncing " + n, { permanent: true })
+            lastId = session.show("Syncing " + n, { permanent: true })
         }),
         button("Show 6 timed", () => {
             for (let i = 0; i < 6; i++) {
                 n += 1
-                session.show("Saved " + n)
+                lastId = session.show("Saved " + n)
             }
         }),
         button("Dismiss oldest permanent", () => {
             let oldest = session.toasts().find((t) => t.permanent && !t.exiting)
             if (oldest) session.dismiss(oldest.id)
+        }),
+        button("Show sized", () => {
+            n += 1
+            lastId = session.show("Sized " + n, { width: 320, height: 72 })
+        }),
+        button("Show mount", () => {
+            n += 1
+            let label = "Job " + n
+            lastId = session.show((el) => {
+                el.textContent = label
+            })
+        }),
+        button("Update content", () => {
+            if (!lastId) return
+            session.update(lastId, {
+                content: (el) => {
+                    el.textContent = "Retry available"
+                    let retry = document.createElement("button")
+                    retry.type = "button"
+                    retry.textContent = "Retry"
+                    el.append(retry)
+                },
+            })
+        }),
+        button("Release last", () => {
+            if (!lastId) return
+            session.update(lastId, { permanent: false })
+        }),
+        button("Show progress", () => {
+            n += 1
+            lastId = session.show("Uploading " + n, { progress: true })
+        }),
+        button("Toggle progress", () => {
+            if (!lastId) return
+            let current = session.toasts().find((t) => t.id === lastId)
+            if (!current) return
+            session.update(lastId, { progress: !current.progress })
         }),
     )
 
