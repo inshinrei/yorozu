@@ -98,12 +98,15 @@
 [data-yorozu-toast] {
     pointer-events: auto;
     box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: var(--yorozu-toast-item-gap);
     min-block-size: var(--yorozu-toast-min-block);
     padding: var(--yorozu-toast-padding);
+    padding-inline-end: var(--yorozu-toast-close-gutter);
     border-radius: var(--yorozu-toast-radius);
     color: var(--yorozu-toast-color);
     font-family: var(--yorozu-toast-font-family);
@@ -129,6 +132,10 @@
 
 [data-yorozu-toast-close] {
     appearance: none;
+    position: absolute;
+    inset-inline-end: var(--yorozu-toast-close-inset);
+    top: 50%;
+    transform: translateY(-50%);
     margin: 0;
     padding: 0;
     border: none;
@@ -137,6 +144,8 @@
     font-size: var(--yorozu-toast-close-size);
     line-height: 1;
     cursor: pointer;
+    opacity: 1;
+    transition: opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 [data-yorozu-toast-close]:hover {
@@ -144,5 +153,17 @@
 }
 
 [data-yorozu-toast][data-permanent] [data-yorozu-toast-close] {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+[data-yorozu-toast-progress] {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    block-size: var(--yorozu-toast-progress-size);
+    pointer-events: none;
+    background: var(--yorozu-toast-progress);
+    transform-origin: left center;
+    transform: scaleX(1);
 }

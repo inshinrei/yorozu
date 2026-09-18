@@ -22,6 +22,10 @@
     --yorozu-toast-close-color: #000000;
     --yorozu-toast-close-hover: rgba(0, 0, 0, 0.55);
     --yorozu-toast-close-size: 1.375rem;
+    --yorozu-toast-close-gutter: 2.5rem;
+    --yorozu-toast-close-inset: 0.85rem;
+    --yorozu-toast-progress-size: 2px;
+    --yorozu-toast-progress: currentColor;
     --yorozu-toast-stack-offset: 8px;
 }
 
