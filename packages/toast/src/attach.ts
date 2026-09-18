@@ -1,4 +1,4 @@
-import { createStackLayer, STACK_LAYER_MS, type StackAxis } from "@yorozu/animations"
+import { createFade, createStackLayer, FADE_MS, STACK_LAYER_MS, type Fade, type StackAxis } from "@yorozu/animations"
 import { createMenuPopover } from "@yorozu/context-menu"
 import { bindToastItem } from "./bind"
 import {
@@ -27,6 +27,10 @@ type Painted = {
     hiding: boolean
     lane: LaneKind
     depth: number | undefined
+    content: unknown
+    fade: Fade | null
+    fadeGen: number
+    fadeMs: number
 }
 
 function popoverOrigin(placement: ToastPlacement): string {
@@ -44,6 +48,7 @@ function motionMs(opts: AttachToastRootOpts | undefined, fallback: number): numb
 function dropItem(item: Painted): void {
     item.playback?.cancel()
     item.unbind()
+    item.fade?.destroy()
     item.unmount?.()
     item.el.remove()
 }
@@ -79,6 +84,45 @@ function syncPermanent(el: HTMLElement, permanent: boolean): void {
 function syncSize<T>(el: HTMLElement, record: ToastRecord<T>): void {
     if (record.width != null) el.style.width = `${record.width}px`
     if (record.height != null) el.style.height = `${record.height}px`
+}
+
+function paintContent(contentEl: HTMLElement, content: ToastContent): (() => void) | undefined {
+    contentEl.replaceChildren()
+    if (typeof content === "string") {
+        contentEl.textContent = content
+        return undefined
+    }
+    let cleanup = content(contentEl)
+    return typeof cleanup === "function" ? cleanup : undefined
+}
+
+function swapContent<T extends ToastContent>(
+    item: Painted,
+    record: ToastRecord<T>,
+    fadeMs: number,
+    alive: () => boolean,
+): void {
+    if (Object.is(item.content, record.content)) return
+    item.fadeGen += 1
+    let gen = item.fadeGen
+    let contentEl = item.el.querySelector("[data-yorozu-toast-content]")
+    if (!(contentEl instanceof HTMLElement)) return
+    if (item.fade && item.fadeMs !== fadeMs) {
+        item.fade.destroy()
+        item.fade = null
+    }
+    if (!item.fade) {
+        item.fade = createFade(contentEl, { durationMs: fadeMs })
+        item.fadeMs = fadeMs
+    }
+    void item.fade.setVisible(false).done.then((ran) => {
+        if (!alive() || item.fadeGen !== gen) return
+        item.unmount?.()
+        item.unmount = paintContent(contentEl, record.content as ToastContent)
+        item.content = record.content
+        if (!ran && fadeMs > 0 && item.fadeGen !== gen) return
+        item.fade?.setVisible(true)
+    })
 }
 
 function createToastEl<T extends ToastContent>(
@@ -192,6 +236,7 @@ export function attachToastRoot<T extends ToastContent>(
                 placeChild(permanentLane, existing.el, index)
                 syncPermanent(existing.el, record.permanent)
                 syncSize(existing.el, record)
+                swapContent(existing, record, motionMs(opts, FADE_MS), () => alive)
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
@@ -211,6 +256,10 @@ export function attachToastRoot<T extends ToastContent>(
                 hiding: false,
                 lane: "permanent",
                 depth: undefined,
+                content: record.content,
+                fade: null,
+                fadeGen: 0,
+                fadeMs: 0,
             }
             items.set(record.id, painted)
             placeChild(permanentLane, created.el, index)
@@ -238,6 +287,10 @@ export function attachToastRoot<T extends ToastContent>(
                         hiding: false,
                         lane: "stack",
                         depth,
+                        content: record.content,
+                        fade: null,
+                        fadeGen: 0,
+                        fadeMs: 0,
                     }
                     items.set(record.id, existing)
                     placeChild(stackLane, created.el, index)
@@ -254,6 +307,7 @@ export function attachToastRoot<T extends ToastContent>(
                 placeChild(stackLane, existing.el, index)
                 syncPermanent(existing.el, record.permanent)
                 syncSize(existing.el, record)
+                swapContent(existing, record, motionMs(opts, FADE_MS), () => alive)
                 if (record.exiting && !existing.closing) {
                     existing.closing = true
                     existing.playback?.cancel()
@@ -278,6 +332,10 @@ export function attachToastRoot<T extends ToastContent>(
                 hiding: false,
                 lane: "stack",
                 depth,
+                content: record.content,
+                fade: null,
+                fadeGen: 0,
+                fadeMs: 0,
             }
             items.set(record.id, painted)
             placeChild(stackLane, created.el, index)

@@ -313,4 +313,62 @@ describe("attachToastRoot", () => {
         close.click()
         expect(item.classList.contains("exiting")).toBe(true)
     })
+
+    it("fades and remounts content on update without rebuilding the shell", async () => {
+        let cleaned = 0
+        session.show((el) => {
+            el.textContent = "one"
+            return () => {
+                cleaned += 1
+            }
+        })
+        let item = root.querySelector("[data-yorozu-toast]") as HTMLElement
+        let content = item.querySelector("[data-yorozu-toast-content]") as HTMLElement
+        animate.mockClear()
+        session.update("id-1", {
+            content: (el) => {
+                el.textContent = "two"
+            },
+        })
+        await flushMicrotasks()
+        expect(root.querySelector("[data-yorozu-toast]")).toBe(item)
+        expect(content.textContent).toBe("two")
+        expect(cleaned).toBe(1)
+        let fadeFrames = animate.mock.calls.map((c) => c[0])
+        expect(
+            fadeFrames.some(
+                (frames) => JSON.stringify(frames) === JSON.stringify([{ opacity: "1" }, { opacity: "0" }]),
+            ),
+        ).toBe(true)
+        expect(
+            fadeFrames.some(
+                (frames) => JSON.stringify(frames) === JSON.stringify([{ opacity: "0" }, { opacity: "1" }]),
+            ),
+        ).toBe(true)
+    })
+
+    it("skips remount when content is the same reference", async () => {
+        let mount = (el: HTMLElement): void => {
+            el.textContent = "same"
+        }
+        session.show(mount)
+        let content = root.querySelector("[data-yorozu-toast-content]") as HTMLElement
+        animate.mockClear()
+        session.update("id-1", { content: mount, progress: true })
+        await flushMicrotasks()
+        expect(content.textContent).toBe("same")
+        let fadeFrames = animate.mock.calls.filter((c) => JSON.stringify(c[0]).includes("opacity"))
+        expect(fadeFrames).toHaveLength(0)
+    })
+
+    it("content fade is instant when prefersReducedMotion", async () => {
+        stop!()
+        stop = attachToastRoot(session, root, { prefersReducedMotion: () => true })
+        session.show("Hello")
+        animate.mockClear()
+        session.update("id-1", { content: "World" })
+        await flushMicrotasks()
+        expect(root.querySelector("[data-yorozu-toast-content]")!.textContent).toBe("World")
+        expect(animate).not.toHaveBeenCalled()
+    })
 })
