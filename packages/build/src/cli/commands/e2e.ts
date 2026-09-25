@@ -63,6 +63,26 @@ export function mapChangedFilesToE2eProjects(files: readonly string[]): string[]
     return E2E_PROJECTS.filter((project) => selected.has(project))
 }
 
+const ZERO_SHA_RE: RegExp = /^0+$/
+
+export function isUnusableE2eSince(since: string | undefined | null): boolean {
+    if (since == null) return true
+    let trimmed = since.trim()
+    if (trimmed === "") return true
+    return ZERO_SHA_RE.test(trimmed)
+}
+
+export function selectChangedE2eProjects(opts: {
+    since?: string | null
+    files?: readonly string[]
+    gitFailed?: boolean
+}): string[] {
+    if (opts.gitFailed === true || isUnusableE2eSince(opts.since)) {
+        return [...E2E_PROJECTS]
+    }
+    return mapChangedFilesToE2eProjects(opts.files ?? [])
+}
+
 async function defaultSince(cwd: string): Promise<string> {
     let res = await exec(["git", "merge-base", "origin/main", "HEAD"], {
         cwd,
@@ -85,14 +105,26 @@ export let e2eCli = bc.command({
         let root = resolveWorkspaceRoot(args.workspace)
         let projects: Array<string>
         if (args.changed) {
-            let files = await findChangedFiles({
-                since: args.since ?? (await defaultSince(root)),
-                cwd: root,
-            })
-            projects = mapChangedFilesToE2eProjects(files)
-            if (projects.length === 0) {
-                info("e2e: no projects for changed files")
-                return
+            let since = args.since
+            if (since === undefined) {
+                since = await defaultSince(root)
+            }
+            if (isUnusableE2eSince(since)) {
+                projects = selectChangedE2eProjects({ since })
+            } else {
+                try {
+                    let files = await findChangedFiles({
+                        since,
+                        cwd: root,
+                    })
+                    projects = selectChangedE2eProjects({ since, files })
+                    if (projects.length === 0) {
+                        info("e2e: no projects for changed files")
+                        return
+                    }
+                } catch {
+                    projects = selectChangedE2eProjects({ since, gitFailed: true })
+                }
             }
         } else {
             projects = [...E2E_PROJECTS]

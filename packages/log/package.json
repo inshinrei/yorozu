@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/log",
-    "version": "1.0.74",
+    "version": "1.0.75",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",
