@@ -1,40 +1,43 @@
 {
-  "name": "yorozu",
-  "version": "1.0.73",
-  "type": "module",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "vitest watch",
-    "test": "vitest run",
-    "build": "tsx packages/build/src/cli/main.ts build :all",
-    "lint:workspace": "tsx packages/build/src/cli/main.ts lint",
-    "typecheck": "tsx packages/build/src/cli/main.ts typecheck",
-    "release": "tsx packages/build/src/cli/main.ts release --with-npm",
-    "release:dry": "tsx packages/build/src/cli/main.ts release --with-npm --dry-run",
-    "prepare": "pnpm run -C packages/build build-vite-plugin",
-    "playground:animations": "vite --config packages/animations/playground/vite.config.ts",
-    "playground:media-viewer": "vite --config packages/media-viewer/playground/vite.config.ts",
-    "playground:toast": "vite --config packages/toast/playground/vite.config.ts"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/inshinrei/yorozu.git"
-  },
-  "author": "inshinrei",
-  "license": "MIT",
-  "devDependencies": {
-    "@rolldown/binding-darwin-arm64": "1.0.0-rc.16",
-    "@types/node": "25.6.0",
-    "@yorozu/build": "workspace:^",
-    "esbuild": "0.25.12",
-    "jsdom": "30.0.1",
-    "prettier": "3.8.3",
-    "ts-node": "10.9.2",
-    "tsx": "4.23.12",
-    "typescript": "6.0.2",
-    "vite": "8.0.8",
-    "vite-plugin-dts": "5.0.3",
-    "vitest": "4.1.4"
-  }
+    "name": "yorozu",
+    "version": "1.0.73",
+    "type": "module",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "vitest watch",
+        "test": "vitest run",
+        "build": "tsx packages/build/src/cli/main.ts build :all",
+        "lint:workspace": "tsx packages/build/src/cli/main.ts lint",
+        "typecheck": "tsx packages/build/src/cli/main.ts typecheck",
+        "release": "tsx packages/build/src/cli/main.ts release --with-npm",
+        "release:dry": "tsx packages/build/src/cli/main.ts release --with-npm --dry-run",
+        "prepare": "pnpm run -C packages/build build-vite-plugin",
+        "playground:animations": "vite --config packages/animations/playground/vite.config.ts",
+        "playground:media-viewer": "vite --config packages/media-viewer/playground/vite.config.ts",
+        "playground:toast": "vite --config packages/toast/playground/vite.config.ts",
+        "e2e": "playwright test",
+        "e2e:changed": "tsx packages/build/src/cli/main.ts e2e --changed"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/inshinrei/yorozu.git"
+    },
+    "author": "inshinrei",
+    "license": "MIT",
+    "devDependencies": {
+        "@playwright/test": "1.63.0",
+        "@rolldown/binding-darwin-arm64": "1.0.0-rc.16",
+        "@types/node": "25.6.0",
+        "@yorozu/build": "workspace:^",
+        "esbuild": "0.25.12",
+        "jsdom": "30.0.1",
+        "prettier": "3.8.3",
+        "ts-node": "10.9.2",
+        "tsx": "4.23.12",
+        "typescript": "6.0.2",
+        "vite": "8.0.8",
+        "vite-plugin-dts": "5.0.3",
+        "vitest": "4.1.4"
+    }
 }

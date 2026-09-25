@@ -10,3 +10,8 @@ dist_vite-internal.js
 packages/build/dist_vite-internal.js
 
 .worktrees
+
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache
