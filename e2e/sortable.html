@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>sortable e2e</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 24px;
+            }
+            #list-y,
+            #list-x,
+            #list-both {
+                display: flex;
+                gap: 4px;
+                margin: 0 0 16px;
+            }
+            #list-y {
+                flex-direction: column;
+            }
+            #list-x {
+                flex-direction: row;
+            }
+            #list-both {
+                flex-wrap: wrap;
+                width: 120px;
+            }
+            #list-y > *,
+            #list-x > *,
+            #list-both > * {
+                box-sizing: border-box;
+                flex: 0 0 48px;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                user-select: none;
+                touch-action: none;
+                background: #ddd;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="list-y"></div>
+        <div id="order-y"></div>
+        <div id="list-x"></div>
+        <div id="order-x"></div>
+        <div id="list-both"></div>
+        <div id="order-both"></div>
+        <script type="module" src="/src/sortable.ts"></script>
+    </body>
+</html>
