@@ -17,9 +17,6 @@ importers:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
-      '@rolldown/binding-darwin-arm64':
-        specifier: 1.0.0-rc.16
-        version: 1.0.0-rc.16
       '@types/node':
         specifier: 25.6.0
         version: 25.6.0
@@ -53,6 +50,10 @@ importers:
       vitest:
         specifier: 4.1.4
         version: 4.1.4(@types/node@25.6.0)(jsdom@30.0.1)(vite@8.0.8(@types/node@25.6.0)(esbuild@0.25.12)(tsx@4.23.12)(yaml@2.8.3))
+    optionalDependencies:
+      '@rolldown/binding-darwin-arm64':
+        specifier: 1.0.0-rc.16
+        version: 1.0.0-rc.16
 
   packages/_standalone/fetch:
     dependencies:
@@ -2009,7 +2010,8 @@ snapshots:
   '@rolldown/binding-darwin-arm64@1.0.0-rc.15':
     optional: true
 
-  '@rolldown/binding-darwin-arm64@1.0.0-rc.16': {}
+  '@rolldown/binding-darwin-arm64@1.0.0-rc.16':
+    optional: true
 
   '@rolldown/binding-darwin-x64@1.0.0-rc.15':
     optional: true

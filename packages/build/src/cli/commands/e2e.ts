@@ -83,6 +83,16 @@ export function selectChangedE2eProjects(opts: {
     return mapChangedFilesToE2eProjects(opts.files ?? [])
 }
 
+export function changedE2eFallbackReason(opts: { since?: string | null; gitFailed?: boolean }): string | undefined {
+    if (isUnusableE2eSince(opts.since)) {
+        return "e2e: unusable --since, running all projects"
+    }
+    if (opts.gitFailed === true) {
+        return "e2e: git diff failed, running all projects"
+    }
+    return undefined
+}
+
 async function defaultSince(cwd: string): Promise<string> {
     let res = await exec(["git", "merge-base", "origin/main", "HEAD"], {
         cwd,
@@ -110,6 +120,8 @@ export let e2eCli = bc.command({
                 since = await defaultSince(root)
             }
             if (isUnusableE2eSince(since)) {
+                let reason = changedE2eFallbackReason({ since })
+                if (reason !== undefined) info(reason)
                 projects = selectChangedE2eProjects({ since })
             } else {
                 try {
@@ -123,6 +135,8 @@ export let e2eCli = bc.command({
                         return
                     }
                 } catch {
+                    let reason = changedE2eFallbackReason({ since, gitFailed: true })
+                    if (reason !== undefined) info(reason)
                     projects = selectChangedE2eProjects({ since, gitFailed: true })
                 }
             }

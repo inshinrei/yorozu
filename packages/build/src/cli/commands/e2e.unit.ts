@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { E2E_PROJECTS, isUnusableE2eSince, mapChangedFilesToE2eProjects, selectChangedE2eProjects } from "./e2e"
+import {
+    changedE2eFallbackReason,
+    E2E_PROJECTS,
+    isUnusableE2eSince,
+    mapChangedFilesToE2eProjects,
+    selectChangedE2eProjects,
+} from "./e2e"
 
 describe("mapChangedFilesToE2eProjects", () => {
     it("maps package src to its project and dependents", () => {
@@ -74,5 +80,18 @@ describe("selectChangedE2eProjects", () => {
             }),
         ).toEqual(["sortable"])
         expect(selectChangedE2eProjects({ since: "abc123", files: [] })).toEqual([])
+    })
+})
+
+describe("changedE2eFallbackReason", () => {
+    it("explains empty/zero since and git-diff failure", () => {
+        expect(changedE2eFallbackReason({ since: "" })).toBe("e2e: unusable --since, running all projects")
+        expect(changedE2eFallbackReason({ since: "0000000000000000000000000000000000000000" })).toBe(
+            "e2e: unusable --since, running all projects",
+        )
+        expect(changedE2eFallbackReason({ since: "abc123", gitFailed: true })).toBe(
+            "e2e: git diff failed, running all projects",
+        )
+        expect(changedE2eFallbackReason({ since: "abc123" })).toBeUndefined()
     })
 })
