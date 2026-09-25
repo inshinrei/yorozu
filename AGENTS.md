@@ -23,3 +23,13 @@ Example: root and managed packages at `1.0.30` + `fix(utils): …` → all of th
 
 - `let` over `const` except arrow functions and exported/module-level constants
 - 4-space indent, no semicolons, double quotes
+
+## E2E
+
+Packages with Playwright coverage: `@yorozu/confirm-tooltip`, `@yorozu/context-menu`, `@yorozu/media-viewer`, `@yorozu/sortable`, `@yorozu/virtual-list`.
+
+When changing those packages' `src/` (or `e2e/` / `playwright.config.ts`), run the matching project before you finish:
+
+`pnpm exec playwright test --project=<name>`
+
+or `pnpm e2e:changed`. Full `pnpm e2e` is required before a release build.

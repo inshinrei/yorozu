@@ -49,3 +49,9 @@ test("K6 outside pointerdown hides; item pointerdown does not", async ({ page })
     await page.mouse.click(8, 8)
     await waitGone(page.locator("[data-yorozu-menu]"))
 })
+
+test("ArrowDown from the open menu focuses the first enabled item", async ({ page }) => {
+    await openMenu(page)
+    await page.keyboard.press("ArrowDown")
+    await expect(page.locator("#item-stay")).toBeFocused()
+})

@@ -14,6 +14,8 @@ if (!(openButton instanceof HTMLButtonElement)) {
     throw new Error("missing #open-confirm")
 }
 
+let omitListenEsc = new URLSearchParams(window.location.search).get("esc") === "0"
+
 openButton.addEventListener("click", (event: MouseEvent) => {
     if (session != null) return
 
@@ -51,7 +53,7 @@ openButton.addEventListener("click", (event: MouseEvent) => {
 
     session = createConfirmTooltipSession({
         onClose,
-        listenEsc: true,
+        ...(omitListenEsc ? {} : { listenEsc: true }),
         getDurationMs: () => 0,
     })
     session.attach(panel)

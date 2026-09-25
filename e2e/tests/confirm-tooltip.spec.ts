@@ -47,3 +47,11 @@ test("C5 outside pointerdown hides; inside does not", async ({ page }) => {
     await page.mouse.click(8, 8)
     await waitGone(page.locator("[data-yorozu-confirm]"))
 })
+
+test("Escape does not close when listenEsc is omitted", async ({ page }) => {
+    await page.goto("/confirm-tooltip.html?esc=0")
+    await page.locator("#open-confirm").click()
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+    await page.keyboard.press("Escape")
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+})

@@ -210,3 +210,17 @@ test("V13 click a non-current filmstrip thumb jumps; current thumb is disabled",
     await expect(currentThumb(page)).toBeDisabled()
     await expect(currentThumb(page)).toHaveAttribute("aria-current", "true")
 })
+
+test("ArrowRight is locked while zoomed; 0 restores then arrow works", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await expectIndex(page, 1)
+    await page.locator("#chrome-zoom-in").click()
+    await expect(page.locator("#chrome-percent")).toHaveText("125%")
+    await page.locator("[data-yorozu-media-viewer]").focus()
+    await page.keyboard.press("ArrowRight")
+    await expectIndex(page, 1)
+    await page.keyboard.press("0")
+    await expect(page.locator("#chrome-percent")).toHaveText("100%")
+    await page.keyboard.press("ArrowRight")
+    await expectIndex(page, 2)
+})

@@ -60,6 +60,17 @@ test("L3 reanchor-80 includes row-80", async ({ page }) => {
     await assertWindow(page, { includes: "row-80" })
 })
 
+test("after jump-80, wait 200ms, row-80 still mounted", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    await page.locator("#jump-80").click()
+    await expect(row(page, "row-80")).toBeAttached()
+    await new Promise((resolve) => {
+        setTimeout(resolve, 200)
+    })
+    await expect(row(page, "row-80")).toBeAttached()
+})
+
 test("L4 rapid jumps keep the target mounted and contiguous", async ({ page }) => {
     await page.goto("/virtual-list.html")
     await expect(row(page, "row-0")).toBeAttached()

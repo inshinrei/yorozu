@@ -119,3 +119,17 @@ test("S3 both-axis wrap drag into the second row previews then commits", async (
     expect(await joinDataKeys(list)).not.toBe("a,b,c,d")
     expect(transformsCleared(await itemTransforms(list))).toBe(true)
 })
+
+test("click without 10px move does not change #order-y", async ({ page }) => {
+    await page.goto("/sortable.html")
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+    let item = page.locator('#list-y [data-key="a"]')
+    let box = await item.boundingBox()
+    expect(box).not.toBeNull()
+    let from = boxCenter(box!)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + 2, from.y + 2)
+    await page.mouse.up()
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+})
