@@ -9,6 +9,7 @@ import { publishPackagesCli } from "./commands/publish"
 import { bumpVersionCli } from "./commands/bump-version"
 import { generateChangelogCli } from "./commands/gen-changelog"
 import { findChangedPackagesCli } from "./commands/find-changed-packages"
+import { e2eCli } from "./commands/e2e"
 import { releaseCli } from "./commands/release"
 import { jsrCli } from "./commands/jsr"
 import { generateDocsCli } from "./commands/docs"
@@ -24,6 +25,7 @@ await bc.run(
         bumpVersionCli,
         generateChangelogCli,
         findChangedPackagesCli,
+        e2eCli,
         releaseCli,
         jsrCli,
         generateDocsCli,

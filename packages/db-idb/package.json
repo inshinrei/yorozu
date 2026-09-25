@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/db-idb",
-    "version": "1.0.73",
+    "version": "1.0.74",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

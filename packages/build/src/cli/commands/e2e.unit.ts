@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest"
+import { E2E_PROJECTS, mapChangedFilesToE2eProjects } from "./e2e"
+
+describe("mapChangedFilesToE2eProjects", () => {
+    it("maps package src to its project and dependents", () => {
+        expect(mapChangedFilesToE2eProjects(["packages/confirm-tooltip/src/session.ts"])).toEqual(["confirm-tooltip"])
+        expect(mapChangedFilesToE2eProjects(["packages/context-menu/src/session.ts"])).toEqual([
+            "confirm-tooltip",
+            "context-menu",
+        ])
+        expect(mapChangedFilesToE2eProjects(["packages/virtual-list/src/list.ts"])).toEqual([
+            "media-viewer",
+            "virtual-list",
+        ])
+        expect(mapChangedFilesToE2eProjects(["packages/sortable/src/session.ts"])).toEqual(["sortable"])
+        expect(mapChangedFilesToE2eProjects(["packages/media-viewer/src/attach.ts"])).toEqual(["media-viewer"])
+    })
+
+    it("maps e2e page files to that project", () => {
+        expect(mapChangedFilesToE2eProjects(["e2e/tests/confirm-tooltip.spec.ts"])).toEqual(["confirm-tooltip"])
+        expect(mapChangedFilesToE2eProjects(["e2e/src/context-menu.ts"])).toEqual(["context-menu"])
+        expect(mapChangedFilesToE2eProjects(["e2e/sortable.html"])).toEqual(["sortable"])
+    })
+
+    it("maps shared e2e infra to all five projects", () => {
+        expect(mapChangedFilesToE2eProjects(["e2e/helpers/wait.ts"])).toEqual([...E2E_PROJECTS])
+        expect(mapChangedFilesToE2eProjects(["e2e/vite.config.ts"])).toEqual([...E2E_PROJECTS])
+        expect(mapChangedFilesToE2eProjects(["playwright.config.ts"])).toEqual([...E2E_PROJECTS])
+        expect(mapChangedFilesToE2eProjects(["e2e/public/media/img.png"])).toEqual([...E2E_PROJECTS])
+    })
+
+    it("ignores unit tests, markdown, dist, playground, and unrelated packages", () => {
+        expect(mapChangedFilesToE2eProjects(["packages/confirm-tooltip/src/session.unit.ts"])).toEqual([])
+        expect(mapChangedFilesToE2eProjects(["packages/toast/src/session.ts"])).toEqual([])
+        expect(mapChangedFilesToE2eProjects(["README.md"])).toEqual([])
+        expect(mapChangedFilesToE2eProjects(["packages/media-viewer/playground/src/main.ts"])).toEqual([])
+        expect(mapChangedFilesToE2eProjects(["packages/sortable/dist/index.js"])).toEqual([])
+    })
+})
