@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>virtual-list e2e</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 24px;
+            }
+            #scroller {
+                box-sizing: border-box;
+                width: 400px;
+                height: 480px;
+                overflow: auto;
+                position: relative;
+            }
+            #sizer {
+                position: relative;
+                width: 100%;
+            }
+            #sizer > [data-id] {
+                position: absolute;
+                left: 0;
+                right: 0;
+                height: 48px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="scroller">
+            <div id="sizer"></div>
+        </div>
+        <button type="button" id="jump-80">Jump 80</button>
+        <button type="button" id="reanchor-80">Reanchor 80</button>
+        <script type="module" src="/src/virtual-list.ts"></script>
+    </body>
+</html>

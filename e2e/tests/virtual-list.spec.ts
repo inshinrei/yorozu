@@ -1,0 +1,75 @@
+import { expect, test, type Page } from "@playwright/test"
+import { assertContiguous, mountedIds } from "../helpers/list"
+
+const ITEM_SIZE: number = 48
+const SIZER_HEIGHT: string = "24000px"
+
+const rows = (page: Page) => page.locator("#scroller [data-id]")
+const row = (page: Page, id: string) => page.locator(`#scroller [data-id="${id}"]`)
+
+const assertWindow = async (page: Page, opts?: { firstId?: string; includes?: string }): Promise<string[]> => {
+    let ids = await mountedIds(rows(page))
+    expect(ids.length).toBeGreaterThan(0)
+    expect(ids.length).toBeLessThan(80)
+    expect(ids.length).toBeGreaterThanOrEqual(16)
+    expect(ids.length).toBeLessThanOrEqual(90)
+    assertContiguous(ids, "row-")
+    if (opts?.firstId !== undefined) {
+        expect(ids[0]).toBe(opts.firstId)
+    }
+    if (opts?.includes !== undefined) {
+        expect(ids).toContain(opts.includes)
+    }
+    return ids
+}
+
+const jumpTo = async (page: Page, index: number): Promise<void> => {
+    await page.locator("#scroller").evaluate(
+        (el: HTMLElement, args: { index: number; itemSize: number }) => {
+            el.scrollTop = args.index * args.itemSize
+        },
+        { index, itemSize: ITEM_SIZE },
+    )
+    await expect(row(page, `row-${String(index)}`)).toBeAttached()
+}
+
+test("L1 cold mount windows from the top", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    await expect(page.locator("#sizer")).toHaveCSS("height", SIZER_HEIGHT)
+    await assertWindow(page, { firstId: "row-0" })
+})
+
+test("L2 jump-80 auto-reanchors past the mounted window", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    await expect(page.locator("#sizer")).toHaveCSS("height", SIZER_HEIGHT)
+
+    await page.locator("#jump-80").click()
+    await expect(row(page, "row-80")).toBeVisible()
+    await assertWindow(page, { includes: "row-80" })
+    await expect(page.locator("#sizer")).toHaveCSS("height", SIZER_HEIGHT)
+})
+
+test("L3 reanchor-80 includes row-80", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+
+    await page.locator("#reanchor-80").click()
+    await expect(row(page, "row-80")).toBeAttached()
+    await assertWindow(page, { includes: "row-80" })
+})
+
+test("L4 rapid jumps keep the target mounted and contiguous", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+
+    for (let i of [0, 80, 20, 490, 10]) {
+        await jumpTo(page, i)
+        let ids = await mountedIds(rows(page))
+        expect(ids.length).toBeGreaterThan(0)
+        expect(ids.length).toBeLessThan(80)
+        expect(ids).toContain(`row-${String(i)}`)
+        assertContiguous(ids, "row-")
+    }
+})
