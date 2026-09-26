@@ -1,6 +1,6 @@
 {
     "name": "yorozu",
-    "version": "1.0.85",
+    "version": "1.0.86",
     "type": "module",
     "description": "",
     "main": "index.js",
@@ -16,6 +16,7 @@
         "playground:animations": "vite --config packages/animations/playground/vite.config.ts",
         "playground:media-viewer": "vite --config packages/media-viewer/playground/vite.config.ts",
         "playground:toast": "vite --config packages/toast/playground/vite.config.ts",
+        "playground:virtual-list": "vite --config packages/virtual-list/playground/vite.config.ts",
         "e2e": "playwright test",
         "e2e:changed": "tsx packages/build/src/cli/main.ts e2e --changed"
     },
