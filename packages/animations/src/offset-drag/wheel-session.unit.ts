@@ -1,21 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { WHEEL_COOLDOWN_MS, WHEEL_QUIET_PX, WHEEL_RELEASE_MS, createWheelSession, isQuietWheel } from "./wheel-session"
+import {
+    WHEEL_COOLDOWN_MS,
+    WHEEL_MOMENTUM_ACCEL_MAX,
+    WHEEL_MOMENTUM_ACCEL_MIN,
+    WHEEL_MOMENTUM_DT_MS,
+    WHEEL_MOMENTUM_PEAK_PX,
+    WHEEL_MOMENTUM_WINDOW,
+    WHEEL_QUIET_PX,
+    WHEEL_RELEASE_MS,
+    createWheelSession,
+    isQuietWheel,
+} from "./wheel-session"
 
 describe("createWheelSession", () => {
     afterEach(() => {
         vi.useRealTimers()
     })
 
-    it("exports quiet / release / cooldown tokens", () => {
+    it("exports quiet / release / cooldown / momentum tokens", () => {
         expect(WHEEL_QUIET_PX).toBe(10)
-        expect(WHEEL_RELEASE_MS).toBe(90)
+        expect(WHEEL_RELEASE_MS).toBe(140)
         expect(WHEEL_COOLDOWN_MS).toBe(420)
+        expect(WHEEL_MOMENTUM_DT_MS).toBe(40)
+        expect(WHEEL_MOMENTUM_ACCEL_MIN).toBe(0.55)
+        expect(WHEEL_MOMENTUM_ACCEL_MAX).toBe(0.97)
+        expect(WHEEL_MOMENTUM_PEAK_PX).toBe(18)
+        expect(WHEEL_MOMENTUM_WINDOW).toBe(4)
         expect(isQuietWheel(0, 0)).toBe(true)
         expect(isQuietWheel(9, 9)).toBe(true)
         expect(isQuietWheel(10, 0)).toBe(false)
     })
 
-    it("starts on non-quiet, ignores quiet ticks, releases after 90ms", () => {
+    it("zero-delta after a move does not release at 90ms; releases at 140ms after last note", () => {
         vi.useFakeTimers()
         let onRelease = vi.fn()
         let wheel = createWheelSession({ onRelease })
@@ -24,8 +40,80 @@ describe("createWheelSession", () => {
         vi.advanceTimersByTime(50)
         expect(wheel.note(0, 0)).toBe("quiet")
         vi.advanceTimersByTime(40)
+        expect(onRelease).not.toHaveBeenCalled()
+        expect(wheel.active()).toBe(true)
+        vi.advanceTimersByTime(50)
+        expect(onRelease).not.toHaveBeenCalled()
+        expect(wheel.active()).toBe(true)
+        vi.advanceTimersByTime(50)
         expect(onRelease).toHaveBeenCalledTimes(1)
         expect(wheel.active()).toBe(false)
+        wheel.destroy()
+    })
+
+    it("sub-quiet 5px ticks are move and rearm idle", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        expect(wheel.note(5, 0)).toBe("move")
+        vi.advanceTimersByTime(90)
+        expect(onRelease).not.toHaveBeenCalled()
+        expect(wheel.note(5, 0)).toBe("move")
+        vi.advanceTimersByTime(90)
+        expect(onRelease).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(50)
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        wheel.destroy()
+    })
+
+    it("twelve 20px ticks 16ms apart do not release until 140ms after the last", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        for (let i = 0; i < 12; i++) {
+            if (i > 0) vi.advanceTimersByTime(16)
+            expect(wheel.note(20, 0)).toBe("move")
+        }
+        expect(onRelease).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(90)
+        expect(onRelease).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(50)
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        wheel.destroy()
+    })
+
+    it("momentum true after contact is coast and releases once", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        expect(wheel.note(80, 0)).toBe("move")
+        expect(wheel.note(80, 0, { momentum: true })).toBe("coast")
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        expect(wheel.note(40, 0, { momentum: true })).toBe("coast")
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        wheel.destroy()
+    })
+
+    it("decaying contact ticks become coast on the fourth sample", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        expect(wheel.note(80, 0, { timeStamp: 0 })).toBe("move")
+        expect(wheel.note(64, 0, { timeStamp: 16 })).toBe("move")
+        expect(wheel.note(50, 0, { timeStamp: 32 })).toBe("move")
+        expect(wheel.note(38, 0, { timeStamp: 48 })).toBe("coast")
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        wheel.destroy()
+    })
+
+    it("slow 5px ticks never trip decay", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        for (let i = 0; i < 6; i++) {
+            expect(wheel.note(5, 0, { timeStamp: i * 16 })).toBe("move")
+        }
+        expect(onRelease).not.toHaveBeenCalled()
         wheel.destroy()
     })
 
@@ -39,13 +127,13 @@ describe("createWheelSession", () => {
         expect(onRelease).not.toHaveBeenCalled()
     })
 
-    it("does not release a 120px tick until quiet idle (no early commit)", () => {
+    it("does not release a 120px tick until 140ms idle", () => {
         vi.useFakeTimers()
         let onRelease = vi.fn()
         let wheel = createWheelSession({ onRelease })
         expect(wheel.note(120, 0)).toBe("move")
         expect(onRelease).not.toHaveBeenCalled()
-        vi.advanceTimersByTime(89)
+        vi.advanceTimersByTime(139)
         expect(onRelease).not.toHaveBeenCalled()
         vi.advanceTimersByTime(1)
         expect(onRelease).toHaveBeenCalledTimes(1)

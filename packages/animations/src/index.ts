@@ -158,7 +158,16 @@ export {
 
 export type { DragAxis } from "./offset-drag/math"
 export { DRAG_LOCK_PX, DRAG_LOCK_RATIO, resolveDragAxis, projectDragOffset } from "./offset-drag/math"
-export { WHEEL_QUIET_PX, WHEEL_RELEASE_MS, WHEEL_COOLDOWN_MS } from "./offset-drag/wheel-session"
+export {
+    WHEEL_QUIET_PX,
+    WHEEL_RELEASE_MS,
+    WHEEL_COOLDOWN_MS,
+    WHEEL_MOMENTUM_DT_MS,
+    WHEEL_MOMENTUM_ACCEL_MIN,
+    WHEEL_MOMENTUM_ACCEL_MAX,
+    WHEEL_MOMENTUM_PEAK_PX,
+    WHEEL_MOMENTUM_WINDOW,
+} from "./offset-drag/wheel-session"
 export type { OffsetDrag, OffsetDragConfig, OffsetDragRelease } from "./offset-drag/session"
 export { createOffsetDrag } from "./offset-drag/session"
 

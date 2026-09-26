@@ -377,20 +377,20 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("wheel idle 90ms commits; destroy clears the wheel timer", () => {
-        expect(MEDIA_SWIPE_WHEEL_RELEASE_MS).toBe(90)
+    it("wheel idle 140ms commits; destroy clears the wheel timer", () => {
+        expect(MEDIA_SWIPE_WHEEL_RELEASE_MS).toBe(140)
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         expect(swipe.onWheel(wheel({ deltaX: 60, deltaY: 0 }))).toBe(true)
         expect(onNewer).not.toHaveBeenCalled()
-        vi.advanceTimersByTime(90)
+        vi.advanceTimersByTime(140)
         expect(onNewer).toHaveBeenCalledTimes(1)
 
         let late = vi.fn()
         let doomed = createMediaSwipe(baseCbs({ onNewer: late }))
         expect(doomed.onWheel(wheel({ deltaX: 60, deltaY: 0 }))).toBe(true)
         doomed.destroy()
-        vi.advanceTimersByTime(90)
+        vi.advanceTimersByTime(140)
         expect(late).not.toHaveBeenCalled()
         swipe.destroy()
     })
