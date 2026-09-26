@@ -15,6 +15,7 @@ export const E2E_PROJECTS: readonly string[] = [
 const SKIP_CHANGED_E2E = picomatch(["**/*.unit.ts", "**/*.md", "**/dist/**", "**/playground/**"])
 
 const PACKAGE_TO_E2E_PROJECTS: Readonly<Record<string, readonly string[]>> = {
+    animations: ["media-viewer", "virtual-list"],
     "confirm-tooltip": ["confirm-tooltip"],
     "context-menu": ["confirm-tooltip", "context-menu"],
     "media-viewer": ["media-viewer"],

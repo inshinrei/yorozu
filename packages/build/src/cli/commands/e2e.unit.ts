@@ -20,6 +20,10 @@ describe("mapChangedFilesToE2eProjects", () => {
         ])
         expect(mapChangedFilesToE2eProjects(["packages/sortable/src/session.ts"])).toEqual(["sortable"])
         expect(mapChangedFilesToE2eProjects(["packages/media-viewer/src/attach.ts"])).toEqual(["media-viewer"])
+        expect(mapChangedFilesToE2eProjects(["packages/animations/src/overscroll-bounce/session.ts"])).toEqual([
+            "media-viewer",
+            "virtual-list",
+        ])
     })
 
     it("maps e2e page files to that project", () => {
@@ -38,6 +42,7 @@ describe("mapChangedFilesToE2eProjects", () => {
     it("ignores unit tests, markdown, dist, playground, and unrelated packages", () => {
         expect(mapChangedFilesToE2eProjects(["packages/confirm-tooltip/src/session.unit.ts"])).toEqual([])
         expect(mapChangedFilesToE2eProjects(["packages/toast/src/session.ts"])).toEqual([])
+        expect(mapChangedFilesToE2eProjects(["packages/animations/src/overscroll-bounce/session.unit.ts"])).toEqual([])
         expect(mapChangedFilesToE2eProjects(["README.md"])).toEqual([])
         expect(mapChangedFilesToE2eProjects(["packages/media-viewer/playground/src/main.ts"])).toEqual([])
         expect(mapChangedFilesToE2eProjects(["packages/sortable/dist/index.js"])).toEqual([])
