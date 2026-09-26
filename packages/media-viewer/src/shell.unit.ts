@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { createMediaShell, MEDIA_CHROME_MS, MEDIA_CLOSE_MS, MEDIA_OPEN_MS, MEDIA_SWITCH_MS } from "./shell"
+import {
+    createMediaShell,
+    MEDIA_CHROME_CLOSE_MS,
+    MEDIA_CHROME_MS,
+    MEDIA_CLOSE_MS,
+    MEDIA_OPEN_MS,
+    MEDIA_SWITCH_MS,
+} from "./shell"
 
 describe("createMediaShell", () => {
     afterEach(() => {
@@ -173,9 +180,10 @@ describe("createMediaShell", () => {
         await vi.advanceTimersByTimeAsync(MEDIA_CLOSE_MS)
         await closed
         expect(finish).toHaveBeenCalledTimes(1)
-        expect(MEDIA_OPEN_MS).toBe(500)
-        expect(MEDIA_CLOSE_MS).toBe(250)
-        expect(MEDIA_CHROME_MS).toBe(200)
+        expect(MEDIA_OPEN_MS).toBe(150)
+        expect(MEDIA_CLOSE_MS).toBe(100)
+        expect(MEDIA_CHROME_MS).toBe(150)
+        expect(MEDIA_CHROME_CLOSE_MS).toBe(100)
         expect(MEDIA_SWITCH_MS).toBe(320)
         shell.destroy()
     })

@@ -3,9 +3,10 @@
  */
 import type { MediaViewerNavFrom } from "./types"
 
-export const MEDIA_OPEN_MS: number = 500
-export const MEDIA_CLOSE_MS: number = 250
-export const MEDIA_CHROME_MS: number = 200
+export const MEDIA_OPEN_MS: number = 150
+export const MEDIA_CLOSE_MS: number = 100
+export const MEDIA_CHROME_MS: number = 150
+export const MEDIA_CHROME_CLOSE_MS: number = 100
 export const MEDIA_SWITCH_MS: number = 320
 
 export type MediaOpenClosePhase =

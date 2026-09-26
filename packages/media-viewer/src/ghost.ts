@@ -2,6 +2,8 @@
  * Shared-element ghost flight for media open/close.
  */
 import {
+    MOTION_SETTLE_MS,
+    MOTION_HERO_EASE,
     SHARED_ELEMENT_END_MS,
     centerFitInViewport,
     createSharedElement,
@@ -14,10 +16,10 @@ import type { MediaViewerOrigin } from "./types"
 
 export const MEDIA_GHOST_ANIMATING_CLASS: string = "yorozu-media-ghost-animating"
 export const MEDIA_GHOST_HANDOFF_CLASS: string = "yorozu-media-ghost-handoff"
-export const MEDIA_GHOST_MS: number = 500
-export const MEDIA_GHOST_CLOSE_MS: number = 250
-export const MEDIA_GHOST_EASING: string = "cubic-bezier(0.2, 0.8, 0.2, 1)"
-export const MEDIA_GHOST_CLOSE_EASING: string = "cubic-bezier(0.4, 0, 1, 1)"
+export const MEDIA_GHOST_MS: number = MOTION_SETTLE_MS
+export const MEDIA_GHOST_CLOSE_MS: number = MOTION_SETTLE_MS
+export const MEDIA_GHOST_EASING: string = MOTION_HERO_EASE
+export const MEDIA_GHOST_CLOSE_EASING: string = MOTION_HERO_EASE
 export const MEDIA_GHOST_END_MS: number = SHARED_ELEMENT_END_MS
 export const DEFAULT_MEDIA_INSETS: { top: number; right: number; bottom: number; left: number } = {
     top: 52,

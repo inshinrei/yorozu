@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/sortable",
-    "version": "1.0.82",
+    "version": "1.0.83",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

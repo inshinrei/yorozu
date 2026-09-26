@@ -16,6 +16,7 @@ let tokenNames = [
     "--yorozu-media-open-ms",
     "--yorozu-media-close-ms",
     "--yorozu-media-chrome-ms",
+    "--yorozu-media-chrome-close-ms",
     "--yorozu-media-switch-ms",
     "--yorozu-media-ghost-ms",
     "--yorozu-media-ghost-close-ms",
@@ -48,16 +49,17 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-pad-bottom: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-x: 0.75rem")
         expect(css).toContain("--yorozu-media-slide-gap: 40px")
-        expect(css).toContain("--yorozu-media-open-ms: 500ms")
-        expect(css).toContain("--yorozu-media-close-ms: 250ms")
-        expect(css).toContain("--yorozu-media-chrome-ms: 200ms")
+        expect(css).toContain("--yorozu-media-open-ms: 150ms")
+        expect(css).toContain("--yorozu-media-close-ms: 100ms")
+        expect(css).toContain("--yorozu-media-chrome-ms: 150ms")
+        expect(css).toContain("--yorozu-media-chrome-close-ms: 100ms")
         expect(css).toContain("--yorozu-media-switch-ms: 320ms")
-        expect(css).toContain("--yorozu-media-ghost-ms: 500ms")
+        expect(css).toContain("--yorozu-media-ghost-ms: 250ms")
         expect(css).toContain("--yorozu-media-ghost-close-ms: 250ms")
-        expect(css).toContain("--yorozu-media-ghost-ease: cubic-bezier(0.2, 0.8, 0.2, 1)")
-        expect(css).toContain("--yorozu-media-ghost-close-ease: cubic-bezier(0.4, 0, 1, 1)")
-        expect(css).toContain("--yorozu-media-chrome-ease: cubic-bezier(0.25, 0.1, 0.25, 1)")
-        expect(css).toContain("--yorozu-media-chrome-hide-ease: ease-in")
+        expect(css).toContain("--yorozu-media-ghost-ease: cubic-bezier(0.38, 0.70, 0.125, 1)")
+        expect(css).toContain("--yorozu-media-ghost-close-ease: cubic-bezier(0.38, 0.70, 0.125, 1)")
+        expect(css).toContain("--yorozu-media-chrome-ease: linear")
+        expect(css).toContain("--yorozu-media-chrome-hide-ease: ease-in-out")
         expect(css).toContain("--yorozu-media-radius: 0.75rem")
         expect(css).toContain("--yorozu-media-filmstrip-ms: 0.2s")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
@@ -174,8 +176,6 @@ describe("default media viewer styles", () => {
         )
         expect(css).toContain("--yorozu-media-open-ms")
         expect(css).toContain("--yorozu-media-close-ms")
-        expect(css).toContain("--yorozu-media-ghost-ease")
-        expect(css).toContain("--yorozu-media-ghost-close-ease")
         let chromeGroup =
             css.match(
                 /\[data-yorozu-media-viewer\]\[data-phase="open"\]:not\(\[data-swipe-dismiss\]\) \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/,
@@ -185,8 +185,26 @@ describe("default media viewer styles", () => {
         let backdropBlock = css.match(/(?:^|\n)\[data-yorozu-media-backdrop\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(backdropBlock).toContain("clip-path: inset(100% 0 100% 0)")
         expect(backdropBlock).toContain("--yorozu-media-close-ms")
-        expect(backdropBlock).toContain("--yorozu-media-ghost-close-ease")
+        expect(backdropBlock).toContain("linear")
+        expect(backdropBlock).not.toContain("--yorozu-media-ghost-close-ease")
         expect(backdropBlock).not.toContain("--yorozu-media-chrome-ms")
+    })
+
+    it("handoff class reveals the viewport under the flying clone", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let animatingIdx = css.indexOf("html.yorozu-media-ghost-animating [data-yorozu-media-viewport]")
+        let handoffIdx = css.indexOf("html.yorozu-media-ghost-handoff [data-yorozu-media-viewport]")
+        expect(animatingIdx).toBeGreaterThanOrEqual(0)
+        expect(handoffIdx).toBeGreaterThan(animatingIdx)
+        let handoffBlock =
+            css.match(/(?:^|\n)html\.yorozu-media-ghost-handoff \[data-yorozu-media-viewport\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(handoffBlock).toContain("visibility: visible")
+    })
+
+    it("closing chrome uses chrome-close duration", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-yorozu-media-viewer][data-phase="closing"] [data-yorozu-media-header]')
+        expect(css).toContain("--yorozu-media-chrome-close-ms")
     })
 
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {

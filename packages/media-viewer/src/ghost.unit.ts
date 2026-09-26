@@ -110,26 +110,26 @@ describe("createMediaGhost", () => {
         expect(clone).toBeTruthy()
         expect(clone.getAttribute("data-yorozu-media-ghost")).toBe("")
         expect(hideTarget.style.visibility).toBe("hidden")
-        expect(MEDIA_GHOST_MS).toBe(500)
+        expect(MEDIA_GHOST_MS).toBe(250)
         expect(MEDIA_GHOST_CLOSE_MS).toBe(250)
-        expect(MEDIA_GHOST_EASING).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
-        expect(MEDIA_GHOST_CLOSE_EASING).toBe("cubic-bezier(0.4, 0, 1, 1)")
+        expect(MEDIA_GHOST_EASING).toBe("cubic-bezier(0.38, 0.70, 0.125, 1)")
+        expect(MEDIA_GHOST_CLOSE_EASING).toBe("cubic-bezier(0.38, 0.70, 0.125, 1)")
         expect(MEDIA_GHOST_END_MS).toBe(16)
     })
 
-    it("playOpen defaults duration and easing to Photos open motion", async () => {
+    it("playOpen defaults duration and easing to hero open motion", async () => {
         ghost.playOpen({ host, seed, to })
         await vi.runAllTimersAsync()
         expect(animate).toHaveBeenCalled()
         let options = animate.mock.calls.at(-1)![1] as KeyframeAnimationOptions
         expect(options).toMatchObject({
-            duration: 500,
+            duration: 250,
             easing: MEDIA_GHOST_EASING,
             fill: "forwards",
         })
     })
 
-    it("playClose defaults duration and easing to Photos close motion", async () => {
+    it("playClose defaults duration and easing to hero close motion", async () => {
         ghost.playClose({ host, fromStage: to, target: seed })
         await vi.runAllTimersAsync()
         expect(animate).toHaveBeenCalled()
