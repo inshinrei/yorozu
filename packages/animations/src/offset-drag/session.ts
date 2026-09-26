@@ -210,20 +210,33 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
 
     const onPointerDown = (event: PointerEvent): boolean => {
         if (destroyed || !config.getEnabled() || event.button !== 0 || pointerId != null) return false
+        let displaced = settling || offsetX !== 0 || offsetY !== 0
         cancelSettle()
         if (!wheel.gated()) wheel.clear()
         pointerId = event.pointerId
-        startClientX = event.clientX
-        startClientY = event.clientY
-        rawX = 0
-        rawY = 0
-        prevRawX = 0
-        prevRawY = 0
-        lastDeltaX = 0
-        lastDeltaY = 0
-        axis = "none"
-        offsetX = 0
-        offsetY = 0
+        if (displaced) {
+            rawX = offsetX
+            rawY = offsetY
+            prevRawX = rawX
+            prevRawY = rawY
+            lastDeltaX = 0
+            lastDeltaY = 0
+            startClientX = event.clientX - rawX
+            startClientY = event.clientY - rawY
+            applyMapped(0)
+        } else {
+            startClientX = event.clientX
+            startClientY = event.clientY
+            rawX = 0
+            rawY = 0
+            prevRawX = 0
+            prevRawY = 0
+            lastDeltaX = 0
+            lastDeltaY = 0
+            axis = "none"
+            offsetX = 0
+            offsetY = 0
+        }
         gesturing = true
         try {
             let node = event.currentTarget as Element | null
@@ -273,18 +286,30 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         })
         if (kind !== "move") return true
 
+        let displaced = settling || offsetX !== 0 || offsetY !== 0
         if (starting) {
             cancelSettle()
-            rawX = 0
-            rawY = 0
-            prevRawX = 0
-            prevRawY = 0
-            lastDeltaX = 0
-            lastDeltaY = 0
-            axis = "none"
-            offsetX = 0
-            offsetY = 0
-            gesturing = true
+            if (displaced) {
+                rawX = offsetX
+                rawY = offsetY
+                prevRawX = rawX
+                prevRawY = rawY
+                lastDeltaX = 0
+                lastDeltaY = 0
+                applyMapped(0)
+                gesturing = true
+            } else {
+                rawX = 0
+                rawY = 0
+                prevRawX = 0
+                prevRawY = 0
+                lastDeltaX = 0
+                lastDeltaY = 0
+                axis = "none"
+                offsetX = 0
+                offsetY = 0
+                gesturing = true
+            }
         }
 
         rawX -= event.deltaX

@@ -310,4 +310,78 @@ describe("createOffsetDrag", () => {
         expect(drag.offsetX()).toBe(-40)
         drag.destroy()
     })
+
+    it("wheel move during bounce settle continues from painted offset", async () => {
+        let releases = 0
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            onRelease: () => {
+                releases += 1
+                drag.settleTo(0, 0, MOTION_SETTLE_MS)
+            },
+        })
+        drag.onWheel(wheel({ deltaX: 40 }))
+        expect(drag.offsetX()).toBe(-40)
+        vi.advanceTimersByTime(140)
+        expect(releases).toBe(1)
+        expect(drag.settling()).toBe(true)
+        await vi.advanceTimersByTimeAsync(32)
+        let painted = drag.offsetX()
+        expect(painted).not.toBe(0)
+        expect(painted).toBeLessThan(0)
+        drag.onWheel(wheel({ deltaX: 20 }))
+        expect(drag.settling()).toBe(false)
+        expect(drag.offsetX()).toBeCloseTo(painted - 20, 0)
+        expect(releases).toBe(1)
+        drag.destroy()
+    })
+
+    it("consumed wheel during bounce settle does not continue from painted offset", async () => {
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            onRelease: () => {
+                drag.consumeWheelSession()
+                drag.settleTo(0, 0, MOTION_SETTLE_MS)
+            },
+        })
+        drag.onWheel(wheel({ deltaX: 40 }))
+        vi.advanceTimersByTime(140)
+        expect(drag.settling()).toBe(true)
+        await vi.advanceTimersByTimeAsync(32)
+        let painted = drag.offsetX()
+        expect(painted).not.toBe(0)
+        drag.onWheel(wheel({ deltaX: 20 }))
+        expect(drag.offsetX()).not.toBeCloseTo(painted - 20, 0)
+        expect(drag.settling()).toBe(true)
+        drag.destroy()
+    })
+
+    it("wheel move from rest starts a new gesture at the tick delta", () => {
+        let drag = createOffsetDrag({ getEnabled: () => true })
+        expect(drag.offsetX()).toBe(0)
+        expect(drag.settling()).toBe(false)
+        drag.onWheel(wheel({ deltaX: 20 }))
+        expect(drag.offsetX()).toBe(-20)
+        drag.destroy()
+    })
+
+    it("pointerdown during wheel bounce settle continues from painted offset", async () => {
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            onRelease: () => {
+                drag.settleTo(0, 0, MOTION_SETTLE_MS)
+            },
+        })
+        drag.onWheel(wheel({ deltaX: 40 }))
+        vi.advanceTimersByTime(140)
+        await vi.advanceTimersByTimeAsync(32)
+        let painted = drag.offsetX()
+        expect(painted).not.toBe(0)
+        expect(drag.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
+        expect(drag.offsetX()).toBe(painted)
+        expect(drag.settling()).toBe(false)
+        drag.onPointerMove(pointer("pointermove", { clientX: 380, clientY: 200 }))
+        expect(drag.offsetX()).toBeCloseTo(painted - 20, 10)
+        drag.destroy()
+    })
 })
