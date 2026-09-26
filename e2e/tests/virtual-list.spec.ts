@@ -83,12 +83,22 @@ test("PageDown Home End on a focused scroller move the window", async ({ page })
     let firstVisible = Math.floor(scrollTop / ITEM_SIZE)
     expect(afterPage).toContain(`row-${String(firstVisible)}`)
 
+    await scroller.focus()
     await page.keyboard.press("End")
+    await expect
+        .poll(async () =>
+            scroller.evaluate((el) => {
+                let node = el as HTMLElement
+                return node.scrollHeight - node.clientHeight - node.scrollTop
+            }),
+        )
+        .toBeLessThan(2)
     await expect(row(page, "row-490")).toBeAttached()
     let afterEnd = await mountedIds(rows(page))
     assertContiguous(afterEnd, "row-")
     expect(afterEnd).toContain("row-490")
 
+    await scroller.focus()
     await page.keyboard.press("Home")
     await expect(row(page, "row-0")).toBeAttached()
     await assertWindow(page, { firstId: "row-0" })
