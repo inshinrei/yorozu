@@ -1296,12 +1296,15 @@ describe("attachMediaViewer", () => {
         stop?.()
         stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
         let api: MediaViewerChromeApi | undefined
-        let thumb = stampOriginThumb("a", { left: 20, top: 10, width: 40, height: 40 })
-        let atUncover = { seen: false, clone: null as Element | null }
+        let thumb = stampOriginThumb("a", { left: 80, top: 10, width: 40, height: 40 })
+        let atUncover = { seen: false, clone: null as Element | null, left: "", top: "" }
         let stopTrap = trapVisibility(thumb, (value) => {
             if (value !== "visible") return
             atUncover.seen = true
-            atUncover.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
+            let clone = ghostHost.querySelector("[data-yorozu-media-ghost]") as HTMLElement | null
+            atUncover.clone = clone
+            atUncover.left = clone?.style.left ?? ""
+            atUncover.top = clone?.style.top ?? ""
         })
         try {
             viewer.open({
@@ -1324,6 +1327,7 @@ describe("attachMediaViewer", () => {
             })
             let frames = lastCloseKeyframes()
             expect(frames[1]?.opacity).not.toBe("0")
+            expect(frames[0]?.transform).not.toBe("translate3d(0px, 0px, 0) scale(1, 1)")
             expect(animate.mock.calls.at(-1)?.[1]).toMatchObject({
                 duration: MEDIA_GHOST_CLOSE_MS,
                 easing: MEDIA_GHOST_CLOSE_EASING,
@@ -1333,6 +1337,8 @@ describe("attachMediaViewer", () => {
                 expect(atUncover.seen).toBe(true)
             })
             expect(atUncover.clone).toBeTruthy()
+            expect(atUncover.left).toBe("80px")
+            expect(atUncover.top).toBe("10px")
         } finally {
             stopTrap()
             thumb.remove()
@@ -1410,6 +1416,48 @@ describe("attachMediaViewer", () => {
             let frames = lastCloseKeyframes()
             expect(frames[1]?.opacity).toBe("0")
             expect(frames[0]?.transform).toBe("translate3d(0px, 0px, 0) scale(1, 1)")
+        } finally {
+            thumb.remove()
+            clip.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("close ghost flies when the clip root fully contains the origin", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        let clip = document.createElement("div")
+        document.body.append(clip)
+        vi.spyOn(clip, "getBoundingClientRect").mockReturnValue(fakeRect(0, 0, 400, 300))
+        stop?.()
+        stop = attachMediaViewer(viewer, root, {
+            getGhostHost: () => ghostHost,
+            getHistoryClipRoot: () => clip,
+        })
+        let api: MediaViewerChromeApi | undefined
+        let thumb = stampOriginThumb("a", { left: 80, top: 10, width: 40, height: 40 })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            animate.mockClear()
+            api!.close()
+            await vi.waitFor(() => {
+                expect(animate.mock.calls.length).toBeGreaterThan(0)
+            })
+            let frames = lastCloseKeyframes()
+            expect(frames[1]?.opacity).not.toBe("0")
+            expect(frames[0]?.transform).not.toBe("translate3d(0px, 0px, 0) scale(1, 1)")
         } finally {
             thumb.remove()
             clip.remove()
