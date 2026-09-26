@@ -1,6 +1,6 @@
 {
     "name": "yorozu",
-    "version": "1.0.92",
+    "version": "1.0.93",
     "type": "module",
     "description": "",
     "main": "index.js",

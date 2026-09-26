@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { MOTION_SETTLE_MS } from "../core/motion-timing"
 import { WHEEL_RELEASE_MS } from "../offset-drag/wheel-session"
-import { rubberBandOverscroll } from "./math"
+import { OVERSCROLL_SPRING_MAX_MS, rubberBandAppKit, rubberBandOverscroll } from "./math"
 import { createOverscrollBounce, type OverscrollBounceOptions } from "./session"
 
 function wheel(init: Partial<WheelEventInit> = {}): WheelEvent {
@@ -61,12 +60,12 @@ describe("createOverscrollBounce", () => {
         scroller.scrollTop = 0
         scroller.dispatchEvent(wheel({ deltaY: -80 }))
         expect(content.dataset.yorozuOverscroll).toBe("top")
-        expect(translateY(content)).toBeCloseTo(rubberBandOverscroll(80, 480), 10)
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(80), 10)
         expect(translateY(content)).toBeGreaterThan(0)
         expect(scroller.scrollTop).toBe(0)
         vi.advanceTimersByTime(WHEEL_RELEASE_MS)
         expect(content.dataset.yorozuOverscroll).toBe("top")
-        await vi.advanceTimersByTimeAsync(MOTION_SETTLE_MS + 32)
+        await vi.advanceTimersByTimeAsync(OVERSCROLL_SPRING_MAX_MS + 32)
         expect(content.dataset.yorozuOverscroll).toBe("none")
         expect(content.style.transform).toBe("")
         bounce.destroy()
@@ -77,12 +76,12 @@ describe("createOverscrollBounce", () => {
         scroller.scrollTop = 24000 - 480
         scroller.dispatchEvent(wheel({ deltaY: 80 }))
         expect(content.dataset.yorozuOverscroll).toBe("bottom")
-        expect(translateY(content)).toBeCloseTo(rubberBandOverscroll(-80, 480), 10)
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(-80), 10)
         expect(translateY(content)).toBeLessThan(0)
         expect(scroller.scrollTop).toBe(24000 - 480)
         vi.advanceTimersByTime(WHEEL_RELEASE_MS)
         expect(content.dataset.yorozuOverscroll).toBe("bottom")
-        await vi.advanceTimersByTimeAsync(MOTION_SETTLE_MS + 32)
+        await vi.advanceTimersByTimeAsync(OVERSCROLL_SPRING_MAX_MS + 32)
         expect(content.dataset.yorozuOverscroll).toBe("none")
         expect(content.style.transform).toBe("")
         bounce.destroy()
@@ -129,7 +128,7 @@ describe("createOverscrollBounce", () => {
         expect(content.dataset.yorozuOverscroll).toBe("top")
         expect(translateY(content)).toBeCloseTo(rubberBandOverscroll(80, 480), 10)
         scroller.dispatchEvent(pointer("pointerup", { clientY: 280 }))
-        await vi.advanceTimersByTimeAsync(MOTION_SETTLE_MS + 32)
+        await vi.advanceTimersByTimeAsync(OVERSCROLL_SPRING_MAX_MS + 32)
         expect(content.dataset.yorozuOverscroll).toBe("none")
         expect(content.style.transform).toBe("")
         bounce.destroy()
@@ -183,7 +182,7 @@ describe("createOverscrollBounce", () => {
         Object.defineProperty(coast, "momentum", { value: true })
         scroller.dispatchEvent(coast)
         expect(Math.abs(translateY(content))).toBeLessThanOrEqual(Math.abs(stretched))
-        await vi.advanceTimersByTimeAsync(WHEEL_RELEASE_MS + MOTION_SETTLE_MS + 32)
+        await vi.advanceTimersByTimeAsync(OVERSCROLL_SPRING_MAX_MS + 32)
         expect(content.dataset.yorozuOverscroll).toBe("none")
         expect(content.style.transform).toBe("")
         bounce.destroy()
@@ -253,5 +252,49 @@ describe("createOverscrollBounce", () => {
         scroller.dispatchEvent(wheel({ deltaY: -80 }))
         expect(content.dataset.yorozuOverscroll).toBe("top")
         bounce.destroy()
+    })
+
+    it("applies one coast impulse at the rest edge then ignores leftover", async () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        let first = wheel({ deltaY: -80 })
+        Object.defineProperty(first, "momentum", { value: true })
+        scroller.dispatchEvent(first)
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(80), 10)
+        let stretched = translateY(content)
+        let second = wheel({ deltaY: -80 })
+        Object.defineProperty(second, "momentum", { value: true })
+        scroller.dispatchEvent(second)
+        expect(Math.abs(translateY(content))).toBeLessThanOrEqual(Math.abs(stretched))
+        await vi.advanceTimersByTimeAsync(OVERSCROLL_SPRING_MAX_MS + 32)
+        expect(content.dataset.yorozuOverscroll).toBe("none")
+        bounce.destroy()
+    })
+
+    it("does not consume-gate after bounce lift so a later contact still rubbers", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        vi.advanceTimersByTime(WHEEL_RELEASE_MS)
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(160), 10)
+        bounce.destroy()
+    })
+
+    it("paints AppKit visual on wheel and iOS visual on touch for the same travel", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(80), 10)
+        bounce.destroy()
+        let again = mount()
+        again.scroller.scrollTop = 0
+        again.scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
+        again.scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
+        expect(translateY(again.content)).toBeCloseTo(rubberBandOverscroll(80, 480), 10)
+        again.bounce.destroy()
     })
 })
