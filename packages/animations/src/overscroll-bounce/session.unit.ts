@@ -181,4 +181,22 @@ describe("createOverscrollBounce", () => {
         expect(content.style.transform).toBe("")
         bounce.destroy()
     })
+
+    it("cancels a live settle when inward wheel crosses 0 so the tween does not revive", async () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
+        scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        scroller.dispatchEvent(pointer("pointerup", { clientY: 280 }))
+        let inward = wheel({ deltaY: 100 })
+        scroller.dispatchEvent(inward)
+        expect(inward.defaultPrevented).toBe(false)
+        expect(content.style.transform).toBe("")
+        expect(content.dataset.yorozuOverscroll).toBe("none")
+        await vi.advanceTimersByTimeAsync(16)
+        expect(content.style.transform).toBe("")
+        expect(content.dataset.yorozuOverscroll).toBe("none")
+        bounce.destroy()
+    })
 })

@@ -126,6 +126,7 @@ export function createOverscrollBounce(
             return
         }
         if (next === 0 || Math.sign(next) !== Math.sign(raw)) {
+            cancelSettle()
             paint(0)
             return
         }
