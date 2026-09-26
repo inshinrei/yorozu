@@ -109,6 +109,7 @@ export function createOverscrollBounce(
             paint(0)
             return
         }
+        if (lastVisualAt > 0 && performance.now() - lastVisualAt >= OVERSCROLL_VELOCITY_ZERO_MS) lastV = 0
         let x0 = overscrollVisual(raw, map, scroller.clientHeight, coeff)
         let v0 = clamp(lastV, -OVERSCROLL_SPRING_V_MAX, OVERSCROLL_SPRING_V_MAX)
         lastV = 0
@@ -133,14 +134,15 @@ export function createOverscrollBounce(
                 return
             }
             raw = invertOverscrollVisual(y, map, scroller.clientHeight, coeff)
-            content.style.transform = `translateY(${y}px)`
+            content.style.transform = y === 0 ? "" : `translateY(${y}px)`
             writeToken(y)
         }
         stopSettle = onAnimationFrame(tick)
+        let cancel = playback.cancel
         playback.cancel = () => {
             stopSettle()
             if (settlePlayback === playback) settlePlayback = null
-            resolve(false)
+            cancel()
         }
     }
 
@@ -205,16 +207,16 @@ export function createOverscrollBounce(
             if (onEdge) event.preventDefault()
             return
         }
-        let next = raw - event.deltaY
         if (raw === 0) {
             if (wouldStart) {
                 setMap("appkit")
                 event.preventDefault()
                 cancelSettle()
-                paint(next)
+                paint(raw - event.deltaY)
             }
             return
         }
+        let next = raw - event.deltaY
         if (next === 0 || Math.sign(next) !== Math.sign(raw)) {
             cancelSettle()
             paint(0)
@@ -225,7 +227,7 @@ export function createOverscrollBounce(
         setMap("appkit")
         event.preventDefault()
         cancelSettle()
-        paint(next)
+        paint(raw - event.deltaY)
     }
 
     const onPointerDown = (event: PointerEvent): void => {
@@ -264,7 +266,7 @@ export function createOverscrollBounce(
         setMap("ios")
         event.preventDefault()
         cancelSettle()
-        paint(next)
+        paint(raw + dy)
     }
 
     const onPointerUp = (event: PointerEvent): void => {

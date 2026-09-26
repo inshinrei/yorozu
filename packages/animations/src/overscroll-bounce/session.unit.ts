@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { WHEEL_RELEASE_MS } from "../offset-drag/wheel-session"
-import { OVERSCROLL_SPRING_MAX_MS, rubberBandAppKit, rubberBandOverscroll } from "./math"
+import {
+    OVERSCROLL_SPRING_MAX_MS,
+    elasticOverscrollAt,
+    invertOverscrollVisual,
+    rubberBandAppKit,
+    rubberBandOverscroll,
+} from "./math"
 import { createOverscrollBounce, type OverscrollBounceOptions } from "./session"
 
 function wheel(init: Partial<WheelEventInit> = {}): WheelEvent {
@@ -52,6 +58,7 @@ describe("createOverscrollBounce", () => {
     afterEach(() => {
         vi.useRealTimers()
         vi.unstubAllGlobals()
+        vi.restoreAllMocks()
         document.body.replaceChildren()
     })
 
@@ -197,7 +204,7 @@ describe("createOverscrollBounce", () => {
         bounce.destroy()
     })
 
-    it("cancels a live settle when inward wheel crosses 0 so the tween does not revive", async () => {
+    it("cancels a live settle when inward wheel crosses 0 so the spring does not revive", async () => {
         let { scroller, content, bounce } = mount()
         scroller.scrollTop = 0
         scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
@@ -296,5 +303,38 @@ describe("createOverscrollBounce", () => {
         again.scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
         expect(translateY(again.content)).toBeCloseTo(rubberBandOverscroll(80, 480), 10)
         again.bounce.destroy()
+    })
+
+    it("keeps visual when a wheel continues an iOS stretch", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
+        scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
+        let iosVisual = rubberBandOverscroll(80, 480)
+        expect(translateY(content)).toBeCloseTo(iosVisual, 10)
+        scroller.dispatchEvent(pointer("pointerup", { clientY: 280 }))
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        let appkitRaw = invertOverscrollVisual(iosVisual, "appkit", 480)
+        expect(translateY(content)).toBeCloseTo(rubberBandAppKit(appkitRaw + 80), 10)
+        bounce.destroy()
+    })
+
+    it("zeros lift velocity after 100ms of no samples before snap", async () => {
+        let clock = 0
+        vi.spyOn(performance, "now").mockImplementation(() => clock)
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        clock = 16
+        await vi.advanceTimersByTimeAsync(16)
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        clock = 16 + WHEEL_RELEASE_MS
+        await vi.advanceTimersByTimeAsync(WHEEL_RELEASE_MS)
+        clock = 16 + WHEEL_RELEASE_MS + 16
+        await vi.advanceTimersByTimeAsync(16)
+        let x0 = rubberBandAppKit(160)
+        expect(translateY(content)).not.toBeCloseTo(elasticOverscrollAt(x0, 250, 0.016), 2)
+        expect(translateY(content)).toBeCloseTo(elasticOverscrollAt(x0, 0, 0.016), 5)
+        bounce.destroy()
     })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
     OVERSCROLL_APPKIT_STIFFNESS,
     OVERSCROLL_COEFF,
+    OVERSCROLL_SPRING_AMPLITUDE,
     OVERSCROLL_SPRING_MAX_MS,
     OVERSCROLL_SPRING_RATE,
     elasticOverscrollAt,
@@ -52,6 +53,8 @@ describe("elasticOverscrollAt", () => {
         expect(elasticOverscrollAt(20, 0, 0)).toBe(20)
         expect(elasticOverscrollAt(20, 0, 0.24)).toBeCloseTo(0.9957, 3)
         expect(elasticOverscrollAt(50, 0, 0.25)).toBeCloseTo(2.197, 3)
+        expect(OVERSCROLL_SPRING_AMPLITUDE).toBe(0.31)
+        expect(elasticOverscrollAt(20, 100, 0.1)).toBeCloseTo((20 + 0.31 * 100 * 0.1) * Math.exp(-12.5 * 0.1), 10)
     })
 })
 
