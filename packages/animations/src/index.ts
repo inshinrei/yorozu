@@ -32,6 +32,7 @@ export {
     MOTION_EASE_OUT,
     MOTION_EASE_IN,
     MOTION_SPRING_EASE,
+    MOTION_HERO_EASE,
 } from "./core/motion-timing"
 
 export type { Rect, Size, Insets, ObjectFit } from "./rect/types"

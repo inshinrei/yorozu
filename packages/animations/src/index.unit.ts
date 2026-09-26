@@ -30,6 +30,8 @@ describe("package barrel", () => {
         expect(animations.FADE_MS).toBe(animations.MOTION_UI_MS)
         expect(animations.STACK_LAYER_MS).toBe(animations.MOTION_UI_MS)
         expect(animations.SHARED_ELEMENT_MS).toBe(animations.MOTION_NAV_MS)
+        expect(animations.MOTION_HERO_EASE).toBe("cubic-bezier(0.38, 0.70, 0.125, 1)")
+        expect(animations.MOTION_SPRING_EASE).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
         expect(animations.SEND_FLIGHT_MS).toBe(animations.MOTION_NAV_MS)
         expect(animations.SWIPE_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)
         expect(animations.SCROLL_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)

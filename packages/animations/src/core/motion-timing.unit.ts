@@ -3,6 +3,7 @@ import {
     MOTION_EASE,
     MOTION_EASE_IN,
     MOTION_EASE_OUT,
+    MOTION_HERO_EASE,
     MOTION_MODAL_MS,
     MOTION_NAV_MS,
     MOTION_SETTLE_MS,
@@ -20,5 +21,6 @@ describe("motion timing tokens", () => {
         expect(MOTION_EASE_OUT).toBe("ease-out")
         expect(MOTION_EASE_IN).toBe("ease-in")
         expect(MOTION_SPRING_EASE).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)")
+        expect(MOTION_HERO_EASE).toBe("cubic-bezier(0.38, 0.70, 0.125, 1)")
     })
 })
