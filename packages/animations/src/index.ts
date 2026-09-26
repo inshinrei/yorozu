@@ -174,7 +174,24 @@ export { createOffsetDrag } from "./offset-drag/session"
 
 export type { OverscrollBounce, OverscrollBounceOptions } from "./overscroll-bounce/session"
 export { createOverscrollBounce } from "./overscroll-bounce/session"
-export { OVERSCROLL_COEFF, rubberBandOverscroll } from "./overscroll-bounce/math"
+export type { OverscrollMap } from "./overscroll-bounce/math"
+export {
+    OVERSCROLL_COEFF,
+    OVERSCROLL_APPKIT_STIFFNESS,
+    OVERSCROLL_SPRING_AMPLITUDE,
+    OVERSCROLL_SPRING_PERIOD,
+    OVERSCROLL_SPRING_RATE,
+    OVERSCROLL_SPRING_DONE_PX,
+    OVERSCROLL_SPRING_MIN_MS,
+    OVERSCROLL_SPRING_MAX_MS,
+    OVERSCROLL_SPRING_V_MAX,
+    OVERSCROLL_VELOCITY_ZERO_MS,
+    rubberBandOverscroll,
+    rubberBandAppKit,
+    elasticOverscrollAt,
+    invertOverscrollVisual,
+    overscrollVisual,
+} from "./overscroll-bounce/math"
 
 export type { ScrollTweenOptions } from "./scroll-tween/scroll"
 export { SCROLL_TWEEN_MS, playScrollTween } from "./scroll-tween/scroll"

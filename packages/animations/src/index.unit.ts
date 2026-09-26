@@ -24,6 +24,9 @@ describe("package barrel", () => {
         expect(typeof animations.resolveDragAxis).toBe("function")
         expect(typeof animations.createOverscrollBounce).toBe("function")
         expect(animations.OVERSCROLL_COEFF).toBe(0.55)
+        expect(animations.OVERSCROLL_APPKIT_STIFFNESS).toBe(20)
+        expect(typeof animations.rubberBandAppKit).toBe("function")
+        expect(typeof animations.elasticOverscrollAt).toBe("function")
         expect(typeof animations.rubberBandOverscroll).toBe("function")
     })
 
