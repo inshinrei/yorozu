@@ -205,6 +205,7 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             return
         }
         drag.reset()
+        if (snap.from === "wheel") drag.consumeWheelSession()
         flushGestureOff()
     }
 

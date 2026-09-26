@@ -944,6 +944,28 @@ describe("attachMediaViewer", () => {
         }
     })
 
+    it("data-swipe-dismiss is set while dragging down and not while dragging up", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        await vi.advanceTimersByTimeAsync(16)
+        expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(true)
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 400, clientY: 280 }))
+        expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
+
+        viewer.open({ items: [img("a")] })
+        overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 120 }))
+        await vi.advanceTimersByTimeAsync(16)
+        expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(false)
+        expect(overlay.getAttribute("data-phase")).toBe("open")
+    })
+
     it("keyboard nav sets data-switch on the strip; swipe does not", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))

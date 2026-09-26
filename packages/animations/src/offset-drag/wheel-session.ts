@@ -60,7 +60,6 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
     let samples: WheelSample[] = []
     let peakMag = 0
     let lastMag = 0
-    let lastTime = 0
 
     function clearIdle(): void {
         if (idleTimer == null) return
@@ -78,7 +77,6 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
         samples = []
         peakMag = 0
         lastMag = 0
-        lastTime = 0
         releasedThisGesture = false
     }
 
@@ -148,8 +146,11 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
 
         if (meta.momentum === true) {
             if (phase === "contact") fireRelease("coast")
+            else {
+                phase = "coast"
+                armIdle()
+            }
             lastMag = mag
-            lastTime = now
             return "coast"
         }
 
@@ -158,13 +159,11 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
         if (phase === "contact" && looksLikeMomentum(mag, sign, now)) {
             fireRelease("coast")
             lastMag = mag
-            lastTime = now
             return "coast"
         }
 
         if (mag === 0 && phase === "contact") {
             armIdle()
-            lastTime = now
             return "quiet"
         }
 
@@ -173,7 +172,6 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
                 beginContact()
             } else {
                 lastMag = mag
-                lastTime = now
                 armIdle()
                 return "coast"
             }
@@ -184,7 +182,6 @@ export function createWheelSession(options: WheelSessionOptions): WheelSession {
         samples.push({ mag, sign, time: now })
         if (mag > peakMag) peakMag = mag
         lastMag = mag
-        lastTime = now
         armIdle()
         return "move"
     }

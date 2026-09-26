@@ -293,7 +293,8 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         lastDeltaY = -event.deltaY
         prevRawX = rawX
         prevRawY = rawY
-        applyMapped(0)
+        // 1d sub-lock ticks must paint; mixed ticks keep 10px / 1.5 lock
+        applyMapped(rawX === 0 || rawY === 0 ? 0 : lockPx)
         notify()
         return true
     }

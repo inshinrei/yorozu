@@ -182,23 +182,26 @@ describe("createMediaSwipe", () => {
         mods.destroy()
     })
 
-    it.each([false, true])("trapWheel preventDefault then idle-commits after 90ms (reduced=%s)", (reduced: boolean) => {
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(
-            baseCbs({
-                getPrefersReducedMotion: () => reduced,
-                onNewer,
-            }),
-        )
-        let ev = wheel({ deltaX: 80 })
-        let prevent = vi.spyOn(ev, "preventDefault")
-        expect(swipe.trapWheel(ev)).toBe(true)
-        expect(prevent).toHaveBeenCalled()
-        expect(onNewer).not.toHaveBeenCalled()
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
+    it.each([false, true])(
+        "trapWheel preventDefault then idle-commits after 140ms (reduced=%s)",
+        (reduced: boolean) => {
+            let onNewer = vi.fn()
+            let swipe = createMediaSwipe(
+                baseCbs({
+                    getPrefersReducedMotion: () => reduced,
+                    onNewer,
+                }),
+            )
+            let ev = wheel({ deltaX: 80 })
+            let prevent = vi.spyOn(ev, "preventDefault")
+            expect(swipe.trapWheel(ev)).toBe(true)
+            expect(prevent).toHaveBeenCalled()
+            expect(onNewer).not.toHaveBeenCalled()
+            vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+            expect(onNewer).toHaveBeenCalledTimes(1)
+            swipe.destroy()
+        },
+    )
 
     it("commits once per wheel session until cooldown plus a quiet sample", () => {
         expect(MEDIA_SWIPE_WHEEL_COOLDOWN_MS).toBe(420)
@@ -248,7 +251,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("wheel 20px plus 90ms does not navigate", () => {
+    it("wheel 20px plus idle does not navigate", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         expect(swipe.onWheel(wheel({ deltaX: 20, deltaY: 0 }))).toBe(true)
@@ -257,7 +260,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("wheel 120px waits for quiet idle (no early commit)", () => {
+    it("wheel 120px waits for idle (no early commit)", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
         expect(swipe.onWheel(wheel({ deltaX: 120, deltaY: 0 }))).toBe(true)
@@ -267,7 +270,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("wheel deltaY 80 (up) plus 90ms does not close", () => {
+    it("wheel deltaY 80 (up) plus idle does not close", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 80 }))).toBe(true)
@@ -276,7 +279,25 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("wheel deltaY -80 (down) plus 90ms closes once", () => {
+    it("wheel-origin none consumes leftover until cooldown plus quiet", () => {
+        let onNewer = vi.fn()
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer, onClose }))
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 80 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onClose).not.toHaveBeenCalled()
+        expect(swipe.onWheel(wheel({ deltaX: 120, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: 120, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("wheel deltaY -80 (down) plus idle closes once", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: -80 }))).toBe(true)
@@ -311,7 +332,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("clears axis to none when bounce-settling after upward swipe", () => {
+    it("clears axis to none after upward swipe reset", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))

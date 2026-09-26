@@ -266,7 +266,7 @@ test("vertical swipe up does not move the strip", async ({ page }) => {
     await expectIndex(page, 1)
 })
 
-test("trackpad wheel past 50px waits for quiet then changes item", async ({ page }) => {
+test("trackpad wheel past 50px waits for idle then changes item", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await expectIndex(page, 1)
     await wheelViewport(page, 80, 0)
@@ -282,7 +282,7 @@ test("trackpad wheel under 50px stays on the item", async ({ page }) => {
     await expectIndex(page, 1)
 })
 
-test("trackpad wheel 120px still waits for quiet (no early commit)", async ({ page }) => {
+test("trackpad wheel 120px still waits for idle (no early commit)", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await wheelViewport(page, 120, 0)
     await expectIndexNow(page, 1)
@@ -299,7 +299,7 @@ test("trackpad wheel up does not dismiss", async ({ page }) => {
     await expectIndex(page, 1)
 })
 
-test("trackpad wheel down past 50px dismisses after quiet", async ({ page }) => {
+test("trackpad wheel down past 50px dismisses after idle", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await wheelViewport(page, 0, -80)
     await waitGone(viewer(page))

@@ -129,6 +129,36 @@ describe("createOffsetDrag", () => {
         drag.destroy()
     })
 
+    it("mixed first wheel tick keeps the 10px axis lock", () => {
+        let drag = createOffsetDrag({ getEnabled: () => true })
+        drag.onWheel(wheel({ deltaX: 5, deltaY: 4 }))
+        expect(drag.axis()).toBe("none")
+        expect(drag.offsetX()).toBe(0)
+        expect(drag.offsetY()).toBe(0)
+        drag.destroy()
+    })
+
+    it("decay coast ticks do not change offset after lift", () => {
+        let from: string[] = []
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            onRelease: (snap) => {
+                from.push(snap.from)
+            },
+        })
+        drag.onWheel(wheel({ deltaX: 80 }))
+        drag.onWheel(wheel({ deltaX: 64 }))
+        drag.onWheel(wheel({ deltaX: 50 }))
+        expect(drag.offsetX()).toBe(-(80 + 64 + 50))
+        drag.onWheel(wheel({ deltaX: 38 }))
+        expect(from).toEqual(["wheel"])
+        expect(drag.offsetX()).toBe(-(80 + 64 + 50))
+        drag.onWheel(wheel({ deltaX: 30 }))
+        expect(drag.offsetX()).toBe(-(80 + 64 + 50))
+        expect(from).toEqual(["wheel"])
+        drag.destroy()
+    })
+
     it("momentum wheel after contact does not change offset", () => {
         let from: string[] = []
         let drag = createOffsetDrag({

@@ -94,6 +94,35 @@ describe("createWheelSession", () => {
         wheel.destroy()
     })
 
+    it("momentum leftovers rearm idle so a later tick stays coast", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        expect(wheel.note(80, 0)).toBe("move")
+        expect(wheel.note(40, 0, { momentum: true })).toBe("coast")
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(50)
+        expect(wheel.note(20, 0, { momentum: true })).toBe("coast")
+        vi.advanceTimersByTime(90)
+        expect(wheel.note(5, 0)).toBe("coast")
+        expect(onRelease).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(WHEEL_RELEASE_MS)
+        expect(wheel.note(5, 0)).toBe("move")
+        wheel.destroy()
+    })
+
+    it("momentum true from idle stays coast and does not start contact", () => {
+        vi.useFakeTimers()
+        let onRelease = vi.fn()
+        let wheel = createWheelSession({ onRelease })
+        expect(wheel.note(40, 0, { momentum: true })).toBe("coast")
+        expect(onRelease).not.toHaveBeenCalled()
+        expect(wheel.active()).toBe(false)
+        expect(wheel.note(5, 0)).toBe("coast")
+        expect(onRelease).not.toHaveBeenCalled()
+        wheel.destroy()
+    })
+
     it("decaying contact ticks become coast on the fourth sample", () => {
         vi.useFakeTimers()
         let onRelease = vi.fn()
