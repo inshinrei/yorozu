@@ -58,6 +58,34 @@ function trapVisibility(el: HTMLElement, onSet: (value: string) => void): () => 
     }
 }
 
+function fakeRect(left: number, top: number, width: number, height: number): DOMRect {
+    return {
+        x: left,
+        y: top,
+        left,
+        top,
+        width,
+        height,
+        right: left + width,
+        bottom: top + height,
+        toJSON() {
+            return {}
+        },
+    }
+}
+
+function stampOriginThumb(
+    id: string,
+    box: { left: number; top: number; width: number; height: number },
+): HTMLImageElement {
+    let thumb = document.createElement("img")
+    thumb.setAttribute("data-media-origin", id)
+    thumb.style.visibility = "visible"
+    vi.spyOn(thumb, "getBoundingClientRect").mockReturnValue(fakeRect(box.left, box.top, box.width, box.height))
+    document.body.append(thumb)
+    return thumb
+}
+
 let origin: MediaViewerOrigin = {
     id: "a",
     rect: { top: 10, left: 20, width: 40, height: 40 },
@@ -73,6 +101,12 @@ describe("attachMediaViewer", () => {
     let stop: (() => void) | undefined
     let animate: ReturnType<typeof vi.fn>
     let onIndexChange: Mock<IndexChangeFn>
+
+    function lastCloseKeyframes(): Keyframe[] {
+        let call = animate.mock.calls.at(-1)
+        expect(call).toBeTruthy()
+        return call![0] as Keyframe[]
+    }
 
     beforeEach(() => {
         animate = vi.fn(() => ({
@@ -1253,6 +1287,163 @@ describe("attachMediaViewer", () => {
                 fill: "forwards",
             })
         })
+        ghostHost.remove()
+    })
+
+    it("close ghost flies when the live origin is fully on-screen", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        let thumb = stampOriginThumb("a", { left: 20, top: 10, width: 40, height: 40 })
+        let atUncover = { seen: false, clone: null as Element | null }
+        let stopTrap = trapVisibility(thumb, (value) => {
+            if (value !== "visible") return
+            atUncover.seen = true
+            atUncover.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
+        })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            animate.mockClear()
+            api!.close()
+            await vi.waitFor(() => {
+                expect(animate.mock.calls.length).toBeGreaterThan(0)
+            })
+            let frames = lastCloseKeyframes()
+            expect(frames[1]?.opacity).not.toBe("0")
+            expect(animate.mock.calls.at(-1)?.[1]).toMatchObject({
+                duration: MEDIA_GHOST_CLOSE_MS,
+                easing: MEDIA_GHOST_CLOSE_EASING,
+                fill: "forwards",
+            })
+            await vi.waitFor(() => {
+                expect(atUncover.seen).toBe(true)
+            })
+            expect(atUncover.clone).toBeTruthy()
+        } finally {
+            stopTrap()
+            thumb.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("close ghost fades in place when the live origin is 2px past the window", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        let thumb = stampOriginThumb("a", { left: 20, top: -2, width: 40, height: 40 })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            animate.mockClear()
+            api!.close()
+            await vi.waitFor(() => {
+                expect(animate.mock.calls.length).toBeGreaterThan(0)
+            })
+            let frames = lastCloseKeyframes()
+            expect(frames[1]?.opacity).toBe("0")
+            expect(frames[0]?.transform).toBe("translate3d(0px, 0px, 0) scale(1, 1)")
+        } finally {
+            thumb.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("close ghost fades in place when the clip root clips the origin", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        let clip = document.createElement("div")
+        document.body.append(clip)
+        vi.spyOn(clip, "getBoundingClientRect").mockReturnValue(fakeRect(0, 0, 200, 48))
+        stop?.()
+        stop = attachMediaViewer(viewer, root, {
+            getGhostHost: () => ghostHost,
+            getHistoryClipRoot: () => clip,
+        })
+        let api: MediaViewerChromeApi | undefined
+        let thumb = stampOriginThumb("a", { left: 10, top: 10, width: 40, height: 40 })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            animate.mockClear()
+            api!.close()
+            await vi.waitFor(() => {
+                expect(animate.mock.calls.length).toBeGreaterThan(0)
+            })
+            let frames = lastCloseKeyframes()
+            expect(frames[1]?.opacity).toBe("0")
+            expect(frames[0]?.transform).toBe("translate3d(0px, 0px, 0) scale(1, 1)")
+        } finally {
+            thumb.remove()
+            clip.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("close ghost fades in place when there is no live origin, even if open seed is on-screen", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a")],
+            origin,
+            ghost: true,
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        await vi.waitFor(() => {
+            expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+        })
+        animate.mockClear()
+        api!.close()
+        await vi.waitFor(() => {
+            expect(animate.mock.calls.length).toBeGreaterThan(0)
+        })
+        let frames = lastCloseKeyframes()
+        expect(frames[1]?.opacity).toBe("0")
+        expect(frames[0]?.transform).toBe("translate3d(0px, 0px, 0) scale(1, 1)")
         ghostHost.remove()
     })
 

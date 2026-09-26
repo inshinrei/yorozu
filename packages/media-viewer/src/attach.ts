@@ -1,7 +1,7 @@
 /**
  * Overlay + stage + optional filmstrip + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
  */
-import { dualRaf, isRectFullyVisibleIn, prefersReducedMotion } from "@yorozu/animations"
+import { dualRaf, prefersReducedMotion } from "@yorozu/animations"
 import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
 import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
 import {
@@ -16,7 +16,7 @@ import {
 } from "./ghost"
 import { bindMediaViewerKeys } from "./keyboard"
 import { fitContain, stageContentSize } from "./layout"
-import { captureOriginFromDom, queryMediaOriginEl } from "./origin"
+import { captureOriginFromDom, isMediaOriginLandable, queryMediaOriginEl } from "./origin"
 import { createMediaShell, type MediaShell } from "./shell"
 import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "./swipe"
@@ -406,7 +406,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let snap = viewer.snapshot()
         let current = snap.current
         let live = current ? captureOriginFromDom(current.id) : null
-        let target = live ?? snap.origin
         let stage = paintedStageEl() ?? viewport
         let fromStage = stage ? computeStageFitRectFromElement(stage, naturalForFit(snap)) : null
         if (!fromStage && stage) {
@@ -419,26 +418,21 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let fb = viewportFallback()
             fromStage = { top: 0, left: 0, width: fb.width, height: fb.height }
         }
-        let fadeOut = target == null
-        if (target) {
-            let clipEl = opts?.getHistoryClipRoot?.()
-            if (clipEl) {
-                let clip = clipEl.getBoundingClientRect()
-                fadeOut = !isRectFullyVisibleIn(target.rect, {
-                    top: clip.top,
-                    left: clip.left,
-                    width: clip.width,
-                    height: clip.height,
-                })
-            }
+        let fb = viewportFallback()
+        let viewportRect = { top: 0, left: 0, width: fb.width, height: fb.height }
+        let clipEl = opts?.getHistoryClipRoot?.()
+        let clip: { top: number; left: number; width: number; height: number } | null = null
+        if (clipEl) {
+            let box = clipEl.getBoundingClientRect()
+            clip = { top: box.top, left: box.left, width: box.width, height: box.height }
         }
+        let landable = live != null && isMediaOriginLandable(live.rect, { viewport: viewportRect, clip })
         let handle = ghost.playClose({
             host: ghostHost(),
             fromStage,
-            target,
-            imageUrl: current?.src ?? target?.imageUrl ?? null,
+            target: landable ? live : null,
+            imageUrl: current?.src ?? live?.imageUrl ?? null,
             bitmap: ghostBitmap(),
-            fadeOut,
             durationMs: MEDIA_GHOST_CLOSE_MS,
             easing: MEDIA_GHOST_CLOSE_EASING,
             onLand: uncoverOriginEl,
