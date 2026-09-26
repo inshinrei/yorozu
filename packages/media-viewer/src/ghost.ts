@@ -50,6 +50,7 @@ export type MediaGhost = {
         hideTarget?: HTMLElement | null
         durationMs?: number
         easing?: string
+        onLand?: () => void | Promise<void>
         bitmap?: CanvasImageSource | null
     }) => MediaGhostHandle | null
     cancel: () => void
@@ -189,6 +190,7 @@ export function createMediaGhost(opts?: {
         hideTarget?: HTMLElement | null
         durationMs?: number
         easing?: string
+        onLand?: () => void | Promise<void>
         bitmap?: CanvasImageSource | null
     }): MediaGhostHandle | null {
         let my = ++gen
@@ -203,6 +205,7 @@ export function createMediaGhost(opts?: {
             hideTarget: playOpts.hideTarget,
             durationMs: playOpts.durationMs ?? MEDIA_GHOST_CLOSE_MS,
             easing: playOpts.easing ?? MEDIA_GHOST_CLOSE_EASING,
+            onLand: playOpts.onLand,
         })
         if (!playback) {
             if (gen === my) setAnimating(false)

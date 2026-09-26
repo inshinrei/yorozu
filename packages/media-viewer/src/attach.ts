@@ -381,7 +381,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         applyOverlayAttrs()
         let stage = paintedStageEl() ?? viewport
         let to = computeStageFitRectFromElement(stage, naturalForFit(snap))
-        coverOriginEl(queryMediaOriginEl(seed.id))
         let handle = ghost.playOpen({
             host: ghostHost(),
             seed,
@@ -395,10 +394,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 applyOverlayAttrs()
             },
         })
-        if (!handle) {
-            uncoverOriginEl()
-            return false
-        }
+        if (!handle) return false
+        coverOriginEl(queryMediaOriginEl(seed.id))
         let ran = await handle.done
         applyOverlayAttrs()
         return ran
@@ -435,7 +432,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 })
             }
         }
-        let hideTarget = current ? queryMediaOriginEl(current.id) : null
         let handle = ghost.playClose({
             host: ghostHost(),
             fromStage,
@@ -443,9 +439,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             imageUrl: current?.src ?? target?.imageUrl ?? null,
             bitmap: ghostBitmap(),
             fadeOut,
-            hideTarget,
             durationMs: MEDIA_GHOST_CLOSE_MS,
             easing: MEDIA_GHOST_CLOSE_EASING,
+            onLand: uncoverOriginEl,
         })
         if (!handle) return false
         let ran = await handle.done

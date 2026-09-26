@@ -158,6 +158,26 @@ describe("createMediaGhost", () => {
         expect(host.querySelector("[data-yorozu-media-ghost]")).toBeNull()
     })
 
+    it("playClose onLand runs with the clone mounted and without the handoff class", async () => {
+        let duringLand = { clones: 0, handoff: false, animating: false }
+        let handle = ghost.playClose({
+            host,
+            fromStage: to,
+            target: seed,
+            onLand: () => {
+                duringLand.clones = ghost.cloneCount()
+                duringLand.handoff = document.documentElement.classList.contains(MEDIA_GHOST_HANDOFF_CLASS)
+                duringLand.animating = document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)
+            },
+        })
+        await vi.runAllTimersAsync()
+        expect(duringLand.clones).toBe(1)
+        expect(duringLand.handoff).toBe(false)
+        expect(duringLand.animating).toBe(true)
+        expect(await handle!.done).toBe(true)
+        expect(host.querySelector("[data-yorozu-media-ghost]")).toBeNull()
+    })
+
     it("cancel removes the clone", () => {
         let handle = ghost.playOpen({ host, seed, to })
         expect(host.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()

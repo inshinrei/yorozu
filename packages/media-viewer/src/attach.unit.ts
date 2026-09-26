@@ -39,6 +39,24 @@ function pointer(type: string, init: Partial<PointerEventInit>): PointerEvent {
     })
 }
 
+function trapVisibility(el: HTMLElement, onSet: (value: string) => void): () => void {
+    let style = el.style
+    let current = style.visibility
+    Object.defineProperty(style, "visibility", {
+        configurable: true,
+        enumerable: true,
+        get: () => current,
+        set: (value: string) => {
+            current = String(value)
+            onSet(current)
+        },
+    })
+    return (): void => {
+        Reflect.deleteProperty(style, "visibility")
+        style.visibility = current
+    }
+}
+
 let origin: MediaViewerOrigin = {
     id: "a",
     rect: { top: 10, left: 20, width: 40, height: 40 },
@@ -865,6 +883,10 @@ describe("attachMediaViewer", () => {
     })
 
     it("hides the origin thumb after ghost takeoff and restores it after close", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
         let api: MediaViewerChromeApi | undefined
         let thumb = document.createElement("img")
         thumb.setAttribute("data-media-origin", "a")
@@ -884,6 +906,7 @@ describe("attachMediaViewer", () => {
             await vi.waitFor(() => {
                 expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(true)
             })
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()
             expect(thumb.style.visibility).toBe("hidden")
 
             await vi.waitFor(() => {
@@ -899,6 +922,110 @@ describe("attachMediaViewer", () => {
             expect(thumb.style.visibility).toBe("visible")
         } finally {
             thumb.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("hides the origin thumb only after the ghost clone is in the host", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let thumb = document.createElement("img")
+        thumb.setAttribute("data-media-origin", "a")
+        thumb.style.visibility = "visible"
+        document.body.append(thumb)
+        let atHide = { seen: false, clone: null as Element | null }
+        let stopTrap = trapVisibility(thumb, (value) => {
+            if (value !== "hidden") return
+            atHide.seen = true
+            atHide.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
+        })
+        try {
+            viewer.open({ items: [img("a")], origin, ghost: true })
+            await vi.waitFor(() => {
+                expect(atHide.seen).toBe(true)
+            })
+            expect(atHide.clone).toBeTruthy()
+            expect(thumb.style.visibility).toBe("hidden")
+            expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(true)
+        } finally {
+            stopTrap()
+            thumb.remove()
+            ghostHost.remove()
+        }
+    })
+
+    it("does not hide the origin thumb when open ghost fails to start", async () => {
+        let thumb = document.createElement("img")
+        thumb.setAttribute("data-media-origin", "a")
+        thumb.style.visibility = "visible"
+        document.body.append(thumb)
+        let hid = false
+        let stopTrap = trapVisibility(thumb, (value) => {
+            if (value === "hidden") hid = true
+        })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin: { ...origin, rect: { top: 0, left: 0, width: 0, height: 0 } },
+                ghost: true,
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            expect(hid).toBe(false)
+            expect(thumb.style.visibility).toBe("visible")
+            expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(false)
+        } finally {
+            stopTrap()
+            thumb.remove()
+        }
+    })
+
+    it("restores origin visibility while the close ghost clone is still mounted", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        let thumb = document.createElement("img")
+        thumb.setAttribute("data-media-origin", "a")
+        thumb.style.visibility = "visible"
+        document.body.append(thumb)
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            expect(thumb.style.visibility).toBe("hidden")
+            let atUncover = { seen: false, clone: null as Element | null }
+            let stopTrap = trapVisibility(thumb, (value) => {
+                if (value !== "visible") return
+                atUncover.seen = true
+                atUncover.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
+            })
+            try {
+                api!.close()
+                await vi.waitFor(() => {
+                    expect(atUncover.seen).toBe(true)
+                })
+                expect(atUncover.clone).toBeTruthy()
+            } finally {
+                stopTrap()
+            }
+        } finally {
+            thumb.remove()
+            ghostHost.remove()
         }
     })
 

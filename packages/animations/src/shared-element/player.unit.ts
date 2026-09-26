@@ -256,6 +256,25 @@ describe("createSharedElement", () => {
         expect(hideTarget.style.visibility).toBe("")
     })
 
+    it("playClose awaits onLand before removing the clone", async () => {
+        let host = createFakeEl() as unknown as HTMLElement
+        let duringLand = { clones: 0 }
+        let se = createSharedElement()
+        let playback = se.playClose({
+            host,
+            fromStage: to,
+            target: { rect: from },
+            onLand: () => {
+                duringLand.clones = (host as unknown as FakeNode).children.length
+            },
+        })
+        expect(playback).not.toBeNull()
+        await vi.runAllTimersAsync()
+        expect(duringLand.clones).toBe(1)
+        expect(await playback!.done).toBe(true)
+        expect((host as unknown as FakeNode).children).toHaveLength(0)
+    })
+
     it("playOpen forwards durationMs and easing into animate options", async () => {
         let host = createFakeEl() as unknown as HTMLElement
         let se = createSharedElement()

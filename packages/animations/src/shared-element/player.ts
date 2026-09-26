@@ -66,6 +66,7 @@ export type SharedElementController = {
         easing?: string
         viewport?: Size
         hideTarget?: HTMLElement | null
+        onLand?: () => void | Promise<void>
     }) => Playback | null
     cancel: () => void
     cloneCount: () => number
@@ -378,6 +379,7 @@ export function createSharedElement(): SharedElementController {
         easing?: string
         viewport?: Size
         hideTarget?: HTMLElement | null
+        onLand?: () => void | Promise<void>
     }): Playback | null => {
         let imageUrl = opts.imageUrl ?? opts.target?.imageUrl ?? null
         let image = opts.image ?? opts.target?.image ?? null
@@ -396,6 +398,7 @@ export function createSharedElement(): SharedElementController {
                     roundedStart: false,
                     roundedEnd: false,
                     hideTarget: opts.hideTarget,
+                    onLand: opts.onLand,
                 },
                 {
                     to: { ...opts.fromStage },
@@ -436,6 +439,7 @@ export function createSharedElement(): SharedElementController {
                 roundedStart: false,
                 roundedEnd: true,
                 hideTarget: opts.hideTarget,
+                onLand: opts.onLand,
             },
             flight,
         )
