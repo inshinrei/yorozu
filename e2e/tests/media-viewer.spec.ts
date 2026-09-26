@@ -5,6 +5,7 @@ import {
     currentThumb,
     expectIndex,
     expectIndexNow,
+    MEDIA_VIEWER_SETTLE_MS,
     MEDIA_VIEWER_WHEEL_RELEASE_MS,
     openFromThumb,
     openViewer,
@@ -318,4 +319,42 @@ test("trackpad pan stream does not change item until the wheel stream ends", asy
     }
     await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
     await expectIndex(page, 2)
+})
+
+test("trackpad bounce can be grabbed again before snap finishes", async ({ page }) => {
+    await openFromThumb(page, "img-1", { motion: true })
+    await expectIndex(page, 1)
+    await page.locator("[data-yorozu-media-viewport]").hover()
+    await page.mouse.wheel(20, 0)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 16)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    await page.mouse.wheel(40, 0)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 2)
+})
+
+test("trackpad bounce re-grab under 50px stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1", { motion: true })
+    await expectIndex(page, 1)
+    await page.locator("[data-yorozu-media-viewport]").hover()
+    await page.mouse.wheel(20, 0)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 16)
+    await page.mouse.wheel(5, 0)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + MEDIA_VIEWER_SETTLE_MS + 50)
+    await expectIndex(page, 1)
+})
+
+test("trackpad leftover after a committed switch does not skip another item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await expectIndex(page, 1)
+    await page.locator("[data-yorozu-media-viewport]").hover()
+    await page.mouse.wheel(80, 0)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 2)
+    await page.mouse.wheel(80, 0)
+    await waitMs(50)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("2")
 })

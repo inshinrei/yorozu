@@ -11,8 +11,9 @@ export async function waitOpen(page: Page): Promise<void> {
     await expect(openViewer(page)).toHaveCount(1)
 }
 
-export async function openFromThumb(page: Page, id: string): Promise<void> {
-    await page.goto("/media-viewer.html")
+export async function openFromThumb(page: Page, id: string, opts?: { motion?: boolean }): Promise<void> {
+    let url = opts?.motion ? "/media-viewer.html?motion=1" : "/media-viewer.html"
+    await page.goto(url)
     await page.locator(`[data-id="${id}"]`).click()
     await waitOpen(page)
 }
@@ -34,6 +35,7 @@ export async function swipeViewport(page: Page, dx: number, dy: number): Promise
 }
 
 export const MEDIA_VIEWER_WHEEL_RELEASE_MS: number = 140
+export const MEDIA_VIEWER_SETTLE_MS: number = 250
 
 export async function wheelViewport(page: Page, deltaX: number, deltaY: number): Promise<void> {
     await page.locator("[data-yorozu-media-viewport]").hover()

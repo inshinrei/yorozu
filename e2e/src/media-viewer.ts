@@ -17,7 +17,7 @@ const items: MediaViewerItem[] = [
     { id: "vid-0", kind: "video", src: VID_SRC },
 ]
 
-const prefersReducedMotion = (): boolean => true
+const prefersReducedMotion = (): boolean => new URLSearchParams(location.search).get("motion") !== "1"
 
 const paintHeader = (container: HTMLElement, api: MediaViewerChromeApi): (() => void) => {
     let bar = document.createElement("div")
