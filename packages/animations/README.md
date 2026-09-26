@@ -232,6 +232,7 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 | Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                                                      |
 | Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                                                             |
 | Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                                                         |
+| Overscroll bounce | `createOverscrollBounce`                | Edge rubber on a native overflow scroller                                                  |
 | Ripple            | `playRipple`                            | Touch ink at pointer                                                                       |
 | Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1                                                    |
 | Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                                                       |

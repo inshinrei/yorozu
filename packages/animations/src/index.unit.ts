@@ -22,6 +22,9 @@ describe("package barrel", () => {
         expect(typeof animations.createLayoutSizeTween).toBe("function")
         expect(typeof animations.createOffsetDrag).toBe("function")
         expect(typeof animations.resolveDragAxis).toBe("function")
+        expect(typeof animations.createOverscrollBounce).toBe("function")
+        expect(animations.OVERSCROLL_COEFF).toBe(0.55)
+        expect(typeof animations.rubberBandOverscroll).toBe("function")
     })
 
     it("re-exports motion timing tokens and aliases", () => {

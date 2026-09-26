@@ -172,6 +172,10 @@ export {
 export type { OffsetDrag, OffsetDragConfig, OffsetDragRelease } from "./offset-drag/session"
 export { createOffsetDrag } from "./offset-drag/session"
 
+export type { OverscrollBounce, OverscrollBounceOptions } from "./overscroll-bounce/session"
+export { createOverscrollBounce } from "./overscroll-bounce/session"
+export { OVERSCROLL_COEFF, rubberBandOverscroll } from "./overscroll-bounce/math"
+
 export type { ScrollTweenOptions } from "./scroll-tween/scroll"
 export { SCROLL_TWEEN_MS, playScrollTween } from "./scroll-tween/scroll"
 
