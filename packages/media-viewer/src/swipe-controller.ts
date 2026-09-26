@@ -142,7 +142,6 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     }
 
     function bounceToRest(from: OffsetDragRelease["from"]): void {
-        if (from === "wheel") drag.consumeWheelSession()
         let bounceMs = swipeSettleDurationMs("bounce", reduced())
         drag.settleTo(0, 0, bounceMs)
         if (!drag.settling()) cbs.onSettle?.()
@@ -205,7 +204,6 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
             return
         }
         drag.reset()
-        if (snap.from === "wheel") drag.consumeWheelSession()
         flushGestureOff()
     }
 

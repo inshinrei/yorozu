@@ -10,7 +10,7 @@ pnpm add @yorozu/media-viewer
 
 ## Swipe
 
-Unzoomed pointer drag and two-finger trackpad pan (`wheel`) live-follow while the gesture is in contact. On pointerup, or after 140ms with no wheel events (or the first inertial/momentum tick), the viewer commits: horizontal past 50px goes older/newer; swipe down past 50px closes; under 50px bounces. Swipe up does not move the strip. Trackpad leftover ticks after commit are ignored until cooldown.
+Unzoomed pointer drag and two-finger trackpad pan (`wheel`) live-follow while the gesture is in contact. On pointerup, or after 140ms with no wheel events (or the first inertial/momentum tick), the viewer commits: horizontal past 50px goes older/newer; swipe down past 50px closes; under 50px bounces; a later trackpad contact tick before that bounce rests continues from the painted offset. Swipe up does not move the strip. Trackpad leftover ticks after a committed older/newer/close are ignored until cooldown.
 
 ## Zoom
 
