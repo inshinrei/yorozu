@@ -146,6 +146,22 @@ describe("createOverscrollBounce", () => {
         bounce.destroy()
     })
 
+    it("destroy releases pointer capture taken during a rubber drag", () => {
+        let { scroller, content, bounce } = mount()
+        let released: number[] = []
+        scroller.setPointerCapture = vi.fn()
+        scroller.releasePointerCapture = ((id: number) => {
+            released.push(id)
+        }) as typeof scroller.releasePointerCapture
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
+        scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        expect(scroller.setPointerCapture).toHaveBeenCalledWith(1)
+        bounce.destroy()
+        expect(released).toEqual([1])
+    })
+
     it("destroy is idempotent and detaches listeners", () => {
         let { scroller, content, bounce } = mount()
         bounce.destroy()
@@ -197,6 +213,45 @@ describe("createOverscrollBounce", () => {
         await vi.advanceTimersByTimeAsync(16)
         expect(content.style.transform).toBe("")
         expect(content.dataset.yorozuOverscroll).toBe("none")
+        bounce.destroy()
+    })
+
+    it("ignores a second touch while the first pointer is stored", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientY: 200 }))
+        scroller.dispatchEvent(pointer("pointerdown", { pointerId: 2, clientY: 210 }))
+        scroller.dispatchEvent(pointer("pointermove", { pointerId: 2, clientY: 300 }))
+        expect(content.dataset.yorozuOverscroll).toBe("none")
+        scroller.dispatchEvent(pointer("pointermove", { pointerId: 1, clientY: 280 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        expect(translateY(content)).toBeCloseTo(rubberBandOverscroll(80, 480), 10)
+        bounce.destroy()
+    })
+
+    it("releases pointer capture on destroy during a touch rubber", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.setPointerCapture = (): void => undefined
+        let release = vi.fn()
+        scroller.releasePointerCapture = release
+        scroller.dispatchEvent(pointer("pointerdown", { clientY: 200 }))
+        scroller.dispatchEvent(pointer("pointermove", { clientY: 280 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        bounce.destroy()
+        expect(release).toHaveBeenCalledWith(1)
+    })
+
+    it("does not consume-gate after inward wheel stand-down", () => {
+        let { scroller, content, bounce } = mount()
+        scroller.scrollTop = 0
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
+        scroller.dispatchEvent(wheel({ deltaY: 100 }))
+        expect(content.dataset.yorozuOverscroll).toBe("none")
+        vi.advanceTimersByTime(WHEEL_RELEASE_MS)
+        scroller.dispatchEvent(wheel({ deltaY: -80 }))
+        expect(content.dataset.yorozuOverscroll).toBe("top")
         bounce.destroy()
     })
 })

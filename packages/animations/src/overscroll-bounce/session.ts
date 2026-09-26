@@ -37,21 +37,21 @@ export function createOverscrollBounce(
     let captured = false
     let settlePlayback: Playback | null = null
     let coeff = options?.coeff ?? OVERSCROLL_COEFF
-    let getDurationMs = options?.getDurationMs ?? ((): number => MOTION_SETTLE_MS)
+    const getDurationMs = options?.getDurationMs ?? ((): number => MOTION_SETTLE_MS)
 
-    let paint = (nextRaw: number): void => {
+    const paint = (nextRaw: number): void => {
         raw = nextRaw
         let visual = rubberBandOverscroll(raw, scroller.clientHeight, coeff)
         content.style.transform = visual === 0 ? "" : `translateY(${visual}px)`
         content.dataset.yorozuOverscroll = visual > 0 ? "top" : visual < 0 ? "bottom" : "none"
     }
 
-    let cancelSettle = (): void => {
+    const cancelSettle = (): void => {
         settlePlayback?.cancel()
         settlePlayback = null
     }
 
-    let settle = (): void => {
+    const settle = (): void => {
         cancelSettle()
         if (raw === 0) {
             paint(0)
@@ -79,7 +79,7 @@ export function createOverscrollBounce(
         })
     }
 
-    let wheel = createWheelSession({
+    const wheel = createWheelSession({
         releaseMs: WHEEL_RELEASE_MS,
         onRelease: () => {
             wheel.consume()
@@ -87,7 +87,7 @@ export function createOverscrollBounce(
         },
     })
 
-    let releaseCapture = (id: number): void => {
+    const releaseCapture = (id: number): void => {
         if (!captured) return
         captured = false
         try {
@@ -97,7 +97,7 @@ export function createOverscrollBounce(
         }
     }
 
-    let onWheel = (event: WheelEvent): void => {
+    const onWheel = (event: WheelEvent): void => {
         if (destroyed || pointerId !== null) return
         if (event.ctrlKey || event.metaKey) return
         let onEdge = atTop(scroller) || atBottom(scroller)
@@ -128,6 +128,7 @@ export function createOverscrollBounce(
         if (next === 0 || Math.sign(next) !== Math.sign(raw)) {
             cancelSettle()
             paint(0)
+            wheel.clear()
             return
         }
         event.preventDefault()
@@ -135,13 +136,14 @@ export function createOverscrollBounce(
         paint(next)
     }
 
-    let onPointerDown = (event: PointerEvent): void => {
+    const onPointerDown = (event: PointerEvent): void => {
         if (destroyed || event.pointerType === "mouse") return
+        if (pointerId !== null) return
         pointerId = event.pointerId
         lastY = event.clientY
     }
 
-    let onPointerMove = (event: PointerEvent): void => {
+    const onPointerMove = (event: PointerEvent): void => {
         if (destroyed || event.pointerId !== pointerId) return
         let dy = event.clientY - lastY
         lastY = event.clientY
@@ -171,7 +173,7 @@ export function createOverscrollBounce(
         paint(next)
     }
 
-    let onPointerUp = (event: PointerEvent): void => {
+    const onPointerUp = (event: PointerEvent): void => {
         if (destroyed || event.pointerId !== pointerId) return
         pointerId = null
         releaseCapture(event.pointerId)
@@ -200,8 +202,8 @@ export function createOverscrollBounce(
             scroller.removeEventListener("pointerup", onPointerUp)
             scroller.removeEventListener("pointercancel", onPointerUp)
             scroller.removeEventListener("pointermove", onPointerMove, moveOpts)
+            if (pointerId !== null) releaseCapture(pointerId)
             pointerId = null
-            captured = false
             paint(0)
         },
     }
