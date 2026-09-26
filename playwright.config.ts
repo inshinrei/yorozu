@@ -26,6 +26,6 @@ export default defineConfig({
         { name: "context-menu", testMatch: /context-menu.*\.spec\.ts/ },
         { name: "media-viewer", testMatch: /media-viewer.*\.spec\.ts/ },
         { name: "sortable", testMatch: /sortable\.spec\.ts/ },
-        { name: "virtual-list", testMatch: /virtual-list\.spec\.ts/ },
+        { name: "virtual-list", testMatch: /virtual-list.*\.spec\.ts/ },
     ],
 })

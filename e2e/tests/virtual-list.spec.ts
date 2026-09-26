@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { waitMs } from "../helpers/wait"
-import { assertContiguous, mountedIds } from "../helpers/list"
+import { assertContiguous, mountedIds, OVERSCROLL_SETTLE_MS, OVERSCROLL_WHEEL_RELEASE_MS } from "../helpers/list"
 
 const ITEM_SIZE: number = 48
 const SIZER_HEIGHT: string = "24000px"
@@ -106,4 +106,52 @@ test("L4 rapid jumps keep the target mounted and contiguous", async ({ page }) =
         expect(ids).toContain(`row-${String(i)}`)
         assertContiguous(ids, "row-")
     }
+})
+
+test("wheel at top rubber-bands then settles", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    let scroller = page.locator("#scroller")
+    let sizer = page.locator("#sizer")
+    await expect.poll(async () => scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBe(0)
+    await scroller.hover()
+    await page.mouse.wheel(0, -80)
+    expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("top")
+    expect(await scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBe(0)
+    expect(await row(page, "row-0").evaluate((el) => (el as HTMLElement).style.top)).toBe("0px")
+    await waitMs(OVERSCROLL_WHEEL_RELEASE_MS + OVERSCROLL_SETTLE_MS + 50)
+    expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("none")
+    await expect(sizer).toHaveCSS("transform", "none")
+})
+
+test("wheel at bottom rubber-bands then settles", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    let scroller = page.locator("#scroller")
+    let sizer = page.locator("#sizer")
+    await scroller.focus()
+    await page.keyboard.press("End")
+    await expect(row(page, "row-490")).toBeAttached()
+    let max = await scroller.evaluate((el) => {
+        let node = el as HTMLElement
+        return node.scrollHeight - node.clientHeight
+    })
+    await expect.poll(async () => scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBe(max)
+    await scroller.hover()
+    await page.mouse.wheel(0, 80)
+    expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("bottom")
+    expect(await scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBe(max)
+    await waitMs(OVERSCROLL_WHEEL_RELEASE_MS + OVERSCROLL_SETTLE_MS + 50)
+    expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("none")
+})
+
+test("PageDown does not rubber-band", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    let scroller = page.locator("#scroller")
+    let sizer = page.locator("#sizer")
+    await scroller.focus()
+    await page.keyboard.press("PageDown")
+    expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("none")
+    await expect.poll(async () => scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBeGreaterThan(0)
 })

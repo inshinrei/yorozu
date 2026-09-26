@@ -1,3 +1,4 @@
+import { createOverscrollBounce } from "@yorozu/animations"
 import { createVirtualList, type VirtualList } from "@yorozu/virtual-list"
 
 const N: number = 500
@@ -28,6 +29,8 @@ let list: VirtualList<string> = createVirtualList({
         paint()
     },
 })
+
+createOverscrollBounce(scroller, sizer)
 
 const paint = (): void => {
     sizer.style.height = `${list.totalSize()}px`
