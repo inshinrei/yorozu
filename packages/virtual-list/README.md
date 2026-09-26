@@ -64,6 +64,8 @@ import { createOverscrollBounce } from "@yorozu/animations"
 createOverscrollBounce(scroller, sizer)
 ```
 
+Wheel / trackpad uses AppKit stiffness 20; touch / pen uses the iOS rubber map. Snap-back is an exponential on the painted offset.
+
 ```css
 #scroller {
     overflow-y: auto;

@@ -1,7 +1,7 @@
 import { expect, type Locator } from "@playwright/test"
 
 export const OVERSCROLL_WHEEL_RELEASE_MS: number = 140
-export const OVERSCROLL_SETTLE_MS: number = 250
+export const OVERSCROLL_SETTLE_MS: number = 500
 
 export async function mountedIds(rows: Locator): Promise<string[]> {
     return rows.evaluateAll((nodes) =>
