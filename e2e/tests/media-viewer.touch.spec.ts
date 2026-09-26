@@ -51,6 +51,8 @@ test("touch vertical swipe up does not dismiss", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await touchSwipe(page, 0, -80)
     await expect(openViewer(page)).toHaveCount(1)
+    await expect(page.locator("[data-yorozu-media-strip]")).toHaveCSS("transform", "none")
+    await expectIndex(page, 1)
 })
 
 test("touch horizontal swipe under 50px stays on the item", async ({ page }) => {

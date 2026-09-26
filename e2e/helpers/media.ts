@@ -33,7 +33,7 @@ export async function swipeViewport(page: Page, dx: number, dy: number): Promise
     await mouseDrag(page, from, { x: from.x + dx, y: from.y + dy })
 }
 
-export const MEDIA_VIEWER_WHEEL_RELEASE_MS: number = 90
+export const MEDIA_VIEWER_WHEEL_RELEASE_MS: number = 140
 
 export async function wheelViewport(page: Page, deltaX: number, deltaY: number): Promise<void> {
     await page.locator("[data-yorozu-media-viewport]").hover()

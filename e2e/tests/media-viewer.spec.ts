@@ -230,7 +230,18 @@ test("horizontal swipe under 50px stays on the item", async ({ page }) => {
     await expectIndex(page, 1)
 })
 
-test("reverse-delta horizontal swipe stays on the item", async ({ page }) => {
+test("horizontal swipe that returns under 50px stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    let from = await viewportCenter(page)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x - 80, from.y, { steps: 8 })
+    await page.mouse.move(from.x - 20, from.y, { steps: 4 })
+    await page.mouse.up()
+    await expectIndex(page, 1)
+})
+
+test("horizontal swipe that ends past 50px changes item even if last delta reversed", async ({ page }) => {
     await openFromThumb(page, "img-1")
     let from = await viewportCenter(page)
     await page.mouse.move(from.x, from.y)
@@ -238,13 +249,20 @@ test("reverse-delta horizontal swipe stays on the item", async ({ page }) => {
     await page.mouse.move(from.x - 80, from.y, { steps: 8 })
     await page.mouse.move(from.x - 65, from.y, { steps: 4 })
     await page.mouse.up()
-    await expectIndex(page, 1)
+    await expectIndex(page, 2)
 })
 
-test("vertical swipe up does not dismiss", async ({ page }) => {
+test("vertical swipe up does not move the strip", async ({ page }) => {
     await openFromThumb(page, "img-1")
-    await swipeViewport(page, 0, -80)
+    let from = await viewportCenter(page)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x, from.y - 80, { steps: 8 })
+    await expect(page.locator("[data-yorozu-media-strip]")).toHaveCSS("transform", "none")
     await expect(openViewer(page)).toHaveCount(1)
+    await page.mouse.up()
+    await expect(openViewer(page)).toHaveCount(1)
+    await expect(page.locator("[data-yorozu-media-strip]")).toHaveCSS("transform", "none")
     await expectIndex(page, 1)
 })
 
@@ -277,10 +295,27 @@ test("trackpad wheel up does not dismiss", async ({ page }) => {
     await wheelViewport(page, 0, 80)
     await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
     await expect(openViewer(page)).toHaveCount(1)
+    await expect(page.locator("[data-yorozu-media-strip]")).toHaveCSS("transform", "none")
+    await expectIndex(page, 1)
 })
 
 test("trackpad wheel down past 50px dismisses after quiet", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await wheelViewport(page, 0, -80)
     await waitGone(viewer(page))
+})
+
+test("trackpad pan stream does not change item until the wheel stream ends", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await expectIndex(page, 1)
+    await page.locator("[data-yorozu-media-viewport]").hover()
+    await page.mouse.wheel(80, 0)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    for (let i = 0; i < 10; i++) {
+        await waitMs(16)
+        await page.mouse.wheel(5, 0)
+        expect(await currentThumb(page).getAttribute("data-index")).toBe("1")
+    }
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 2)
 })
