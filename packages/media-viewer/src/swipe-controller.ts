@@ -251,15 +251,14 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
     function transformStyle(): string | undefined {
         let x = drag.offsetX()
         let y = drag.offsetY()
-        if (drag.settling() || navHopping || dismissing || drag.gesturing() || x !== 0 || y !== 0) {
-            return `translate3d(${x}px, ${y}px, 0)`
-        }
-        return undefined
+        if (x === 0 && y === 0 && !navHopping && !dismissing) return undefined
+        return `translate3d(${x}px, ${y}px, 0)`
     }
 
     function dismissOpacity(): number {
         let y = drag.offsetY()
         if (y < 0) return 1
+        if (y === 0 && !dismissing) return 1
         if (drag.axis() !== "vertical" && !dismissing) return 1
         if (drag.axis() !== "vertical" && dismissing && y === 0) return 1
         let { h } = viewportSize()

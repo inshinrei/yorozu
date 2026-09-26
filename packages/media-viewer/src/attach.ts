@@ -333,7 +333,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let hidden = shell != null && !shell.mediaRevealed() && phase !== "closing"
         if (hidden) overlay.setAttribute("data-media-hidden", "")
         else overlay.removeAttribute("data-media-hidden")
-        let dismiss = swipe.dismissing() || swipe.axis() === "vertical"
+        let dismiss = swipe.dismissing() || swipe.offsetY() > 0
         if (dismiss) overlay.setAttribute("data-swipe-dismiss", "")
         else overlay.removeAttribute("data-swipe-dismiss")
         overlay.style.setProperty("--yorozu-media-dismiss-alpha", String(swipe.dismissOpacity()))

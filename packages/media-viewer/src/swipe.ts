@@ -1,6 +1,6 @@
 /**
  * Pure swipe math: axis lock + commit decision for unzoomed media navigation.
- * Horizontal → older/newer; vertical down → close, vertical up → bounce. Presentation-only (no DOM).
+ * Horizontal → older/newer; vertical down → close, vertical up → none. Presentation-only (no DOM).
  */
 
 import {
@@ -65,7 +65,7 @@ export function clampSwipeOffsetX(offsetX: number, viewportWidth: number): numbe
 export function clampSwipeOffsetY(offsetY: number, viewportHeight: number): number {
     let h = viewportHeight > 0 ? viewportHeight : 800
     if (offsetY > h) return h
-    if (offsetY < -h) return -h
+    if (offsetY < 0) return 0
     return offsetY
 }
 
@@ -85,18 +85,11 @@ export type CommitSwipeArgs = {
     lastDeltaX?: number
 }
 
-function horizontalCommit(
-    offsetX: number,
-    canOlder: boolean,
-    canNewer: boolean,
-    xTh: number,
-    lastDeltaX: number,
-): MediaSwipeCommit {
+function horizontalCommit(offsetX: number, canOlder: boolean, canNewer: boolean, xTh: number): MediaSwipeCommit {
     let absX = Math.abs(offsetX)
     if (absX < xTh) {
         return absX > 0 ? "bounce" : "none"
     }
-    if (!lastDeltaAgrees(offsetX, lastDeltaX)) return "bounce"
     let towardNewer = offsetX < 0
     if (towardNewer) return canNewer ? "newer" : "bounce"
     return canOlder ? "older" : "bounce"
@@ -105,27 +98,27 @@ function horizontalCommit(
 export function commitSwipe(args: CommitSwipeArgs): MediaSwipeCommit {
     let xTh = args.xThreshold ?? MEDIA_SWIPE_X_THRESHOLD
     let yTh = args.yThreshold ?? MEDIA_SWIPE_Y_THRESHOLD
-    let lastDeltaX = args.lastDeltaX ?? 0
     let absX = Math.abs(args.offsetX)
     let absY = Math.abs(args.offsetY)
 
     if (args.axis === "vertical") {
         if (args.offsetY >= yTh) return "close"
-        if (absY > 0) return "bounce"
+        if (args.offsetY > 0) return "bounce"
         return "none"
     }
 
     if (args.axis === "horizontal") {
-        return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh, lastDeltaX)
+        return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh)
     }
 
     if (args.offsetY >= yTh && absY >= absX) return "close"
+    if (args.offsetY < 0 && absY >= absX) return "none"
 
     if (absX >= xTh && absX > absY) {
-        return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh, lastDeltaX)
+        return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh)
     }
 
-    if (absX > 0 || absY > 0) return "bounce"
+    if (absX > 0 || args.offsetY > 0) return "bounce"
     return "none"
 }
 

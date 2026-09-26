@@ -81,7 +81,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("bounces on reverse-cancel after past-threshold drag", async () => {
+    it("commits newer when last delta reversed after past-threshold drag", async () => {
         let onNewer = vi.fn()
         let onSettle = vi.fn()
         let onGestureChange = vi.fn()
@@ -91,16 +91,10 @@ describe("createMediaSwipe", () => {
         swipe.onPointerMove(pointer("pointermove", { clientX: 300, clientY: 200 }))
         swipe.onPointerMove(pointer("pointermove", { clientX: 310, clientY: 200 }))
         swipe.onPointerUp(pointer("pointerup", { clientX: 310, clientY: 200 }))
-        expect(onNewer).not.toHaveBeenCalled()
-        let bounced = swipe.offsetX()
-        expect(bounced).not.toBe(0)
-        expect(swipe.settling()).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
         expect(onSettle).not.toHaveBeenCalled()
-        await vi.advanceTimersByTimeAsync(50)
-        expect(Math.abs(swipe.offsetX())).toBeLessThan(Math.abs(bounced))
-        await vi.advanceTimersByTimeAsync(400)
+        await vi.advanceTimersByTimeAsync(MEDIA_SWIPE_SETTLE_MS + 48)
         expect(swipe.offsetX()).toBe(0)
-        expect(onNewer).not.toHaveBeenCalled()
         expect(onSettle).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
@@ -302,19 +296,22 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("pointer swipe up 80px does not close and settles to 0", async () => {
+    it("pointer swipe up 80px does not close and does not translate", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 120 }))
+        expect(swipe.offsetY()).toBe(0)
+        expect(swipe.transformStyle()).toBeUndefined()
+        expect(swipe.axis()).toBe("vertical")
         swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 120 }))
         expect(onClose).not.toHaveBeenCalled()
-        await vi.advanceTimersByTimeAsync(400)
         expect(swipe.offsetY()).toBe(0)
+        expect(swipe.transformStyle()).toBeUndefined()
         swipe.destroy()
     })
 
-    it("clears axis to none when bounce-settling after upward swipe", async () => {
+    it("clears axis to none when bounce-settling after upward swipe", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
@@ -322,8 +319,6 @@ describe("createMediaSwipe", () => {
         expect(swipe.axis()).toBe("vertical")
         swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 120 }))
         expect(onClose).not.toHaveBeenCalled()
-        expect(swipe.axis()).toBe("none")
-        await vi.advanceTimersByTimeAsync(400)
         expect(swipe.axis()).toBe("none")
         expect(swipe.offsetY()).toBe(0)
         swipe.destroy()
@@ -398,8 +393,7 @@ describe("createMediaSwipe", () => {
     it("wheel bounce ignores leftover wheel until idle", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
-        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: 20, deltaY: 0 }))).toBe(true)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).not.toHaveBeenCalled()
         playWheel(
@@ -416,11 +410,24 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
+    it("twelve 20px wheels 16ms apart do not navigate until idle", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        for (let i = 0; i < 12; i++) {
+            if (i > 0) vi.advanceTimersByTime(16)
+            expect(swipe.onWheel(wheel({ deltaX: 20 }))).toBe(true)
+            expect(onNewer).not.toHaveBeenCalled()
+        }
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
     it("dismissOpacity stays 1 while offsetY is negative", () => {
         let swipe = createMediaSwipe(baseCbs())
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 120 }))
-        expect(swipe.offsetY()).toBe(-80)
+        expect(swipe.offsetY()).toBe(0)
         expect(swipe.dismissOpacity()).toBe(1)
         swipe.reset()
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))

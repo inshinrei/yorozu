@@ -54,9 +54,10 @@ describe("media-viewer swipe math", () => {
             expect(clampSwipeOffsetX(100, 1000)).toBe(100)
         })
 
-        it("limits vertical to viewport height", () => {
+        it("limits vertical to viewport height and not below 0", () => {
             expect(clampSwipeOffsetY(2000, 800)).toBe(800)
-            expect(clampSwipeOffsetY(-2000, 800)).toBe(-800)
+            expect(clampSwipeOffsetY(-100, 800)).toBe(0)
+            expect(clampSwipeOffsetY(-2000, 800)).toBe(0)
         })
     })
 
@@ -75,7 +76,7 @@ describe("media-viewer swipe math", () => {
     })
 
     describe("commitSwipe", () => {
-        it("closes on vertical down past threshold and bounces on vertical up", () => {
+        it("closes on vertical down past threshold and is none on vertical up", () => {
             expect(
                 commitSwipe({
                     axis: "vertical",
@@ -93,7 +94,7 @@ describe("media-viewer swipe math", () => {
                     canOlder: true,
                     canNewer: true,
                 }),
-            ).toBe("bounce")
+            ).toBe("none")
         })
 
         it("does not close on unlocked-axis upward past threshold", () => {
@@ -105,7 +106,7 @@ describe("media-viewer swipe math", () => {
                     canOlder: true,
                     canNewer: true,
                 }),
-            ).toBe("bounce")
+            ).toBe("none")
         })
 
         it("does not close on vertical under threshold", () => {
@@ -156,7 +157,7 @@ describe("media-viewer swipe math", () => {
             ).toBe("bounce")
         })
 
-        it("bounces when last delta reverses past distance threshold (reverse-cancel)", () => {
+        it("commits horizontal past threshold even when last delta reversed", () => {
             expect(
                 commitSwipe({
                     axis: "horizontal",
@@ -166,17 +167,7 @@ describe("media-viewer swipe math", () => {
                     canNewer: true,
                     lastDeltaX: 5,
                 }),
-            ).toBe("bounce")
-            expect(
-                commitSwipe({
-                    axis: "horizontal",
-                    offsetX: 80,
-                    offsetY: 0,
-                    canOlder: true,
-                    canNewer: true,
-                    lastDeltaX: -5,
-                }),
-            ).toBe("bounce")
+            ).toBe("newer")
         })
 
         it("commits when past distance and last delta is zero", () => {
