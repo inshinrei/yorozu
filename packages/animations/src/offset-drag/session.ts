@@ -75,8 +75,8 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         config.onChange?.()
     }
 
-    const applyMapped = (): void => {
-        axis = resolveDragAxis(axis, rawX, rawY, lockPx, lockRatio)
+    const applyMapped = (axisLockPx: number = lockPx): void => {
+        axis = resolveDragAxis(axis, rawX, rawY, axisLockPx, lockRatio)
         let mapped = mapOffset({ x: rawX, y: rawY, axis })
         offsetX = mapped.x
         offsetY = mapped.y
@@ -265,7 +265,12 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         if (pointerId != null) return true
 
         let starting = !wheel.active()
-        let kind = wheel.note(event.deltaX, event.deltaY)
+        type WheelMomentumEvent = WheelEvent & { momentum?: boolean }
+        let ev = event as WheelMomentumEvent
+        let kind = wheel.note(event.deltaX, event.deltaY, {
+            momentum: typeof ev.momentum === "boolean" ? ev.momentum : undefined,
+            timeStamp: event.timeStamp,
+        })
         if (kind !== "move") return true
 
         if (starting) {
@@ -288,7 +293,7 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         lastDeltaY = -event.deltaY
         prevRawX = rawX
         prevRawY = rawY
-        applyMapped()
+        applyMapped(0)
         notify()
         return true
     }

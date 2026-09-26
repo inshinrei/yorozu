@@ -83,7 +83,7 @@ describe("createOffsetDrag", () => {
         drag.destroy()
     })
 
-    it("wheel 120px waits for quiet then onRelease from wheel", () => {
+    it("wheel 120px waits for idle then onRelease from wheel", () => {
         let from: string[] = []
         let drag = createOffsetDrag({
             getEnabled: () => true,
@@ -94,12 +94,14 @@ describe("createOffsetDrag", () => {
         expect(drag.onWheel(wheel({ deltaX: 120 }))).toBe(true)
         expect(drag.offsetX()).toBe(-120)
         expect(from).toEqual([])
-        vi.advanceTimersByTime(140)
+        vi.advanceTimersByTime(90)
+        expect(from).toEqual([])
+        vi.advanceTimersByTime(50)
         expect(from).toEqual(["wheel"])
         drag.destroy()
     })
 
-    it("quiet wheel samples do not move offset or postpone release", () => {
+    it("zero-delta wheel does not move offset and rearms idle to 140ms", () => {
         let from: string[] = []
         let drag = createOffsetDrag({
             getEnabled: () => true,
@@ -111,8 +113,41 @@ describe("createOffsetDrag", () => {
         expect(drag.offsetX()).toBe(-80)
         drag.onWheel(wheel({ deltaX: 0, deltaY: 0 }))
         expect(drag.offsetX()).toBe(-80)
-        vi.advanceTimersByTime(140)
+        vi.advanceTimersByTime(90)
+        expect(from).toEqual([])
+        vi.advanceTimersByTime(50)
         expect(from).toEqual(["wheel"])
+        drag.destroy()
+    })
+
+    it("sub-quiet 5px wheel ticks accumulate offset", () => {
+        let drag = createOffsetDrag({ getEnabled: () => true })
+        drag.onWheel(wheel({ deltaX: 5 }))
+        expect(drag.offsetX()).toBe(-5)
+        drag.onWheel(wheel({ deltaX: 5 }))
+        expect(drag.offsetX()).toBe(-10)
+        drag.destroy()
+    })
+
+    it("momentum wheel after contact does not change offset", () => {
+        let from: string[] = []
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            onRelease: (snap) => {
+                from.push(snap.from)
+            },
+        })
+        drag.onWheel(wheel({ deltaX: 80 }))
+        expect(drag.offsetX()).toBe(-80)
+        let coast = wheel({ deltaX: 40 })
+        Object.defineProperty(coast, "momentum", { value: true })
+        expect(drag.onWheel(coast)).toBe(true)
+        expect(from).toEqual(["wheel"])
+        expect(drag.offsetX()).toBe(-80)
+        let more = wheel({ deltaX: 40 })
+        Object.defineProperty(more, "momentum", { value: true })
+        drag.onWheel(more)
+        expect(drag.offsetX()).toBe(-80)
         drag.destroy()
     })
 
@@ -212,7 +247,7 @@ describe("createOffsetDrag", () => {
         drag.onWheel(wheel({ deltaX: 80 }))
         drag.consumeWheelSession()
         expect(drag.onWheel(wheel({ deltaX: 80 }))).toBe(true)
-        vi.advanceTimersByTime(90)
+        vi.advanceTimersByTime(140)
         expect(from).toEqual([])
         vi.advanceTimersByTime(420)
         drag.onWheel(wheel({ deltaX: 0 }))
