@@ -20,6 +20,8 @@ describe("package barrel", () => {
         expect(typeof animations.playSharedElement).toBe("function")
         expect(typeof animations.createCancelGroup).toBe("function")
         expect(typeof animations.createLayoutSizeTween).toBe("function")
+        expect(typeof animations.createOffsetDrag).toBe("function")
+        expect(typeof animations.resolveDragAxis).toBe("function")
     })
 
     it("re-exports motion timing tokens and aliases", () => {
@@ -31,5 +33,7 @@ describe("package barrel", () => {
         expect(animations.SEND_FLIGHT_MS).toBe(animations.MOTION_NAV_MS)
         expect(animations.SWIPE_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)
         expect(animations.SCROLL_TWEEN_MS).toBe(animations.MOTION_SETTLE_MS)
+        expect(animations.WHEEL_RELEASE_MS).toBe(90)
+        expect(animations.DRAG_LOCK_PX).toBe(10)
     })
 })

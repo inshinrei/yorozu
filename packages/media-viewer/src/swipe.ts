@@ -1,23 +1,34 @@
 /**
  * Pure swipe math: axis lock + commit decision for unzoomed media navigation.
- * Horizontal → older/newer; vertical → close. Presentation-only (no DOM).
+ * Horizontal → older/newer; vertical down → close, vertical up → bounce. Presentation-only (no DOM).
  */
 
-export type MediaSwipeAxis = "none" | "horizontal" | "vertical"
+import {
+    DRAG_LOCK_PX,
+    DRAG_LOCK_RATIO,
+    MOTION_NAV_MS,
+    MOTION_SETTLE_MS,
+    WHEEL_COOLDOWN_MS,
+    WHEEL_QUIET_PX,
+    WHEEL_RELEASE_MS,
+    projectDragOffset,
+    resolveDragAxis,
+    type DragAxis,
+} from "@yorozu/animations"
+
+export type MediaSwipeAxis = DragAxis
 export type MediaSwipeCommit = "none" | "older" | "newer" | "close" | "bounce"
 
 export const MEDIA_SWIPE_X_THRESHOLD: number = 50
 export const MEDIA_SWIPE_Y_THRESHOLD: number = 50
-export const MEDIA_SWIPE_WHEEL_EARLY_FACTOR: number = 2
-export const MEDIA_SWIPE_DIRECTION_THRESHOLD: number = 10
-export const MEDIA_SWIPE_DIRECTION_TOLERANCE: number = 1.5
-export const MEDIA_SWIPE_WHEEL_RELEASE_MS: number = 90
-export const MEDIA_SWIPE_WHEEL_COOLDOWN_MS: number = 420
-export const MEDIA_SWIPE_WHEEL_QUIET_PX: number = 10
+export const MEDIA_SWIPE_DIRECTION_THRESHOLD: number = DRAG_LOCK_PX
+export const MEDIA_SWIPE_DIRECTION_TOLERANCE: number = DRAG_LOCK_RATIO
+export const MEDIA_SWIPE_WHEEL_RELEASE_MS: number = WHEEL_RELEASE_MS
+export const MEDIA_SWIPE_WHEEL_COOLDOWN_MS: number = WHEEL_COOLDOWN_MS
+export const MEDIA_SWIPE_WHEEL_QUIET_PX: number = WHEEL_QUIET_PX
 export const MEDIA_SWIPE_SLIDE_GAP_PX: number = 40
 export const MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO: number = 1
-export const MEDIA_SWIPE_SETTLE_MS: number = 350
-export const MEDIA_SWIPE_SETTLE_MS_MIN: number = 160
+export const MEDIA_SWIPE_SETTLE_MS: number = MOTION_NAV_MS
 export const MEDIA_SWIPE_EDGE_RESIST: number = 0.28
 
 export function horizontalSlideStepPx(viewportWidth: number): number {
@@ -30,32 +41,17 @@ export function rebasedOffsetAfterNav(offsetX: number, dir: "older" | "newer", v
     return dir === "newer" ? offsetX + step : offsetX - step
 }
 
-export function settleDurationMs(remainingPx: number, viewportSize: number): number {
-    let v = viewportSize > 0 ? viewportSize : 800
-    let t = Math.min(1, Math.abs(remainingPx) / v)
-    return Math.round(MEDIA_SWIPE_SETTLE_MS_MIN + t * (MEDIA_SWIPE_SETTLE_MS - MEDIA_SWIPE_SETTLE_MS_MIN))
+export function swipeSettleDurationMs(kind: "bounce" | "nav", reduced: boolean): number {
+    if (reduced) return 0
+    return kind === "nav" ? MOTION_NAV_MS : MOTION_SETTLE_MS
 }
 
 export function resolveSwipeAxis(current: MediaSwipeAxis, offsetX: number, offsetY: number): MediaSwipeAxis {
-    if (current !== "none") return current
-    let absX = Math.abs(offsetX)
-    let absY = Math.abs(offsetY)
-    if (absX === 0 && absY === 0) return "none"
-
-    let preferHorizontal =
-        absX > MEDIA_SWIPE_DIRECTION_THRESHOLD || (absY > 0 && absX / absY > MEDIA_SWIPE_DIRECTION_TOLERANCE)
-    let preferVertical =
-        absY > MEDIA_SWIPE_DIRECTION_THRESHOLD || (absX > 0 && absY / absX > MEDIA_SWIPE_DIRECTION_TOLERANCE)
-
-    if (preferHorizontal && (!preferVertical || absX >= absY)) return "horizontal"
-    if (preferVertical) return "vertical"
-    return "none"
+    return resolveDragAxis(current, offsetX, offsetY)
 }
 
 export function projectSwipeOffset(axis: MediaSwipeAxis, offsetX: number, offsetY: number): { x: number; y: number } {
-    if (axis === "horizontal") return { x: offsetX, y: 0 }
-    if (axis === "vertical") return { x: 0, y: offsetY }
-    return { x: 0, y: 0 }
+    return projectDragOffset(axis, offsetX, offsetY)
 }
 
 export function clampSwipeOffsetX(offsetX: number, viewportWidth: number): number {
@@ -114,7 +110,7 @@ export function commitSwipe(args: CommitSwipeArgs): MediaSwipeCommit {
     let absY = Math.abs(args.offsetY)
 
     if (args.axis === "vertical") {
-        if (absY >= yTh) return "close"
+        if (args.offsetY >= yTh) return "close"
         if (absY > 0) return "bounce"
         return "none"
     }
@@ -123,7 +119,7 @@ export function commitSwipe(args: CommitSwipeArgs): MediaSwipeCommit {
         return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh, lastDeltaX)
     }
 
-    if (absY >= yTh && absY >= absX) return "close"
+    if (args.offsetY >= yTh && absY >= absX) return "close"
 
     if (absX >= xTh && absX > absY) {
         return horizontalCommit(args.offsetX, args.canOlder, args.canNewer, xTh, lastDeltaX)
@@ -131,20 +127,6 @@ export function commitSwipe(args: CommitSwipeArgs): MediaSwipeCommit {
 
     if (absX > 0 || absY > 0) return "bounce"
     return "none"
-}
-
-export function wheelEarlyThresholdPx(axisThreshold: number): number {
-    return axisThreshold * MEDIA_SWIPE_WHEEL_EARLY_FACTOR
-}
-
-export function shouldEarlyCommitWheel(axis: MediaSwipeAxis, offsetX: number, offsetY: number): boolean {
-    if (axis === "horizontal") {
-        return Math.abs(offsetX) > wheelEarlyThresholdPx(MEDIA_SWIPE_X_THRESHOLD)
-    }
-    if (axis === "vertical") {
-        return Math.abs(offsetY) > wheelEarlyThresholdPx(MEDIA_SWIPE_Y_THRESHOLD)
-    }
-    return false
 }
 
 export function verticalDismissOpacity(offsetY: number, viewportHeight: number): number {

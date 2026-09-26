@@ -1,24 +1,18 @@
 /**
  * Pointer + wheel swipe controller for unzoomed media navigation.
- * Live offset while gesturing; commit on pointerup / wheel idle / early wheel.
+ * Hosts createOffsetDrag; album commit policy stays in this module.
  */
-import { easeOutCubic } from "@yorozu/animations"
+import { createOffsetDrag, type OffsetDrag, type OffsetDragRelease } from "@yorozu/animations"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
-    MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
-    MEDIA_SWIPE_WHEEL_QUIET_PX,
-    MEDIA_SWIPE_WHEEL_RELEASE_MS,
     clampSwipeOffsetX,
     clampSwipeOffsetY,
     commitSwipe,
     projectSwipeOffset,
     rebasedOffsetAfterNav,
-    resolveSwipeAxis,
-    settleDurationMs,
-    shouldEarlyCommitWheel,
+    swipeSettleDurationMs,
     verticalDismissOpacity,
     type MediaSwipeAxis,
-    type MediaSwipeCommit,
 } from "./swipe"
 
 export type MediaSwipeCallbacks = {
@@ -55,29 +49,17 @@ export type MediaSwipe = {
     destroy: () => void
 }
 
-export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
-    let offsetX = 0
-    let offsetY = 0
-    let axis: MediaSwipeAxis = "none"
-    let gesturing = false
-    let settling = false
-    let dismissing = false
+const CHROME_SKIP = "button, a, input, textarea, select, video"
 
-    let pointerId: number | null = null
-    let startClientX = 0
-    let startClientY = 0
-    let prevRawX = 0
-    let lastDeltaX = 0
-    let wheelTimer: ReturnType<typeof setTimeout> | null = null
-    let settleRaf: number | null = null
-    let wheelActive = false
-    /** After older/newer/close, ignore further wheel until cooldown + quiet valley. */
-    let sessionConsumed = false
-    /** After wheel bounce, ignore leftover wheel until cooldown + quiet. Does not block pointer. */
-    let wheelHoldoff = false
-    /** One-shot cooldown elapsed; gate clears only after a quiet wheel sample. */
-    let wheelGateCooldownElapsed = false
-    let settleGen = 0
+export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
+    let dismissing = false
+    let navHopping = false
+    let navRaf: number | null = null
+    let prevGesturing = false
+    let prevSettling = false
+    let pendingGestureOff = false
+    let lastChangeFiredSettle = false
+    let drag: OffsetDrag
 
     function viewportSize(): { w: number; h: number } {
         if (cbs.getViewport) {
@@ -88,404 +70,224 @@ export function createMediaSwipe(cbs: MediaSwipeCallbacks): MediaSwipe {
         return { w: window.innerWidth, h: window.innerHeight }
     }
 
-    function clearWheelTimer(): void {
-        if (wheelTimer) {
-            clearTimeout(wheelTimer)
-            wheelTimer = null
-        }
-    }
-
-    function cancelSettleRaf(): void {
-        if (settleRaf != null && typeof cancelAnimationFrame === "function") {
-            cancelAnimationFrame(settleRaf)
-            settleRaf = null
-        }
-    }
-
-    function clearLastDelta(): void {
-        prevRawX = 0
-        lastDeltaX = 0
-    }
-
-    function noteRawSample(rawX: number): void {
-        lastDeltaX = rawX - prevRawX
-        prevRawX = rawX
-    }
-
-    function wheelGated(): boolean {
-        return sessionConsumed || wheelHoldoff
-    }
-
-    function isQuietWheel(e: WheelEvent): boolean {
-        return Math.abs(e.deltaX) < MEDIA_SWIPE_WHEEL_QUIET_PX && Math.abs(e.deltaY) < MEDIA_SWIPE_WHEEL_QUIET_PX
-    }
-
-    function clearWheelGate(): void {
-        sessionConsumed = false
-        wheelHoldoff = false
-        wheelGateCooldownElapsed = false
-    }
-
-    /** One-shot gate cooldown; leftover wheel must not restart this timer. */
-    function startWheelGateCooldown(): void {
-        clearWheelTimer()
-        wheelGateCooldownElapsed = false
-        wheelTimer = setTimeout(() => {
-            wheelTimer = null
-            wheelGateCooldownElapsed = true
-            wheelActive = false
-        }, MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
-    }
-
-    function setSwipeGesturing(next: boolean): void {
-        if (gesturing === next) return
-        gesturing = next
-        cbs.onGestureChange?.(next)
-    }
-
-    function fireSettle(): void {
-        cbs.onSettle?.()
-    }
-
-    function resetOffsetsInstant(): void {
-        let wasBusy = gesturing || settling || dismissing
-        settleGen++
-        offsetX = 0
-        offsetY = 0
-        axis = "none"
-        setSwipeGesturing(false)
-        settling = false
-        dismissing = false
-        pointerId = null
-        wheelActive = false
-        clearWheelGate()
-        clearWheelTimer()
-        cancelSettleRaf()
-        clearLastDelta()
-        if (wasBusy) fireSettle()
-    }
-
-    function applyProjected(rawX: number, rawY: number): void {
-        let nextAxis = resolveSwipeAxis(axis, rawX, rawY)
-        axis = nextAxis
-        let projected = projectSwipeOffset(nextAxis, rawX, rawY)
+    const mapOffset = (raw: { x: number; y: number; axis: MediaSwipeAxis }): { x: number; y: number } => {
+        let projected = projectSwipeOffset(raw.axis, raw.x, raw.y)
         let { w, h } = viewportSize()
-
-        if (nextAxis === "horizontal") {
+        if (raw.axis === "horizontal") {
             if (projected.x < 0 && !cbs.getCanNewer()) projected.x *= MEDIA_SWIPE_EDGE_RESIST
             if (projected.x > 0 && !cbs.getCanOlder()) projected.x *= MEDIA_SWIPE_EDGE_RESIST
             projected.x = clampSwipeOffsetX(projected.x, w)
         }
-        if (nextAxis === "vertical") {
+        if (raw.axis === "vertical") {
             projected.y = clampSwipeOffsetY(projected.y, h)
         }
-
-        offsetX = projected.x
-        offsetY = projected.y
+        return projected
     }
 
-    function refreshWheelIdleTimer(): void {
-        if (wheelGated()) return
-        clearWheelTimer()
-        wheelTimer = setTimeout(() => {
-            wheelTimer = null
-            if (!wheelActive) return
-            finishGesture()
-        }, MEDIA_SWIPE_WHEEL_RELEASE_MS)
+    function reduced(): boolean {
+        return cbs.getPrefersReducedMotion()
     }
 
-    function markSessionConsumed(): void {
-        sessionConsumed = true
-        startWheelGateCooldown()
+    function cancelNavRaf(): void {
+        if (navRaf == null) return
+        if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(navRaf)
+        navRaf = null
     }
 
-    function endPointerWheel(): void {
-        setSwipeGesturing(false)
-        pointerId = null
-        wheelActive = false
-        if (!wheelGated()) clearWheelTimer()
+    function flushGestureOff(): void {
+        if (!pendingGestureOff) return
+        pendingGestureOff = false
+        cbs.onGestureChange?.(false)
     }
 
-    function decideCommit(): MediaSwipeCommit {
-        return commitSwipe({
-            axis,
-            offsetX,
-            offsetY,
-            canOlder: cbs.getCanOlder(),
-            canNewer: cbs.getCanNewer(),
-            lastDeltaX,
-        })
-    }
-
-    function animateOffsetToZero(): void {
-        cancelSettleRaf()
-        let fromX = offsetX
-        let fromY = offsetY
-        if (fromX === 0 && fromY === 0) {
-            settling = false
-            fireSettle()
+    function onDragChange(): void {
+        lastChangeFiredSettle = false
+        let g = drag.gesturing()
+        let s = drag.settling()
+        if (g !== prevGesturing) {
+            prevGesturing = g
+            if (g) {
+                pendingGestureOff = false
+                cbs.onGestureChange?.(true)
+            } else {
+                // finishFrom notifies before onRelease; wait until dismissing/navHopping/settling are set
+                pendingGestureOff = true
+            }
+        }
+        if (prevSettling && !s) {
+            navHopping = false
+            prevSettling = s
+            if (g) return
+            lastChangeFiredSettle = true
+            cbs.onSettle?.()
             return
         }
+        prevSettling = s
+    }
 
-        let gen = ++settleGen
-        settling = true
-
-        let finish = (): void => {
-            if (gen !== settleGen) return
-            offsetX = 0
-            offsetY = 0
-            settling = false
-            settleRaf = null
-            fireSettle()
+    function hopToRest(navMs: number): void {
+        cancelNavRaf()
+        let run = (): void => {
+            navRaf = null
+            drag.settleTo(0, 0, navMs)
+            if (drag.settling()) return
+            navHopping = false
+            cbs.onSettle?.()
         }
-
-        if (cbs.getPrefersReducedMotion()) {
-            if (typeof requestAnimationFrame === "function") {
-                settleRaf = requestAnimationFrame(finish)
-                return
-            }
-            finish()
-            return
-        }
-
-        let { w, h } = viewportSize()
-        let remaining = Math.max(Math.abs(fromX), Math.abs(fromY))
-        let viewport = Math.abs(fromX) >= Math.abs(fromY) ? w : h
-        let duration = settleDurationMs(remaining, viewport)
-        let start = typeof performance !== "undefined" ? performance.now() : Date.now()
-
-        let frame = (now: number): void => {
-            if (gen !== settleGen) return
-            let t = Math.min(1, (now - start) / duration)
-            let eased = easeOutCubic(t)
-            offsetX = fromX * (1 - eased)
-            offsetY = fromY * (1 - eased)
-            if (t < 1) {
-                settleRaf = requestAnimationFrame(frame)
-                return
-            }
-            finish()
-        }
-
         if (typeof requestAnimationFrame === "function") {
-            settleRaf = requestAnimationFrame(frame)
-        } else {
-            finish()
+            navRaf = requestAnimationFrame(run)
+            return
         }
+        run()
     }
 
-    function commitHorizontalNav(dir: "older" | "newer"): void {
+    function bounceToRest(from: OffsetDragRelease["from"]): void {
+        if (from === "wheel") drag.consumeWheelSession()
+        let bounceMs = swipeSettleDurationMs("bounce", reduced())
+        drag.settleTo(0, 0, bounceMs)
+        if (!drag.settling()) cbs.onSettle?.()
+        flushGestureOff()
+    }
+
+    function commitNav(dir: "older" | "newer", offsetX: number): void {
+        navHopping = true
+        drag.consumeWheelSession()
         let { w } = viewportSize()
-        let fromOffset = offsetX
         let rebase = cbs.willRebaseNav?.(dir) !== false
-        let rebased = rebasedOffsetAfterNav(fromOffset, dir, w)
-        axis = "none"
-        offsetY = 0
-        clearLastDelta()
-        cancelSettleRaf()
-        offsetX = rebase ? rebased : fromOffset
-        settling = offsetX !== 0
-        endPointerWheel()
-        markSessionConsumed()
+        let nextX = rebase ? rebasedOffsetAfterNav(offsetX, dir, w) : offsetX
+        drag.setOffset(nextX, 0)
+        drag.settleTo(nextX, 0, 0)
         if (dir === "older") cbs.onOlder()
         else cbs.onNewer()
-
-        let gen = settleGen
-        let run = (): void => {
-            settleRaf = null
-            if (gen !== settleGen) return
-            animateOffsetToZero()
-        }
-        if (typeof requestAnimationFrame === "function") {
-            settleRaf = requestAnimationFrame(run)
-        } else {
-            run()
-        }
+        hopToRest(swipeSettleDurationMs("nav", reduced()))
+        flushGestureOff()
     }
 
-    function commitCloseFromSwipe(): void {
+    function commitClose(): void {
         dismissing = true
-        endPointerWheel()
-        clearLastDelta()
-        cancelSettleRaf()
-        markSessionConsumed()
+        cancelNavRaf()
+        navHopping = false
+        // reset() clears wheel consume; re-arm leftover gate after
+        drag.reset()
+        drag.consumeWheelSession()
         cbs.onClose()
+        flushGestureOff()
     }
 
-    function runCommit(result: MediaSwipeCommit): void {
-        if (result === "older") {
-            commitHorizontalNav("older")
+    function onRelease(snap: OffsetDragRelease): void {
+        if (dismissing) {
+            drag.reset()
+            flushGestureOff()
             return
         }
-        if (result === "newer") {
-            commitHorizontalNav("newer")
+        if (snap.from === "cancel") {
+            bounceToRest("cancel")
+            return
+        }
+        let result = commitSwipe({
+            axis: snap.axis,
+            offsetX: snap.offsetX,
+            offsetY: snap.offsetY,
+            canOlder: cbs.getCanOlder(),
+            canNewer: cbs.getCanNewer(),
+            lastDeltaX: snap.lastDeltaX,
+        })
+        if (result === "older" || result === "newer") {
+            commitNav(result, snap.offsetX)
             return
         }
         if (result === "close") {
-            commitCloseFromSwipe()
+            commitClose()
             return
         }
-        if (result === "bounce" && (offsetX !== 0 || offsetY !== 0)) {
-            let fromWheel = wheelActive
-            settling = true
-            endPointerWheel()
-            axis = "none"
-            clearLastDelta()
-            animateOffsetToZero()
-            if (fromWheel) {
-                wheelHoldoff = true
-                startWheelGateCooldown()
-            }
+        if (result === "bounce") {
+            bounceToRest(snap.from)
             return
         }
-        if (wheelHoldoff || sessionConsumed) {
-            endPointerWheel()
-            axis = "none"
-            clearLastDelta()
-            return
-        }
-        resetOffsetsInstant()
+        drag.reset()
+        flushGestureOff()
     }
 
-    function finishGesture(): void {
-        if (dismissing) return
-        if (!gesturing && !wheelActive) return
-        runCommit(decideCommit())
-    }
+    drag = createOffsetDrag({
+        getEnabled: () => cbs.getEnabled(),
+        prefersReducedMotion: () => reduced(),
+        mapOffset,
+        onChange: onDragChange,
+        onRelease,
+    })
 
     function onPointerDown(e: PointerEvent): boolean {
         if (dismissing) return false
-        if (!cbs.getEnabled()) return false
-        if (e.button !== 0) return false
-        if (pointerId != null) return false
         let t = e.target
-        if (t instanceof Element) {
-            if (t.closest("button, a, input, textarea, select, video")) return false
-        }
-        settleGen++
-        cancelSettleRaf()
-        settling = false
-        clearLastDelta()
-        pointerId = e.pointerId
-        startClientX = e.clientX
-        startClientY = e.clientY
-        setSwipeGesturing(true)
-        wheelActive = false
-        if (!wheelGated()) clearWheelTimer()
-        axis = "none"
-        offsetX = 0
-        offsetY = 0
-        try {
-            ;(e.currentTarget as HTMLElement | null)?.setPointerCapture?.(e.pointerId)
-        } catch {
-            // optional
-        }
+        if (t instanceof Element && t.closest(CHROME_SKIP)) return false
+        if (!drag.onPointerDown(e)) return false
+        cancelNavRaf()
+        navHopping = false
         return true
     }
 
-    function onPointerMove(e: PointerEvent): void {
-        if (pointerId !== e.pointerId || !gesturing || dismissing) return
-        e.preventDefault()
-        let rawX = e.clientX - startClientX
-        let rawY = e.clientY - startClientY
-        noteRawSample(rawX)
-        applyProjected(rawX, rawY)
-    }
-
-    function onPointerUp(e: PointerEvent): void {
-        if (pointerId !== e.pointerId) return
-        finishGesture()
-    }
-
-    function onPointerCancel(e: PointerEvent): void {
-        if (pointerId !== e.pointerId) return
-        runCommit("bounce")
-    }
-
-    function onWheel(e: WheelEvent): boolean {
-        if (!cbs.getEnabled()) return false
-        if (e.ctrlKey || e.metaKey) return false
-
-        e.preventDefault()
-        e.stopPropagation()
-
-        if (pointerId != null) return true
-
-        if (wheelGated()) {
-            if (wheelGateCooldownElapsed && isQuietWheel(e)) {
-                clearWheelGate()
-            }
-            return true
-        }
-
-        if (dismissing) return true
-
-        let starting = !wheelActive
-        settleGen++
-        cancelSettleRaf()
-        settling = false
-        wheelActive = true
-        setSwipeGesturing(true)
-
-        if (starting) {
-            offsetX = 0
-            offsetY = 0
-            axis = "none"
-            clearLastDelta()
-        }
-
-        let nextX = offsetX - e.deltaX
-        let nextY = offsetY - e.deltaY
-        noteRawSample(nextX)
-        applyProjected(nextX, nextY)
-
-        if (shouldEarlyCommitWheel(axis, offsetX, offsetY)) {
-            finishGesture()
-            return true
-        }
-
-        refreshWheelIdleTimer()
-        return true
-    }
-
-    function trapWheel(e: WheelEvent): boolean {
-        if (!cbs.getEnabled() || e.ctrlKey || e.metaKey) return false
-        e.preventDefault()
-        e.stopPropagation()
-        onWheel(e)
-        return true
+    function resetSwipe(): void {
+        cancelNavRaf()
+        navHopping = false
+        let wasBusy = drag.gesturing() || drag.settling() || dismissing || drag.offsetX() !== 0 || drag.offsetY() !== 0
+        dismissing = false
+        lastChangeFiredSettle = false
+        drag.reset()
+        flushGestureOff()
+        if (wasBusy && !lastChangeFiredSettle) cbs.onSettle?.()
     }
 
     function destroy(): void {
-        resetOffsetsInstant()
+        cancelNavRaf()
+        navHopping = false
+        let wasBusy = drag.gesturing() || drag.settling() || dismissing || drag.offsetX() !== 0 || drag.offsetY() !== 0
+        dismissing = false
+        lastChangeFiredSettle = false
+        drag.destroy()
+        flushGestureOff()
+        if (wasBusy && !lastChangeFiredSettle) cbs.onSettle?.()
+    }
+
+    function transformStyle(): string | undefined {
+        let x = drag.offsetX()
+        let y = drag.offsetY()
+        if (drag.settling() || navHopping || dismissing || drag.gesturing() || x !== 0 || y !== 0) {
+            return `translate3d(${x}px, ${y}px, 0)`
+        }
+        return undefined
+    }
+
+    function dismissOpacity(): number {
+        let y = drag.offsetY()
+        if (y < 0) return 1
+        if (drag.axis() !== "vertical" && !dismissing) return 1
+        if (drag.axis() !== "vertical" && dismissing && y === 0) return 1
+        let { h } = viewportSize()
+        return verticalDismissOpacity(y, h)
     }
 
     return {
-        offsetX: () => offsetX,
-        offsetY: () => offsetY,
-        axis: () => axis,
-        gesturing: () => gesturing,
-        settling: () => settling,
-        dismissing: () => dismissing,
-        transformStyle: (): string | undefined => {
-            if (settling || dismissing || gesturing || offsetX !== 0 || offsetY !== 0) {
-                return `translate3d(${offsetX}px, ${offsetY}px, 0)`
-            }
-            return undefined
-        },
-        dismissOpacity: (): number => {
-            if (axis !== "vertical" && !dismissing) return 1
-            if (axis !== "vertical" && dismissing && offsetY === 0) return 1
-            let { h } = viewportSize()
-            return verticalDismissOpacity(offsetY, h)
-        },
+        offsetX: (): number => drag.offsetX(),
+        offsetY: (): number => drag.offsetY(),
+        axis: (): MediaSwipeAxis => drag.axis(),
+        gesturing: (): boolean => drag.gesturing(),
+        settling: (): boolean => drag.settling() || navHopping,
+        dismissing: (): boolean => dismissing,
+        transformStyle,
+        dismissOpacity,
         onPointerDown,
-        onPointerMove,
-        onPointerUp,
-        onPointerCancel,
-        onWheel,
-        trapWheel,
-        reset: resetOffsetsInstant,
+        onPointerMove: (e: PointerEvent): void => {
+            drag.onPointerMove(e)
+        },
+        onPointerUp: (e: PointerEvent): void => {
+            drag.onPointerUp(e)
+        },
+        onPointerCancel: (e: PointerEvent): void => {
+            drag.onPointerCancel(e)
+        },
+        onWheel: (e: WheelEvent): boolean => drag.onWheel(e),
+        trapWheel: (e: WheelEvent): boolean => drag.trapWheel(e),
+        reset: resetSwipe,
         destroy,
     }
 }

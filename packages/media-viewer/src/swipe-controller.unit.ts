@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
     MEDIA_SWIPE_EDGE_RESIST,
+    MEDIA_SWIPE_SETTLE_MS,
     MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
     MEDIA_SWIPE_WHEEL_QUIET_PX,
     MEDIA_SWIPE_WHEEL_RELEASE_MS,
-    MEDIA_SWIPE_X_THRESHOLD,
 } from "./swipe"
 import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
 
@@ -39,20 +39,30 @@ function playWheel(swipe: MediaSwipe, steps: { dt: number; deltaX: number; delta
 }
 
 describe("createMediaSwipe", () => {
-    afterEach(() => {
-        vi.useRealTimers()
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number,
+        )
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id))
     })
 
-    it("commits newer on left drag past threshold when canNewer", () => {
+    afterEach(() => {
+        vi.useRealTimers()
+        vi.unstubAllGlobals()
+    })
+
+    it("commits newer on left pointer drag past threshold then settles to 0", async () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let root = document.createElement("div")
         expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
         swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
         swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
         expect(onNewer).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(MEDIA_SWIPE_SETTLE_MS + 48)
+        expect(swipe.offsetX()).toBe(0)
         swipe.destroy()
-        root.remove()
     })
 
     it("swipes to newer even when peek src is missing (loading neighbor)", () => {
@@ -71,8 +81,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("bounces on reverse-cancel after past-threshold drag", () => {
-        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+    it("bounces on reverse-cancel after past-threshold drag", async () => {
         let onNewer = vi.fn()
         let onSettle = vi.fn()
         let onGestureChange = vi.fn()
@@ -80,7 +89,6 @@ describe("createMediaSwipe", () => {
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         expect(onGestureChange).toHaveBeenCalledWith(true)
         swipe.onPointerMove(pointer("pointermove", { clientX: 300, clientY: 200 }))
-        // reverse a few px so lastDelta disagrees with total offset
         swipe.onPointerMove(pointer("pointermove", { clientX: 310, clientY: 200 }))
         swipe.onPointerUp(pointer("pointerup", { clientX: 310, clientY: 200 }))
         expect(onNewer).not.toHaveBeenCalled()
@@ -88,16 +96,29 @@ describe("createMediaSwipe", () => {
         expect(bounced).not.toBe(0)
         expect(swipe.settling()).toBe(true)
         expect(onSettle).not.toHaveBeenCalled()
-        vi.advanceTimersByTime(50)
+        await vi.advanceTimersByTimeAsync(50)
         expect(Math.abs(swipe.offsetX())).toBeLessThan(Math.abs(bounced))
-        vi.advanceTimersByTime(400)
+        await vi.advanceTimersByTimeAsync(400)
         expect(swipe.offsetX()).toBe(0)
         expect(onNewer).not.toHaveBeenCalled()
         expect(onSettle).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
-    it("commits newer on pointer swipe when prefers reduced motion", () => {
+    it("does not fire onSettle when a new pointerdown interrupts bounce", async () => {
+        let onSettle = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onSettle }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 380, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 380, clientY: 200 }))
+        expect(swipe.settling()).toBe(true)
+        expect(onSettle).not.toHaveBeenCalled()
+        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200, pointerId: 2 }))).toBe(true)
+        expect(onSettle).not.toHaveBeenCalled()
+        swipe.destroy()
+    })
+
+    it("commits newer on reduced-motion pointer swipe and snaps after the rebase hop", async () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(
             baseCbs({
@@ -109,38 +130,12 @@ describe("createMediaSwipe", () => {
         swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
         swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
         expect(onNewer).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(16)
+        expect(swipe.offsetX()).toBe(0)
         swipe.destroy()
     })
 
-    it("settles swipe offset when prefers reduced motion", () => {
-        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(
-            baseCbs({
-                getPrefersReducedMotion: () => true,
-                onNewer,
-            }),
-        )
-        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
-        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
-        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        expect(swipe.offsetX()).not.toBe(0)
-        expect(swipe.settling()).toBe(true)
-        swipe.destroy()
-    })
-
-    it("early-commits wheel past 2× threshold", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
-
-    it("bounces without rebase when willRebaseNav is false", () => {
+    it("still calls onNewer when willRebaseNav is false", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(
             baseCbs({
@@ -150,12 +145,8 @@ describe("createMediaSwipe", () => {
         )
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         swipe.onPointerMove(pointer("pointermove", { clientX: 300, clientY: 200 }))
-        let dragged = swipe.offsetX()
-        expect(dragged).toBeLessThan(0)
         swipe.onPointerUp(pointer("pointerup", { clientX: 300, clientY: 200 }))
         expect(onNewer).toHaveBeenCalledTimes(1)
-        expect(Math.abs(swipe.offsetX())).toBeLessThan(200)
-        expect(swipe.offsetX()).toBeLessThanOrEqual(0)
         swipe.destroy()
     })
 
@@ -197,215 +188,111 @@ describe("createMediaSwipe", () => {
         mods.destroy()
     })
 
-    it("trapWheel preventDefault and early-commits when prefers reduced motion", () => {
+    it.each([false, true])("trapWheel preventDefault then idle-commits after 90ms (reduced=%s)", (reduced: boolean) => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(
             baseCbs({
-                getPrefersReducedMotion: () => true,
+                getPrefersReducedMotion: () => reduced,
                 onNewer,
             }),
         )
-        let ev = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1 })
+        let ev = wheel({ deltaX: 80 })
         let prevent = vi.spyOn(ev, "preventDefault")
         expect(swipe.trapWheel(ev)).toBe(true)
         expect(prevent).toHaveBeenCalled()
+        expect(onNewer).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
-    it("commits once per wheel session until cooldown idle", () => {
-        vi.useFakeTimers()
+    it("commits once per wheel session until cooldown plus a quiet sample", () => {
         expect(MEDIA_SWIPE_WHEEL_COOLDOWN_MS).toBe(420)
         expect(MEDIA_SWIPE_WHEEL_QUIET_PX).toBe(10)
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
+        expect(onNewer).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).toHaveBeenCalledTimes(1)
-        let leftover = wheel({ deltaX: early, deltaY: 0 })
+        let leftover = wheel({ deltaX: 80, deltaY: 0 })
         let preventLeftover = vi.spyOn(leftover, "preventDefault")
         expect(swipe.onWheel(leftover)).toBe(true)
         expect(preventLeftover).toHaveBeenCalled()
         expect(onNewer).toHaveBeenCalledTimes(1)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
-
-    it("leftover wheel during cooldown does not restart the cooldown", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        for (let i = 0; i < 8; i++) {
-            vi.advanceTimersByTime(50)
-            expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        }
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        // One-shot cooldown from t=0 elapsed at 420; leftover must not have pushed it out.
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - 400)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
         expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(1)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).toHaveBeenCalledTimes(2)
         swipe.destroy()
     })
 
-    it.each([
-        {
-            name: "one-flick leftover",
-            steps: (early: number) => [
-                { dt: 0, deltaX: early },
-                ...Array.from({ length: 12 }, () => ({ dt: 50, deltaX: early })),
-            ],
-            onNewer: 1,
-        },
-        {
-            name: "leftover after cooldown still large",
-            steps: (early: number) => [
-                { dt: 0, deltaX: early },
-                ...Array.from({ length: 16 }, () => ({ dt: 50, deltaX: early })),
-            ],
-            onNewer: 1,
-        },
-        {
-            name: "next flick after quiet",
-            steps: (early: number) => [
-                { dt: 0, deltaX: early },
-                ...Array.from({ length: 8 }, () => ({ dt: 50, deltaX: early })),
-                { dt: 50, deltaX: 0 },
-                { dt: 50, deltaX: early },
-            ],
-            onNewer: 2,
-        },
-        {
-            name: "second flick during cooldown",
-            steps: (early: number) => [
-                { dt: 0, deltaX: early },
-                { dt: 50, deltaX: 0 },
-                { dt: 50, deltaX: early },
-            ],
-            onNewer: 1,
-        },
-    ])("wheel flick harness: $name", ({ steps, onNewer: expected }) => {
-        vi.useFakeTimers()
+    it("leftover wheel during cooldown does not restart the cooldown", () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        playWheel(swipe, steps(early))
-        expect(onNewer).toHaveBeenCalledTimes(expected)
-        swipe.destroy()
-    })
-
-    it("wheel flick harness: bounce leftover", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
-        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
+        let tick = 80
+        expect(swipe.onWheel(wheel({ deltaX: tick, deltaY: 0 }))).toBe(true)
         vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(onNewer).not.toHaveBeenCalled()
-        playWheel(
-            swipe,
-            Array.from({ length: 10 }, () => ({ dt: 50, deltaX: early })),
-        )
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
         expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
-
-    it("wheel bounce ignores leftover wheel until idle", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
-        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(onNewer).not.toHaveBeenCalled()
-        let leftover = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 })
-        let preventLeftover = vi.spyOn(leftover, "preventDefault")
-        expect(swipe.onWheel(leftover)).toBe(true)
-        expect(preventLeftover).toHaveBeenCalled()
-        expect(swipe.onWheel(wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
-        swipe.destroy()
-    })
-
-    it("no-op pointer after wheel bounce keeps holdoff until idle", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let early = MEDIA_SWIPE_X_THRESHOLD * 2 + 1
-        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
-        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(onNewer).not.toHaveBeenCalled()
-        expect(swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))).toBe(true)
-        swipe.onPointerCancel(pointer("pointercancel", { clientX: 400, clientY: 200 }))
-        let leftover = wheel({ deltaX: early, deltaY: 0 })
-        expect(swipe.onWheel(leftover)).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(0)
-        expect(swipe.onWheel(wheel({ deltaX: early, deltaY: 0 }))).toBe(true)
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
-
-    it("does not commit leftover wheel after pointer nav before idle", () => {
-        vi.useFakeTimers()
-        let onNewer = vi.fn()
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
-        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
-        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        let leftover = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1, deltaY: 0 })
-        let preventLeftover = vi.spyOn(leftover, "preventDefault")
-        expect(swipe.onWheel(leftover)).toBe(true)
-        expect(preventLeftover).toHaveBeenCalled()
-        expect(onNewer).toHaveBeenCalledTimes(1)
-        swipe.destroy()
-    })
-
-    it("trapWheel preventDefault then onWheel when enabled", () => {
-        let order: string[] = []
-        let onNewer = vi.fn(() => {
-            order.push("newer")
-        })
-        let swipe = createMediaSwipe(baseCbs({ onNewer }))
-        let ev = wheel({ deltaX: MEDIA_SWIPE_X_THRESHOLD * 2 + 1 })
-        let origPrevent = ev.preventDefault.bind(ev)
-        ev.preventDefault = (): void => {
-            order.push("prevent")
-            origPrevent()
+        for (let i = 0; i < 8; i++) {
+            vi.advanceTimersByTime(50)
+            expect(swipe.onWheel(wheel({ deltaX: tick, deltaY: 0 }))).toBe(true)
         }
-        expect(swipe.trapWheel(ev)).toBe(true)
-        expect(order[0]).toBe("prevent")
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_COOLDOWN_MS - 400)
+        expect(swipe.onWheel(wheel({ deltaX: tick, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.onWheel(wheel({ deltaX: tick, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).toHaveBeenCalledTimes(2)
+        swipe.destroy()
+    })
+
+    it("wheel 20px plus 90ms does not navigate", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        expect(swipe.onWheel(wheel({ deltaX: 20, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).not.toHaveBeenCalled()
+        swipe.destroy()
+    })
+
+    it("wheel 120px waits for quiet idle (no early commit)", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        expect(swipe.onWheel(wheel({ deltaX: 120, deltaY: 0 }))).toBe(true)
+        expect(onNewer).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
         expect(onNewer).toHaveBeenCalledTimes(1)
         swipe.destroy()
     })
 
-    it("vertical pointer drag past threshold closes", () => {
+    it("wheel deltaY 80 (up) plus 90ms does not close", () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 80 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onClose).not.toHaveBeenCalled()
+        swipe.destroy()
+    })
+
+    it("wheel deltaY -80 (down) plus 90ms closes once", () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: -80 }))).toBe(true)
+        expect(onClose).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onClose).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("pointer swipe down 80px closes once", () => {
         let onClose = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onClose }))
         swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
@@ -415,8 +302,82 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
+    it("pointer swipe up 80px does not close and settles to 0", async () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 120 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 120 }))
+        expect(onClose).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(400)
+        expect(swipe.offsetY()).toBe(0)
+        swipe.destroy()
+    })
+
+    it("clears axis to none when bounce-settling after upward swipe", async () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 120 }))
+        expect(swipe.axis()).toBe("vertical")
+        swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 120 }))
+        expect(onClose).not.toHaveBeenCalled()
+        expect(swipe.axis()).toBe("none")
+        await vi.advanceTimersByTimeAsync(400)
+        expect(swipe.axis()).toBe("none")
+        expect(swipe.offsetY()).toBe(0)
+        swipe.destroy()
+    })
+
+    it("clears axis to none when bounce-settling a short vertical down", async () => {
+        let onClose = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onClose }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 220 }))
+        expect(swipe.axis()).toBe("vertical")
+        swipe.onPointerUp(pointer("pointerup", { clientX: 400, clientY: 220 }))
+        expect(onClose).not.toHaveBeenCalled()
+        expect(swipe.axis()).toBe("none")
+        await vi.advanceTimersByTimeAsync(400)
+        expect(swipe.axis()).toBe("none")
+        expect(swipe.offsetY()).toBe(0)
+        swipe.destroy()
+    })
+
+    it("rejected pointerdown during nav hop does not cancel the hop", async () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        expect(swipe.settling()).toBe(true)
+        let hopped = swipe.offsetX()
+        expect(hopped).not.toBe(0)
+        expect(swipe.onPointerDown(pointer("pointerdown", { button: 1, clientX: 400, clientY: 200 }))).toBe(false)
+        expect(swipe.offsetX()).toBe(hopped)
+        expect(swipe.settling()).toBe(true)
+        await vi.advanceTimersByTimeAsync(MEDIA_SWIPE_SETTLE_MS + 48)
+        expect(swipe.offsetX()).toBe(0)
+        swipe.destroy()
+    })
+
+    it("does not commit leftover wheel after pointer nav before idle", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 320, clientY: 200 }))
+        swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        let leftover = wheel({ deltaX: 120, deltaY: 0 })
+        let preventLeftover = vi.spyOn(leftover, "preventDefault")
+        expect(swipe.onWheel(leftover)).toBe(true)
+        expect(preventLeftover).toHaveBeenCalled()
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
     it("wheel idle 90ms commits; destroy clears the wheel timer", () => {
-        vi.useFakeTimers()
         expect(MEDIA_SWIPE_WHEEL_RELEASE_MS).toBe(90)
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(baseCbs({ onNewer }))
@@ -431,6 +392,41 @@ describe("createMediaSwipe", () => {
         doomed.destroy()
         vi.advanceTimersByTime(90)
         expect(late).not.toHaveBeenCalled()
+        swipe.destroy()
+    })
+
+    it("wheel bounce ignores leftover wheel until idle", () => {
+        let onNewer = vi.fn()
+        let swipe = createMediaSwipe(baseCbs({ onNewer }))
+        expect(swipe.onWheel(wheel({ deltaX: 80, deltaY: 0 }))).toBe(true)
+        expect(swipe.onWheel(wheel({ deltaX: -20, deltaY: 0 }))).toBe(true)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).not.toHaveBeenCalled()
+        playWheel(
+            swipe,
+            Array.from({ length: 10 }, () => ({ dt: 50, deltaX: 120 })),
+        )
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: 0, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        expect(swipe.onWheel(wheel({ deltaX: 120, deltaY: 0 }))).toBe(true)
+        expect(onNewer).toHaveBeenCalledTimes(0)
+        vi.advanceTimersByTime(MEDIA_SWIPE_WHEEL_RELEASE_MS)
+        expect(onNewer).toHaveBeenCalledTimes(1)
+        swipe.destroy()
+    })
+
+    it("dismissOpacity stays 1 while offsetY is negative", () => {
+        let swipe = createMediaSwipe(baseCbs())
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 120 }))
+        expect(swipe.offsetY()).toBe(-80)
+        expect(swipe.dismissOpacity()).toBe(1)
+        swipe.reset()
+        swipe.onPointerDown(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        swipe.onPointerMove(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        expect(swipe.offsetY()).toBe(80)
+        expect(swipe.dismissOpacity()).toBeLessThan(1)
         swipe.destroy()
     })
 })

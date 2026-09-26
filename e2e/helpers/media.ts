@@ -33,6 +33,17 @@ export async function swipeViewport(page: Page, dx: number, dy: number): Promise
     await mouseDrag(page, from, { x: from.x + dx, y: from.y + dy })
 }
 
+export const MEDIA_VIEWER_WHEEL_RELEASE_MS: number = 90
+
+export async function wheelViewport(page: Page, deltaX: number, deltaY: number): Promise<void> {
+    await page.locator("[data-yorozu-media-viewport]").hover()
+    await page.mouse.wheel(deltaX, deltaY)
+}
+
+export async function expectIndexNow(page: Page, index: number): Promise<void> {
+    expect(await currentThumb(page).getAttribute("data-index")).toBe(String(index))
+}
+
 export async function thumbCenterDelta(page: Page): Promise<number | null> {
     let clip = await page.locator("[data-yorozu-media-filmstrip-clip]").boundingBox()
     let thumb = await currentThumb(page).boundingBox()

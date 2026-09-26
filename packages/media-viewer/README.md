@@ -8,6 +8,10 @@ Framework-agnostic media gallery overlay: session, gestures, zoom, ghost flight,
 pnpm add @yorozu/media-viewer
 ```
 
+## Swipe
+
+Unzoomed pointer drag and two-finger trackpad pan (`wheel`) live-follow the gesture. On pointerup, or after 90ms without a non-quiet wheel sample, the viewer either bounces back (under 50px, reverse direction, or swipe **up**) or commits: horizontal past 50px goes older/newer; swipe **down** past 50px closes. Trackpad leftover ticks after commit are ignored until cooldown.
+
 ## Zoom
 
 Chrome reads `percentLabel()` / `scale()` and subscribes with `onZoomChange`. Do not run a perpetual overlay `requestAnimationFrame` to poll zoom. `formatZoomPercent` is the percent formatter.

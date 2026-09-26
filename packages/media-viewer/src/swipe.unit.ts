@@ -1,9 +1,7 @@
+import { MOTION_NAV_MS, MOTION_SETTLE_MS } from "@yorozu/animations"
 import { describe, expect, it } from "vitest"
 import {
-    MEDIA_SWIPE_SETTLE_MS,
-    MEDIA_SWIPE_SETTLE_MS_MIN,
     MEDIA_SWIPE_SLIDE_GAP_PX,
-    MEDIA_SWIPE_WHEEL_EARLY_FACTOR,
     MEDIA_SWIPE_X_THRESHOLD,
     MEDIA_SWIPE_Y_THRESHOLD,
     clampSwipeOffsetX,
@@ -14,10 +12,8 @@ import {
     projectSwipeOffset,
     rebasedOffsetAfterNav,
     resolveSwipeAxis,
-    settleDurationMs,
-    shouldEarlyCommitWheel,
+    swipeSettleDurationMs,
     verticalDismissOpacity,
-    wheelEarlyThresholdPx,
 } from "./swipe"
 
 describe("media-viewer swipe math", () => {
@@ -79,7 +75,7 @@ describe("media-viewer swipe math", () => {
     })
 
     describe("commitSwipe", () => {
-        it("closes on vertical past threshold", () => {
+        it("closes on vertical down past threshold and bounces on vertical up", () => {
             expect(
                 commitSwipe({
                     axis: "vertical",
@@ -97,7 +93,19 @@ describe("media-viewer swipe math", () => {
                     canOlder: true,
                     canNewer: true,
                 }),
-            ).toBe("close")
+            ).toBe("bounce")
+        })
+
+        it("does not close on unlocked-axis upward past threshold", () => {
+            expect(
+                commitSwipe({
+                    axis: "none",
+                    offsetX: 0,
+                    offsetY: -MEDIA_SWIPE_Y_THRESHOLD - 1,
+                    canOlder: true,
+                    canNewer: true,
+                }),
+            ).toBe("bounce")
         })
 
         it("does not close on vertical under threshold", () => {
@@ -208,17 +216,6 @@ describe("media-viewer swipe math", () => {
         })
     })
 
-    describe("shouldEarlyCommitWheel", () => {
-        it("is true past 2× threshold on the locked axis", () => {
-            let earlyX = wheelEarlyThresholdPx(MEDIA_SWIPE_X_THRESHOLD)
-            expect(earlyX).toBe(MEDIA_SWIPE_X_THRESHOLD * MEDIA_SWIPE_WHEEL_EARLY_FACTOR)
-            expect(shouldEarlyCommitWheel("horizontal", earlyX + 1, 0)).toBe(true)
-            expect(shouldEarlyCommitWheel("horizontal", earlyX, 0)).toBe(false)
-            expect(shouldEarlyCommitWheel("vertical", 0, earlyX + 1)).toBe(true)
-            expect(shouldEarlyCommitWheel("none", earlyX + 1, earlyX + 1)).toBe(false)
-        })
-    })
-
     describe("rebasedOffsetAfterNav", () => {
         it("shifts by one slide step so neighbor stays under the finger after swap", () => {
             let step = horizontalSlideStepPx(1000)
@@ -236,12 +233,10 @@ describe("media-viewer swipe math", () => {
         })
     })
 
-    describe("settleDurationMs", () => {
-        it("scales with remaining distance", () => {
-            expect(settleDurationMs(0, 1000)).toBe(MEDIA_SWIPE_SETTLE_MS_MIN)
-            expect(settleDurationMs(1000, 1000)).toBe(MEDIA_SWIPE_SETTLE_MS)
-            expect(settleDurationMs(200, 1000)).toBeGreaterThan(MEDIA_SWIPE_SETTLE_MS_MIN)
-            expect(settleDurationMs(200, 1000)).toBeLessThan(MEDIA_SWIPE_SETTLE_MS)
-        })
+    it("swipeSettleDurationMs uses motion tokens", () => {
+        expect(swipeSettleDurationMs("nav", false)).toBe(MOTION_NAV_MS)
+        expect(swipeSettleDurationMs("bounce", false)).toBe(MOTION_SETTLE_MS)
+        expect(swipeSettleDurationMs("nav", true)).toBe(0)
+        expect(swipeSettleDurationMs("bounce", true)).toBe(0)
     })
 })

@@ -156,6 +156,12 @@ export {
     shouldCommitSwipe,
 } from "./swipe-reveal/swipe"
 
+export type { DragAxis } from "./offset-drag/math"
+export { DRAG_LOCK_PX, DRAG_LOCK_RATIO, resolveDragAxis, projectDragOffset } from "./offset-drag/math"
+export { WHEEL_QUIET_PX, WHEEL_RELEASE_MS, WHEEL_COOLDOWN_MS } from "./offset-drag/wheel-session"
+export type { OffsetDrag, OffsetDragConfig, OffsetDragRelease } from "./offset-drag/session"
+export { createOffsetDrag } from "./offset-drag/session"
+
 export type { ScrollTweenOptions } from "./scroll-tween/scroll"
 export { SCROLL_TWEEN_MS, playScrollTween } from "./scroll-tween/scroll"
 

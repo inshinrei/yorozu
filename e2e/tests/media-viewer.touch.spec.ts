@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test"
-import { expectIndex, openFromThumb, viewportCenter, viewer } from "../helpers/media"
+import { expect, test, type Page } from "@playwright/test"
+import { expectIndex, openFromThumb, openViewer, viewportCenter, viewer } from "../helpers/media"
 import { waitGone } from "../helpers/wait"
 
 test.use({ hasTouch: true })
@@ -45,4 +45,16 @@ test("V11 touch vertical swipe >50px dismisses", async ({ page }) => {
     await openFromThumb(page, "img-1")
     await touchSwipe(page, 0, 80)
     await waitGone(viewer(page))
+})
+
+test("touch vertical swipe up does not dismiss", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await touchSwipe(page, 0, -80)
+    await expect(openViewer(page)).toHaveCount(1)
+})
+
+test("touch horizontal swipe under 50px stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await touchSwipe(page, -20, 0)
+    await expectIndex(page, 1)
 })

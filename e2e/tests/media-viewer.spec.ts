@@ -4,14 +4,18 @@ import {
     activeZoom,
     currentThumb,
     expectIndex,
+    expectIndexNow,
+    MEDIA_VIEWER_WHEEL_RELEASE_MS,
     openFromThumb,
     openViewer,
     swipeViewport,
     thumbCenterDelta,
+    viewportCenter,
     viewer,
     waitOpen,
+    wheelViewport,
 } from "../helpers/media"
-import { waitGone } from "../helpers/wait"
+import { waitGone, waitMs } from "../helpers/wait"
 
 test("V1 open from a thumb shows dialog phase open and active stage", async ({ page }) => {
     await openFromThumb(page, "img-0")
@@ -217,5 +221,66 @@ test("keys in chrome input are ignored except Escape", async ({ page }) => {
     await page.keyboard.press("+")
     await expect(page.locator("#chrome-percent")).toHaveText("100%")
     await page.keyboard.press("Escape")
+    await waitGone(viewer(page))
+})
+
+test("horizontal swipe under 50px stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await swipeViewport(page, -20, 0)
+    await expectIndex(page, 1)
+})
+
+test("reverse-delta horizontal swipe stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    let from = await viewportCenter(page)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x - 80, from.y, { steps: 8 })
+    await page.mouse.move(from.x - 65, from.y, { steps: 4 })
+    await page.mouse.up()
+    await expectIndex(page, 1)
+})
+
+test("vertical swipe up does not dismiss", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await swipeViewport(page, 0, -80)
+    await expect(openViewer(page)).toHaveCount(1)
+    await expectIndex(page, 1)
+})
+
+test("trackpad wheel past 50px waits for quiet then changes item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await expectIndex(page, 1)
+    await wheelViewport(page, 80, 0)
+    await expectIndexNow(page, 1)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 2)
+})
+
+test("trackpad wheel under 50px stays on the item", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await wheelViewport(page, 20, 0)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 1)
+})
+
+test("trackpad wheel 120px still waits for quiet (no early commit)", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await wheelViewport(page, 120, 0)
+    await expectIndexNow(page, 1)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expectIndex(page, 2)
+})
+
+test("trackpad wheel up does not dismiss", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await wheelViewport(page, 0, 80)
+    await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
+    await expect(openViewer(page)).toHaveCount(1)
+})
+
+test("trackpad wheel down past 50px dismisses after quiet", async ({ page }) => {
+    await openFromThumb(page, "img-1")
+    await wheelViewport(page, 0, -80)
     await waitGone(viewer(page))
 })
