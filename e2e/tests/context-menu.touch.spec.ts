@@ -1,13 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
-import { waitOpacity } from "../helpers/wait"
+import { waitMs, waitOpacity } from "../helpers/wait"
 
 test.use({ hasTouch: true })
-
-const waitMs = async (ms: number): Promise<void> => {
-    await new Promise((resolve) => {
-        setTimeout(resolve, ms)
-    })
-}
 
 const dispatchTouch = async (page: Page, type: "touchstart" | "touchend"): Promise<void> => {
     await page.locator("#menu-target").evaluate((node, eventType) => {

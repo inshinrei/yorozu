@@ -1,31 +1,8 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
+import { expectIndex, openFromThumb, viewportCenter, viewer } from "../helpers/media"
 import { waitGone } from "../helpers/wait"
 
 test.use({ hasTouch: true })
-
-const viewer = (page: Page) => page.locator("[data-yorozu-media-viewer]")
-const currentThumb = (page: Page) => page.locator("[data-yorozu-media-thumb][data-current]")
-
-const waitOpen = async (page: Page): Promise<void> => {
-    await expect(page.locator('[data-yorozu-media-viewer][data-phase="open"]')).toHaveCount(1)
-}
-
-const openFromThumb = async (page: Page, id: string): Promise<void> => {
-    await page.goto("/media-viewer.html")
-    await page.locator(`[data-id="${id}"]`).click()
-    await waitOpen(page)
-}
-
-const expectIndex = async (page: Page, index: number): Promise<void> => {
-    await expect(page.locator("[data-yorozu-media-thumb][data-current]")).toHaveCount(1)
-    await expect(currentThumb(page)).toHaveAttribute("data-index", String(index))
-}
-
-const viewportCenter = async (page: Page): Promise<{ x: number; y: number }> => {
-    let box = await page.locator("[data-yorozu-media-viewport]").boundingBox()
-    expect(box).not.toBeNull()
-    return { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 }
-}
 
 const touchSwipe = async (page: Page, dx: number, dy: number): Promise<void> => {
     let from = await viewportCenter(page)

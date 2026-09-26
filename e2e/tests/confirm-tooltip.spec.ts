@@ -55,3 +55,40 @@ test("Escape does not close when listenEsc is omitted", async ({ page }) => {
     await page.keyboard.press("Escape")
     await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
 })
+
+test("working lock ignores outside pointer, Escape, and history-back", async ({ page }) => {
+    await page.goto("/confirm-tooltip.html?lock=1")
+    await page.locator("#open-confirm").click()
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+    await page.mouse.click(8, 8)
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+    await page.keyboard.press("Escape")
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+    await page.goBack()
+    await waitOpacity(page.locator("[data-yorozu-confirm]"), "1")
+})
+
+test("history-back hides the panel", async ({ page }) => {
+    await openConfirm(page)
+    await page.goBack()
+    await waitGone(page.locator("[data-yorozu-confirm]"))
+})
+
+test("clamp near the corner stays in the viewport and does not flip above the pointer", async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 600 })
+    await page.goto("/confirm-tooltip.html")
+    let trigger = page.locator("#open-confirm-corner")
+    let triggerBox = await trigger.boundingBox()
+    expect(triggerBox).not.toBeNull()
+    let clickY = triggerBox!.y + triggerBox!.height / 2
+    await trigger.click()
+    let panel = page.locator("[data-yorozu-confirm]")
+    await waitOpacity(panel, "1")
+    let box = await panel.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(16)
+    expect(box!.y).toBeGreaterThanOrEqual(16)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(800 - 16)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(600 - 16)
+    expect(box!.y).toBeLessThanOrEqual(clickY)
+})

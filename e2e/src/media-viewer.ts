@@ -12,12 +12,7 @@ const GIF_SRC: string = "/media/loop.gif"
 const VID_SRC: string = "/media/clip.mp4"
 
 const items: MediaViewerItem[] = [
-    { id: "img-0", kind: "image", src: IMG_SRC },
-    { id: "img-1", kind: "image", src: IMG_SRC },
-    { id: "img-2", kind: "image", src: IMG_SRC },
-    { id: "img-3", kind: "image", src: IMG_SRC },
-    { id: "img-4", kind: "image", src: IMG_SRC },
-    { id: "img-5", kind: "image", src: IMG_SRC },
+    ...Array.from({ length: 20 }, (_, i): MediaViewerItem => ({ id: `img-${i}`, kind: "image", src: IMG_SRC })),
     { id: "gif-0", kind: "gif", src: GIF_SRC },
     { id: "vid-0", kind: "video", src: VID_SRC },
 ]
@@ -79,7 +74,11 @@ const paintHeader = (container: HTMLElement, api: MediaViewerChromeApi): (() => 
     percent.id = "chrome-percent"
     percent.textContent = api.percentLabel()
 
-    bar.append(close, prev, next, zoomIn, zoomOut, reset, percent)
+    let search = document.createElement("input")
+    search.id = "chrome-search"
+    search.type = "text"
+
+    bar.append(close, prev, next, zoomIn, zoomOut, reset, percent, search)
     container.append(bar)
 
     return api.onZoomChange(() => {
@@ -93,6 +92,18 @@ attachMediaViewer(viewer, document.body, { prefersReducedMotion })
 let gallery = document.querySelector("#gallery")
 if (!(gallery instanceof HTMLElement)) {
     throw new Error("missing #gallery")
+}
+
+for (let item of items) {
+    let btn = document.createElement("button")
+    btn.type = "button"
+    btn.setAttribute("data-id", item.id)
+    btn.setAttribute("data-yorozu-media-origin", item.id)
+    let img = document.createElement("img")
+    img.src = item.kind === "gif" ? GIF_SRC : IMG_SRC
+    img.alt = ""
+    btn.append(img)
+    gallery.append(btn)
 }
 
 gallery.addEventListener("click", (event: MouseEvent) => {

@@ -97,6 +97,13 @@ const paintRootMenu = (): HTMLElement => {
     stay.tabIndex = 0
     stay.textContent = "Stay"
 
+    let disabled = document.createElement("div")
+    disabled.id = "item-disabled"
+    disabled.setAttribute("role", "menuitem")
+    disabled.setAttribute("aria-disabled", "true")
+    disabled.className = "disabled"
+    disabled.textContent = "Disabled"
+
     let closeItem = document.createElement("div")
     closeItem.id = "item-close"
     closeItem.setAttribute("role", "menuitem")
@@ -121,7 +128,7 @@ const paintRootMenu = (): HTMLElement => {
         submenuHover?.openFromClick()
     })
 
-    menu.append(stay, closeItem, sub)
+    menu.append(stay, disabled, closeItem, sub)
     document.body.append(menu)
     return menu
 }
@@ -146,9 +153,11 @@ const openRoot = (anchor: { x: number; y: number }): void => {
             openSubmenu(next)
         },
     })
+    let omitListenEsc = new URLSearchParams(window.location.search).get("esc") === "0"
     session = createMenuSession({
         onClose: destroyRoot,
         getDurationMs,
+        ...(omitListenEsc ? { listenEsc: false } : {}),
     })
     session.attach(menuEl)
     session.placePointer(anchor)
@@ -159,12 +168,18 @@ if (!(target instanceof HTMLElement)) {
     throw new Error("missing #menu-target")
 }
 
-bindLongPress(target)
+const bindTarget = (node: HTMLElement): void => {
+    bindLongPress(node)
+    node.addEventListener("contextmenu", (event: MouseEvent) => {
+        event.preventDefault()
+        openRoot({ x: event.clientX, y: event.clientY })
+    })
+}
 
-target.addEventListener("contextmenu", (event: MouseEvent) => {
-    event.preventDefault()
-    openRoot({ x: event.clientX, y: event.clientY })
-})
+bindTarget(target)
+
+let corner = document.querySelector("#menu-target-corner")
+if (corner instanceof HTMLElement) bindTarget(corner)
 
 document.addEventListener("keydown", (event: KeyboardEvent) => {
     if (session == null || menuEl == null) return

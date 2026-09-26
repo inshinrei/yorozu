@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
+import { waitMs } from "../helpers/wait"
 
 type Point = { x: number; y: number }
 
@@ -132,4 +133,52 @@ test("click without 10px move does not change #order-y", async ({ page }) => {
     await page.mouse.move(from.x + 2, from.y + 2)
     await page.mouse.up()
     await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+})
+
+test("pointercancel restores order and transforms", async ({ page }) => {
+    await page.goto("/sortable.html")
+    let list = page.locator("#list-y")
+    let { from, to } = await captureCenters(list)
+    await dragTowardWithoutUp(page, from, to, { x: from.x, y: from.y + 12 })
+    await assertPreview(list, "y")
+    await page.evaluate(() => {
+        document.dispatchEvent(
+            new PointerEvent("pointercancel", {
+                bubbles: true,
+                cancelable: true,
+                pointerId: 1,
+                isPrimary: true,
+            }),
+        )
+    })
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+    expect(await joinDataKeys(list)).toBe("a,b,c,d")
+    expect(transformsCleared(await itemTransforms(list))).toBe(true)
+})
+
+test("HOLD activation: early move does not reorder; still press then drag does", async ({ page }) => {
+    await page.goto("/sortable.html")
+    await expect(page.locator("#order-hold")).toHaveText("a,b,c,d,e,f,g,h")
+    let list = page.locator("#list-hold")
+    let a = list.locator('[data-key="a"]')
+    let c = list.locator('[data-key="c"]')
+    let aBox = await a.boundingBox()
+    let cBox = await c.boundingBox()
+    expect(aBox).not.toBeNull()
+    expect(cBox).not.toBeNull()
+    let from = boxCenter(aBox!)
+    let to = boxCenter(cBox!)
+
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + 8, from.y)
+    await page.mouse.up()
+    await expect(page.locator("#order-hold")).toHaveText("a,b,c,d,e,f,g,h")
+
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await waitMs(220)
+    await page.mouse.move(to.x, to.y, { steps: 12 })
+    await page.mouse.up()
+    await expect(page.locator("#order-hold")).not.toHaveText("a,b,c,d,e,f,g,h")
 })

@@ -10,7 +10,8 @@
             }
             #list-y,
             #list-x,
-            #list-both {
+            #list-both,
+            #list-hold {
                 display: flex;
                 gap: 4px;
                 margin: 0 0 16px;
@@ -25,9 +26,15 @@
                 flex-wrap: wrap;
                 width: 120px;
             }
+            #list-hold {
+                flex-direction: row;
+                width: 160px;
+                overflow-x: auto;
+            }
             #list-y > *,
             #list-x > *,
-            #list-both > * {
+            #list-both > *,
+            #list-hold > * {
                 box-sizing: border-box;
                 flex: 0 0 48px;
                 width: 48px;
@@ -48,6 +55,8 @@
         <div id="order-x"></div>
         <div id="list-both"></div>
         <div id="order-both"></div>
+        <div id="list-hold"></div>
+        <div id="order-hold"></div>
         <script type="module" src="/src/sortable.ts"></script>
     </body>
 </html>

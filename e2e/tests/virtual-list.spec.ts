@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { waitMs } from "../helpers/wait"
 import { assertContiguous, mountedIds } from "../helpers/list"
 
 const ITEM_SIZE: number = 48
@@ -65,10 +66,32 @@ test("after jump-80, wait 200ms, row-80 still mounted", async ({ page }) => {
     await expect(row(page, "row-0")).toBeAttached()
     await page.locator("#jump-80").click()
     await expect(row(page, "row-80")).toBeAttached()
-    await new Promise((resolve) => {
-        setTimeout(resolve, 200)
-    })
+    await waitMs(200)
     await expect(row(page, "row-80")).toBeAttached()
+})
+
+test("PageDown Home End on a focused scroller move the window", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+    let scroller = page.locator("#scroller")
+    await scroller.focus()
+    await page.keyboard.press("PageDown")
+    await expect.poll(async () => scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBeGreaterThan(0)
+    let scrollTop = await scroller.evaluate((el) => (el as HTMLElement).scrollTop)
+    let afterPage = await mountedIds(rows(page))
+    assertContiguous(afterPage, "row-")
+    let firstVisible = Math.floor(scrollTop / ITEM_SIZE)
+    expect(afterPage).toContain(`row-${String(firstVisible)}`)
+
+    await page.keyboard.press("End")
+    await expect(row(page, "row-490")).toBeAttached()
+    let afterEnd = await mountedIds(rows(page))
+    assertContiguous(afterEnd, "row-")
+    expect(afterEnd).toContain("row-490")
+
+    await page.keyboard.press("Home")
+    await expect(row(page, "row-0")).toBeAttached()
+    await assertWindow(page, { firstId: "row-0" })
 })
 
 test("L4 rapid jumps keep the target mounted and contiguous", async ({ page }) => {

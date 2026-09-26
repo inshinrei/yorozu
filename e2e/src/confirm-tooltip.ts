@@ -14,9 +14,11 @@ if (!(openButton instanceof HTMLButtonElement)) {
     throw new Error("missing #open-confirm")
 }
 
-let omitListenEsc = new URLSearchParams(window.location.search).get("esc") === "0"
+let params = new URLSearchParams(window.location.search)
+let omitListenEsc = params.get("esc") === "0"
+let workingLock = params.get("lock") === "1"
 
-openButton.addEventListener("click", (event: MouseEvent) => {
+const openAt = (x: number, y: number): void => {
     if (session != null) return
 
     let root = document.createElement("div")
@@ -42,6 +44,7 @@ openButton.addEventListener("click", (event: MouseEvent) => {
     danger.id = "confirm-danger"
     danger.setAttribute("data-yorozu-confirm-danger", "")
     danger.textContent = "Delete"
+    if (workingLock) danger.disabled = true
     danger.addEventListener("click", () => {
         session?.close()
     })
@@ -54,8 +57,20 @@ openButton.addEventListener("click", (event: MouseEvent) => {
     session = createConfirmTooltipSession({
         onClose,
         ...(omitListenEsc ? {} : { listenEsc: true }),
+        ...(workingLock ? { canClose: () => false } : {}),
         getDurationMs: () => 0,
     })
     session.attach(panel)
-    session.place({ x: event.clientX, y: event.clientY })
+    session.place({ x, y })
+}
+
+openButton.addEventListener("click", (event: MouseEvent) => {
+    openAt(event.clientX, event.clientY)
 })
+
+let corner = document.querySelector("#open-confirm-corner")
+if (corner instanceof HTMLButtonElement) {
+    corner.addEventListener("click", (event: MouseEvent) => {
+        openAt(event.clientX, event.clientY)
+    })
+}
