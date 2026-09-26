@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/resource-cache",
-    "version": "1.0.97",
+    "version": "1.0.98",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

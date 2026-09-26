@@ -1,6 +1,7 @@
 /**
  * Origin seed capture from a thumb stamped with data-media-origin.
  */
+import { isRectFullyVisibleIn } from "@yorozu/animations"
 import type { MediaViewerOrigin } from "./types"
 
 export const MEDIA_ORIGIN_ATTR: string = "data-media-origin"
@@ -105,4 +106,16 @@ export function captureOriginFromDom(
     if (naturalWidth && naturalWidth > 0) origin.naturalWidth = naturalWidth
     if (naturalHeight && naturalHeight > 0) origin.naturalHeight = naturalHeight
     return origin
+}
+
+export function isMediaOriginLandable(
+    rect: { top: number; left: number; width: number; height: number },
+    opts: {
+        viewport: { top: number; left: number; width: number; height: number }
+        clip?: { top: number; left: number; width: number; height: number } | null
+    },
+): boolean {
+    if (!isRectFullyVisibleIn(rect, opts.viewport)) return false
+    if (opts.clip == null) return true
+    return isRectFullyVisibleIn(rect, opts.clip)
 }

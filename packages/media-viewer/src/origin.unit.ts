@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { captureOriginFromDom, MEDIA_ORIGIN_ATTR, mediaOriginSelector, queryMediaOriginEl } from "./origin"
+import {
+    captureOriginFromDom,
+    isMediaOriginLandable,
+    MEDIA_ORIGIN_ATTR,
+    mediaOriginSelector,
+    queryMediaOriginEl,
+} from "./origin"
 
 function fakeRect(left: number, top: number, width: number, height: number): DOMRect {
     return {
@@ -85,5 +91,46 @@ describe("media origin", () => {
             imageUrl: "https://cdn.example/poster.jpg",
             objectFit: "cover",
         })
+    })
+})
+
+describe("isMediaOriginLandable", () => {
+    let viewport = { top: 0, left: 0, width: 400, height: 300 }
+    let clip = { top: 0, left: 0, width: 200, height: 200 }
+    let fully = { top: 10, left: 10, width: 40, height: 40 }
+
+    it("is true when the rect is fully inside window and clip", () => {
+        expect(isMediaOriginLandable(fully, { viewport, clip })).toBe(true)
+    })
+
+    it("is false when the rect is 2px past the window", () => {
+        expect(isMediaOriginLandable({ top: -2, left: 10, width: 40, height: 40 }, { viewport, clip })).toBe(false)
+    })
+
+    it("is false when the rect is 2px past the clip", () => {
+        expect(
+            isMediaOriginLandable(
+                { top: 10, left: 10, width: 40, height: 40 },
+                {
+                    viewport,
+                    clip: { top: 0, left: 0, width: 200, height: 48 },
+                },
+            ),
+        ).toBe(false)
+    })
+
+    it("is true when the rect is 1px past the window (epsilon)", () => {
+        expect(isMediaOriginLandable({ top: -1, left: 10, width: 40, height: 40 }, { viewport })).toBe(true)
+    })
+
+    it("without clip still requires a fully visible window rect", () => {
+        expect(isMediaOriginLandable(fully, { viewport })).toBe(true)
+        expect(isMediaOriginLandable(fully, { viewport, clip: null })).toBe(true)
+        expect(isMediaOriginLandable({ top: -2, left: 10, width: 40, height: 40 }, { viewport })).toBe(false)
+    })
+
+    it("is false for a zero-size clip or rect", () => {
+        expect(isMediaOriginLandable(fully, { viewport, clip: { top: 0, left: 0, width: 0, height: 0 } })).toBe(false)
+        expect(isMediaOriginLandable({ top: 10, left: 10, width: 0, height: 40 }, { viewport })).toBe(false)
     })
 })
