@@ -55,3 +55,19 @@ function paint(): void {
     }
 }
 ```
+
+Edge bounce is opt-in via `@yorozu/animations`. `createVirtualList` does not paint rubber. Hosts that omit the session get native clamp / UA rubber only.
+
+```ts
+import { createOverscrollBounce } from "@yorozu/animations"
+
+createOverscrollBounce(scroller, sizer)
+```
+
+```css
+#scroller {
+    overflow-y: auto;
+    overscroll-behavior: none;
+    overflow-anchor: none;
+}
+```

@@ -35,6 +35,10 @@ export function createEdgeDebouncedLoaders(
     return { loadMoreForwards, loadMoreBackwards }
 }
 
+export function isScrollOverscrolled(scrollTop: number, maxScroll: number): boolean {
+    return scrollTop < 0 || scrollTop > Math.max(0, maxScroll)
+}
+
 export function handleEdgeScroll(args: {
     scrollTop: number
     viewportHeight: number

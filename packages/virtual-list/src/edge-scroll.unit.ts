@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
     createEdgeDebouncedLoaders,
     handleEdgeScroll,
+    isScrollOverscrolled,
     leadingDebounce,
     maybePreloadBackwards,
     type EdgeScrollState,
@@ -325,5 +326,17 @@ describe("maybePreloadBackwards", () => {
             }),
         ).toBe(true)
         expect(load).toHaveBeenCalled()
+    })
+})
+
+describe("isScrollOverscrolled", () => {
+    it("is true only outside [0, maxScroll]", () => {
+        expect(isScrollOverscrolled(-1, 100)).toBe(true)
+        expect(isScrollOverscrolled(0, 100)).toBe(false)
+        expect(isScrollOverscrolled(100, 100)).toBe(false)
+        expect(isScrollOverscrolled(101, 100)).toBe(true)
+        expect(isScrollOverscrolled(0, 0)).toBe(false)
+        expect(isScrollOverscrolled(-1, 0)).toBe(true)
+        expect(isScrollOverscrolled(-8, -10)).toBe(true)
     })
 })

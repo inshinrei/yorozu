@@ -337,6 +337,51 @@ describe("createVirtualList", () => {
         list.destroy()
     })
 
+    it("does not edge-load on negative scrollTop", () => {
+        let items = ids(100)
+        let load = vi.fn()
+        let changes = 0
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+            loadMoreBackwards: load,
+            onChange: () => {
+                changes += 1
+            },
+        })
+        list.sync()
+        let idsAfterSync = list.viewportIds()
+        let changesAfterSync = changes
+        list.onScroll({ scrollTop: 0, viewportHeight: 80 })
+        list.onScroll({ scrollTop: -40, viewportHeight: 80 })
+        expect(load).not.toHaveBeenCalled()
+        expect(changes).toBe(changesAfterSync)
+        expect(list.viewportIds()).toBe(idsAfterSync)
+        list.destroy()
+    })
+
+    it("does not edge-load when scrollTop is past max", () => {
+        let items = ids(100)
+        let load = vi.fn()
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+            loadMoreBackwards: load,
+        })
+        list.sync()
+        list.reanchor(90)
+        list.getMore("backwards")
+        list.onScroll({ scrollTop: 90 * 40, viewportHeight: 80 })
+        load.mockClear()
+        let idsAtTail = list.viewportIds()
+        list.onScroll({ scrollTop: 90 * 40 + 10_000, viewportHeight: 80 })
+        expect(load).not.toHaveBeenCalled()
+        expect(list.viewportIds()).toEqual(idsAtTail)
+        list.destroy()
+    })
+
     it("destroy cancels a pending idle trim", () => {
         let items = ids(100)
         let list = createVirtualList({

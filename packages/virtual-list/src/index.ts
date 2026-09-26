@@ -15,6 +15,7 @@ export {
     leadingDebounce,
     createEdgeDebouncedLoaders,
     handleEdgeScroll,
+    isScrollOverscrolled,
     maybePreloadBackwards,
 } from "./edge-scroll"
 export {

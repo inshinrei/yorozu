@@ -4,6 +4,7 @@ import {
     DEFAULT_SENSITIVE_AREA_PX,
     createEdgeDebouncedLoaders,
     handleEdgeScroll,
+    isScrollOverscrolled,
     maybePreloadBackwards,
     type EdgeScrollState,
 } from "./edge-scroll"
@@ -317,19 +318,22 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
 
         let windowEnd = from + mountedCount
         let itemSize = options.itemSize
-        handleEdgeScroll({
-            scrollTop: metrics.scrollTop,
-            viewportHeight: metrics.viewportHeight,
-            itemHeight: typeof itemSize === "number" ? itemSize : rowHeight(0),
-            fromOffset: from,
-            mountedCount,
-            sensitiveArea,
-            state: edgeState,
-            loadMoreForwards,
-            loadMoreBackwards,
-            mountedTopPx: rowTop(from),
-            mountedBottomPx: windowEnd >= count ? totalSize() : rowTop(windowEnd),
-        })
+        let maxScroll = Math.max(0, totalSize() - metrics.viewportHeight)
+        if (!isScrollOverscrolled(metrics.scrollTop, maxScroll)) {
+            handleEdgeScroll({
+                scrollTop: metrics.scrollTop,
+                viewportHeight: metrics.viewportHeight,
+                itemHeight: typeof itemSize === "number" ? itemSize : rowHeight(0),
+                fromOffset: from,
+                mountedCount,
+                sensitiveArea,
+                state: edgeState,
+                loadMoreForwards,
+                loadMoreBackwards,
+                mountedTopPx: rowTop(from),
+                mountedBottomPx: windowEnd >= count ? totalSize() : rowTop(windowEnd),
+            })
+        }
 
         scheduleIdleTrim()
         maybeFireNearEnd(count)

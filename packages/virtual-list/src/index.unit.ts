@@ -11,6 +11,7 @@ describe("package barrel", () => {
         expect(vl.DEFAULT_MAX_MOUNTED_FACTOR).toBe(3)
         expect(typeof vl.createEdgeDebouncedLoaders).toBe("function")
         expect(typeof vl.handleEdgeScroll).toBe("function")
+        expect(typeof vl.isScrollOverscrolled).toBe("function")
         expect(typeof vl.maybePreloadBackwards).toBe("function")
         expect(typeof vl.leadingDebounce).toBe("function")
         expect(vl.DEFAULT_SENSITIVE_AREA_PX).toBe(800)
