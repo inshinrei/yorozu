@@ -166,7 +166,7 @@ describe("default media viewer styles", () => {
         expect(ghostChrome).toBeNull()
     })
 
-    it("backdrop clip-path rides the ghost flight, not chrome phase", () => {
+    it("backdrop clip-path uses linear 150/100, not the ghost cubic", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain(
             'html.yorozu-media-ghost-animating [data-yorozu-media-viewer][data-phase="opening"] [data-yorozu-media-backdrop]',
@@ -203,8 +203,13 @@ describe("default media viewer styles", () => {
 
     it("closing chrome uses chrome-close duration", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        expect(css).toContain('[data-yorozu-media-viewer][data-phase="closing"] [data-yorozu-media-header]')
-        expect(css).toContain("--yorozu-media-chrome-close-ms")
+        let closingBlock =
+            css.match(
+                /(?:^|\n)\[data-yorozu-media-viewer\]\[data-phase="closing"\] \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(closingBlock).toContain('[data-yorozu-media-viewer][data-phase="closing"] [data-yorozu-media-header]')
+        expect(closingBlock).toContain("--yorozu-media-chrome-close-ms")
+        expect(closingBlock).toContain("--yorozu-media-chrome-hide-ease")
     })
 
     it("closing phase does not set pointer-events none so leftover gestures stay on the overlay", () => {

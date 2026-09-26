@@ -6,6 +6,7 @@ import {
     MEDIA_GHOST_CLOSE_EASING,
     MEDIA_GHOST_CLOSE_MS,
     MEDIA_GHOST_EASING,
+    MEDIA_GHOST_HANDOFF_CLASS,
     MEDIA_GHOST_MS,
 } from "./ghost"
 import { createMediaViewer, filmstripItemSizes, type MediaViewer } from "./session"
@@ -102,7 +103,7 @@ describe("attachMediaViewer", () => {
         stop = undefined
         viewer.destroy()
         root.remove()
-        document.documentElement.classList.remove(MEDIA_GHOST_ANIMATING_CLASS)
+        document.documentElement.classList.remove(MEDIA_GHOST_ANIMATING_CLASS, MEDIA_GHOST_HANDOFF_CLASS)
         Reflect.deleteProperty(HTMLElement.prototype, "animate")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
         Reflect.deleteProperty(HTMLElement.prototype, "scrollTo")

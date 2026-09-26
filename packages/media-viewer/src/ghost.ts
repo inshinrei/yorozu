@@ -126,6 +126,7 @@ export function createMediaGhost(opts?: {
         if (!el) return
         if (on) {
             el.classList.add(animatingClass)
+            el.classList.remove(handoffClass)
             return
         }
         el.classList.remove(animatingClass)
@@ -205,7 +206,10 @@ export function createMediaGhost(opts?: {
             hideTarget: playOpts.hideTarget,
             durationMs: playOpts.durationMs ?? MEDIA_GHOST_CLOSE_MS,
             easing: playOpts.easing ?? MEDIA_GHOST_CLOSE_EASING,
-            onLand: playOpts.onLand,
+            onLand: async () => {
+                if (gen !== my) return
+                await playOpts.onLand?.()
+            },
         })
         if (!playback) {
             if (gen === my) setAnimating(false)
