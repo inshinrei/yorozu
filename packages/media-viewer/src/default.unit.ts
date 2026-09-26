@@ -190,6 +190,22 @@ describe("default media viewer styles", () => {
         expect(backdropBlock).not.toContain("--yorozu-media-chrome-ms")
     })
 
+    it("chrome reveals during opening, not only after ghost land", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let openingHeader =
+            '[data-yorozu-media-viewer][data-phase="opening"]:not([data-swipe-dismiss]) [data-yorozu-media-header]'
+        expect(css).toContain(openingHeader)
+        let openingBlock =
+            css.match(
+                /(?:^|\n)\[data-yorozu-media-viewer\]\[data-phase="opening"\]:not\(\[data-swipe-dismiss\]\) \[data-yorozu-media-header\][\s\S]*?\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(openingBlock).toContain("[data-yorozu-media-footer]")
+        expect(openingBlock).toContain("[data-yorozu-media-chrome]")
+        expect(openingBlock).toContain("[data-yorozu-media-filmstrip-clip]")
+        expect(openingBlock).toContain("clip-path: inset(0 0 0 0)")
+        expect(openingBlock).toContain("--yorozu-media-chrome-ease")
+    })
+
     it("handoff class reveals the viewport under the flying clone", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let animatingIdx = css.indexOf("html.yorozu-media-ghost-animating [data-yorozu-media-viewport]")
