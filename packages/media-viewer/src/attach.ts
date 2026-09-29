@@ -1208,7 +1208,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         list.setListSlice(slice)
         let count = snap.items.length
         let mounted = list.viewportIds()?.length ?? 0
-        if (count > 0 && slice >= count && mounted < count) {
+        let shouldGrow = count > 0 && slice >= count && mounted < count
+        let shouldShrink = count > 0 && slice < count && mounted >= count
+        if (shouldGrow || shouldShrink) {
             list.reanchor(snap.index)
             list.sync()
         }
@@ -1230,7 +1232,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             filmstripListNeighborSize === sizes.neighbor &&
             filmstripListCurrentSize === sizes.current
         ) {
-            filmstripList.setListSlice(resolveFilmstripListSlice(filmstripList, filmstripEl?.clientWidth ?? 0))
+            filmstripList.setListSlice(filmstripSlice(filmstripEl?.clientWidth ?? 0))
             return filmstripList
         }
         destroyFilmstripList()

@@ -2685,4 +2685,21 @@ describe("attachMediaViewer", () => {
         expect(nav.querySelector('[data-id="id-0"]')).toBe(kept)
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("1")
     })
+
+    it("virtual default setItems from short to long windows the overflowing album", () => {
+        let short = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items: short, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
+        viewer.setItems(short, 0)
+        expect(nav.querySelectorAll("[data-yorozu-media-thumb]")).toHaveLength(8)
+        expect(nav.getAttribute("data-overflow")).toBe("false")
+        let many = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
+        viewer.setItems(many, 0)
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
+        expect(nav.getAttribute("data-overflow")).toBe("true")
+        expect(thumbs.length).toBeGreaterThan(0)
+        expect(thumbs.length).toBeLessThan(many.length)
+        expect(nav.querySelector("[data-edge]")).toBeNull()
+    })
 })
