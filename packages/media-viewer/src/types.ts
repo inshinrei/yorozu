@@ -127,6 +127,7 @@ export type MediaViewer = {
     filmstripVirtualize: () => boolean
     filmstripItemSizePx: () => number
     filmstripItemSizes: () => FilmstripItemSizes
+    filmstripExplicitItemSize: () => boolean
     filmstripOverscan: () => number
     filmstripThumbSrc: () => ((item: MediaViewerItem) => string | null) | undefined
     chrome: () => MediaViewerChromeSlots | null

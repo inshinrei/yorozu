@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import { DEFAULT_DECODE_BUDGET_ACTIVE, DEFAULT_DECODE_BUDGET_PEEK, DEFAULT_DECODE_BUDGET_THUMB } from "./decode"
 import {
     createMediaViewer,
+    DEFAULT_FILMSTRIP_CURRENT_GAP_PX,
+    DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX,
+    DEFAULT_FILMSTRIP_GAP_PX,
     DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
     DEFAULT_FILMSTRIP_OVERSCAN,
     filmstripItemSizes,
@@ -394,6 +397,37 @@ describe("createMediaViewer", () => {
             filmstrip: { virtualize: true, itemSizePx: { neighbor: 20, current: -1 } },
         })
         expect(viewer!.filmstripItemSizes()).toEqual({ neighbor: 20, current: filmstripItemSizes().current })
+    })
+
+    it("filmstrip default pitches use cap 160 and current gap 8", () => {
+        expect(DEFAULT_FILMSTRIP_GAP_PX).toBe(2)
+        expect(DEFAULT_FILMSTRIP_CURRENT_GAP_PX).toBe(8)
+        expect(DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX).toBe(160)
+        expect(filmstripItemSizes()).toEqual({ neighbor: 46, current: 168 })
+        expect(filmstripItemSizes({ neighbor: 20, current: 30, gap: 1, currentGap: 4 })).toEqual({
+            neighbor: 21,
+            current: 34,
+        })
+    })
+
+    it("filmstripExplicitItemSize is true only for a valid itemSizePx", () => {
+        expect(viewer!.filmstripExplicitItemSize()).toBe(false)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: { virtualize: true } })
+        expect(viewer!.filmstripExplicitItemSize()).toBe(false)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: { virtualize: true, itemSizePx: 40 } })
+        expect(viewer!.filmstripExplicitItemSize()).toBe(true)
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 20, current: 30 } },
+        })
+        expect(viewer!.filmstripExplicitItemSize()).toBe(true)
+        viewer!.open({
+            items: [img("a"), img("b")],
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 0, current: Number.NaN } },
+        })
+        expect(viewer!.filmstripExplicitItemSize()).toBe(false)
+        viewer!.open({ items: [img("a"), img("b")], filmstrip: true })
+        expect(viewer!.filmstripExplicitItemSize()).toBe(false)
     })
 
     it("filmstrip object defaults and boolean paths do not virtualize", () => {
