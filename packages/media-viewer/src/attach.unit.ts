@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { attachMediaViewer } from "./attach"
+import { filmstripCurrentWidthPx, filmstripGapAfter, filmstripThumbPitchPx } from "./filmstrip"
 import {
     MEDIA_GHOST_ANIMATING_CLASS,
     MEDIA_GHOST_CLOSE_EASING,
@@ -9,7 +10,7 @@ import {
     MEDIA_GHOST_HANDOFF_CLASS,
     MEDIA_GHOST_MS,
 } from "./ghost"
-import { createMediaViewer, filmstripItemSizes, type MediaViewer } from "./session"
+import { createMediaViewer, type MediaViewer } from "./session"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
 import type {
     MediaViewerChromeApi,
@@ -26,6 +27,10 @@ type DecodeFn = NonNullable<MediaViewerSessionOpts["decode"]>
 
 function img(id: string, src: string | null = `${id}.jpg`): MediaViewerItem {
     return { id, kind: "image", src }
+}
+
+function imgAspect(id: string, w: number, h: number): MediaViewerItem {
+    return { id, kind: "image", src: `${id}.jpg`, naturalWidth: w, naturalHeight: h }
 }
 
 function pointer(type: string, init: Partial<PointerEventInit>): PointerEvent {
@@ -1814,17 +1819,30 @@ describe("attachMediaViewer", () => {
     })
 
     it("virtualized mixed-pitch centerCurrentThumb uses rowTop and current pitch", () => {
-        let items = Array.from({ length: 40 }, (_, i) => img(`id-${i}`))
+        let items = Array.from({ length: 40 }, (_, i) => imgAspect(`id-${i}`, 16, 9))
         viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
         let scrollTo = vi.fn()
         nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
         viewer.goTo(20)
-        let sizes = filmstripItemSizes()
-        let rowTop = 20 * sizes.neighbor
-        let left = rowTop + sizes.current / 2 - 100
-        let totalSize = 39 * sizes.neighbor + sizes.current
+        let w = filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
+        let rowTop = 0
+        for (let i = 0; i < 20; i++) {
+            rowTop += filmstripThumbPitchPx(44, filmstripGapAfter(i, 20, 2, 8))
+        }
+        let left = rowTop + w / 2 - 100
+        let totalSize = rowTop
+        for (let i = 20; i < 40; i++) {
+            let width = i === 20 ? w : 44
+            totalSize += filmstripThumbPitchPx(width, filmstripGapAfter(i, 20, 2, 8))
+        }
         let maxLeft = Math.max(0, totalSize - 200)
         if (left < 0) left = 0
         if (left > maxLeft) left = maxLeft
@@ -1898,32 +1916,46 @@ describe("attachMediaViewer", () => {
     })
 
     it("virtualize default mixed pitches: current cell is wider than neighbors", () => {
-        let items = Array.from({ length: 10 }, (_, i) => img(`id-${i}`))
+        let items = Array.from({ length: 10 }, (_, i) => imgAspect(`id-${i}`, 16, 9))
         viewer.open({ items, index: 2, filmstrip: { virtualize: true } })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
         viewer.setItems(items, 2)
-        let sizes = filmstripItemSizes()
+        let w = filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
         let current = nav.querySelector("[data-current]") as HTMLElement
-        expect(current.style.left).toBe(`${2 * sizes.neighbor}px`)
-        expect(current.style.width).toBe(`${sizes.current}px`)
+        let currentLeft =
+            filmstripThumbPitchPx(44, filmstripGapAfter(0, 2, 2, 8)) +
+            filmstripThumbPitchPx(44, filmstripGapAfter(1, 2, 2, 8))
+        expect(current.style.left).toBe(`${currentLeft}px`)
+        expect(current.style.width).toBe(`${w}px`)
         let neighbor = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
             (el) => el.getAttribute("data-index") === "3",
         ) as HTMLElement
-        expect(neighbor.style.left).toBe(`${2 * sizes.neighbor + sizes.current}px`)
-        expect(neighbor.style.width).toBe(`${sizes.neighbor}px`)
-        expect(Number.parseFloat(current.style.left) + Number.parseFloat(current.style.width)).toBe(
+        expect(neighbor.style.width).toBe("44px")
+        expect(Number.parseFloat(neighbor.style.left)).toBe(currentLeft + w + 8)
+        expect(Number.parseFloat(current.style.left) + Number.parseFloat(current.style.width) + 8).toBe(
             Number.parseFloat(neighbor.style.left),
         )
         let before = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
             (el) => el.getAttribute("data-index") === "1",
         ) as HTMLElement
-        expect(before.style.width).toBe(`${sizes.neighbor}px`)
-        expect(Number.parseFloat(before.style.left) + Number.parseFloat(before.style.width)).toBe(
+        expect(before.style.width).toBe("44px")
+        expect(Number.parseFloat(before.style.left) + Number.parseFloat(before.style.width) + 8).toBe(
             Number.parseFloat(current.style.left),
         )
         let track = nav.querySelector('[role="list"]') as HTMLElement
-        expect(track.style.width).toBe(`${9 * sizes.neighbor + sizes.current}px`)
+        let total = 0
+        for (let i = 0; i < 10; i++) {
+            let width = i === 2 ? w : 44
+            total += filmstripThumbPitchPx(width, filmstripGapAfter(i, 2, 2, 8))
+        }
+        expect(track.style.width).toBe(`${total}px`)
     })
 
     it("failed decode clears the peek spinner", async () => {
@@ -2512,4 +2544,115 @@ describe("attachMediaViewer", () => {
             expect(nextFirst.defaultPrevented).toBe(true)
         },
     )
+
+    it("non-virtual current width follows aspect and clears when leaving current", () => {
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 9, 16), img("c")],
+            index: 0,
+        })
+        let current = root.querySelector("[data-current]") as HTMLElement
+        expect(current.style.width).toBe(
+            `${filmstripCurrentWidthPx({
+                neighborWidth: 44,
+                height: 64,
+                cap: 160,
+                naturalWidth: 16,
+                naturalHeight: 9,
+            })}px`,
+        )
+        viewer.next()
+        let a = [...root.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "0",
+        ) as HTMLElement
+        expect(a.hasAttribute("data-current")).toBe(false)
+        expect(a.style.width).toBe("")
+        let b = root.querySelector("[data-current]") as HTMLElement
+        expect(b.style.width).toBe("44px")
+    })
+
+    it("filmstrip-motion is nav on next and tap on goTo", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        expect(nav.getAttribute("data-filmstrip-motion")).toBe("nav")
+        viewer.next()
+        expect(nav.getAttribute("data-filmstrip-motion")).toBe("nav")
+        viewer.goTo(0)
+        expect(nav.getAttribute("data-filmstrip-motion")).toBe("tap")
+    })
+
+    it("short strip stamps overflow false and edge attrs; long strip clears edges", () => {
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
+        Object.defineProperty(nav, "scrollWidth", { value: 200, configurable: true })
+        viewer.setItems([img("a"), img("b")], 0)
+        expect(nav.getAttribute("data-overflow")).toBe("false")
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
+        expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
+        expect(thumbs[1]?.getAttribute("data-edge")).toBe("end")
+        let many = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
+        Object.defineProperty(nav, "scrollWidth", { value: 2000, configurable: true })
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        viewer.setItems(many, 0)
+        nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        expect(nav.getAttribute("data-overflow")).toBe("true")
+        expect(nav.querySelector("[data-edge]")).toBeNull()
+    })
+
+    it("virtual default paints content width and current-gap gutter", () => {
+        let items = [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 9, 16)]
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
+        viewer.setItems(items, 0)
+        let current = nav.querySelector("[data-current]") as HTMLElement
+        let w = filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
+        expect(current.style.width).toBe(`${w}px`)
+        let neighbor = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "1",
+        ) as HTMLElement
+        expect(neighbor.style.width).toBe("44px")
+        expect(Number.parseFloat(neighbor.style.left)).toBe(w + 8)
+    })
+
+    it("virtual explicit itemSizePx still paints pitch as width", () => {
+        viewer.open({
+            items: [img("a"), img("b"), img("c")],
+            index: 1,
+            filmstrip: { virtualize: true, itemSizePx: { neighbor: 20, current: 30 } },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let current = nav.querySelector("[data-current]") as HTMLElement
+        expect(current.style.width).toBe("30px")
+        expect(current.style.left).toBe("20px")
+    })
+
+    it("virtual default centerCurrentThumb uses content width not pitch", () => {
+        let items = Array.from({ length: 10 }, (_, i) => imgAspect(`id-${i}`, 16, 9))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        let scrollTo = vi.fn()
+        nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
+        viewer.goTo(4)
+        let w = filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
+        let rowTop = 0
+        for (let i = 0; i < 4; i++) {
+            rowTop += filmstripThumbPitchPx(44, filmstripGapAfter(i, 4, 2, 8))
+        }
+        let left = rowTop + w / 2 - 100
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left }))
+    })
 })
