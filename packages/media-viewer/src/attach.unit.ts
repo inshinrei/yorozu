@@ -2657,6 +2657,36 @@ describe("attachMediaViewer", () => {
         )
     })
 
+    it("virtual filmstrip does not pin CSS item-size to the current pitch", () => {
+        let items = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        expect(nav.style.getPropertyValue("--yorozu-media-filmstrip-item-size")).toBe("")
+    })
+
+    it("virtual load restamp snapshots overlay metrics once", () => {
+        let items = Array.from({ length: 12 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLElement
+        let thumbImg = current.querySelector("img") as HTMLImageElement
+        expect(thumbImg).toBeTruthy()
+        Object.defineProperty(thumbImg, "naturalWidth", { value: 16, configurable: true })
+        Object.defineProperty(thumbImg, "naturalHeight", { value: 9, configurable: true })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let reads = 0
+        let orig = window.getComputedStyle.bind(window)
+        window.getComputedStyle = ((elt: Element, pseudo?: string | null) => {
+            if (elt === overlay) reads += 1
+            return orig(elt, pseudo)
+        }) as typeof getComputedStyle
+        try {
+            thumbImg.dispatchEvent(new Event("load"))
+        } finally {
+            window.getComputedStyle = orig
+        }
+        expect(reads).toBe(1)
+    })
+
     it("filmstrip-motion is nav on next and tap on goTo", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement

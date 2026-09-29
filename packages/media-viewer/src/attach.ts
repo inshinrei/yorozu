@@ -1074,6 +1074,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return readFilmstripMetrics()
     }
 
+    function withFilmstripMetrics(run: () => void): void {
+        let owned = filmstripPaintMetricsCache == null
+        if (owned) filmstripPaintMetricsCache = readFilmstripMetrics()
+        try {
+            run()
+        } finally {
+            if (owned) filmstripPaintMetricsCache = null
+        }
+    }
+
     function filmstripThumbAt(index: number): HTMLElement | null {
         if (!filmstripEl) return null
         let el = filmstripEl.querySelector(`[data-yorozu-media-thumb][data-index="${index}"]`)
@@ -1163,12 +1173,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (typeof ResizeObserver !== "function") return
         filmstripResizeObserver = new ResizeObserver(() => {
             if (detached || !filmstripEl) return
-            if (viewer.filmstripVirtualize() && filmstripList != null) {
-                applyFilmstripFitSlice(filmstripList, viewer.snapshot())
-                let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
-                if (track) rebuildVirtualThumbs(track, viewer.snapshot())
-            }
-            stampFilmstripOverflow()
+            withFilmstripMetrics(() => {
+                if (viewer.filmstripVirtualize() && filmstripList != null) {
+                    applyFilmstripFitSlice(filmstripList, viewer.snapshot())
+                    let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+                    if (track) rebuildVirtualThumbs(track, viewer.snapshot())
+                }
+                stampFilmstripOverflow()
+            })
         })
         filmstripResizeObserver.observe(nav)
     }
@@ -1180,14 +1192,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             item.naturalWidth != null && item.naturalHeight != null && item.naturalWidth > 0 && item.naturalHeight > 0
         if (hasItemNaturals) return
         let snap = viewer.snapshot()
-        if (viewer.filmstripVirtualize() && !viewer.filmstripExplicitItemSize() && filmstripList != null) {
-            filmstripList.sync()
-            let track = filmstripEl?.querySelector('[role="list"]') as HTMLElement | null
-            if (track) rebuildVirtualThumbs(track, snap)
-        } else {
-            stampFilmstripCurrentWidths(snap)
-        }
-        stampFilmstripOverflow()
+        withFilmstripMetrics(() => {
+            if (viewer.filmstripVirtualize() && !viewer.filmstripExplicitItemSize() && filmstripList != null) {
+                filmstripList.sync()
+                let track = filmstripEl?.querySelector('[role="list"]') as HTMLElement | null
+                if (track) rebuildVirtualThumbs(track, snap)
+            } else {
+                stampFilmstripCurrentWidths(snap)
+            }
+            stampFilmstripOverflow()
+        })
     }
 
     function destroyFilmstripList(): void {
@@ -1449,7 +1463,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             return
         }
         let virtualize = viewer.filmstripVirtualize()
-        let itemSizePx = viewer.filmstripItemSizePx()
         let createdThisPaint = false
         if (!filmstripEl) {
             createdThisPaint = true
@@ -1472,7 +1485,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         stampFilmstripMotion()
         if (virtualize) {
             filmstripEl.setAttribute("data-virtualized", "")
-            filmstripEl.style.setProperty("--yorozu-media-filmstrip-item-size", `${itemSizePx}px`)
+            filmstripEl.style.removeProperty("--yorozu-media-filmstrip-item-size")
         } else {
             filmstripEl.removeAttribute("data-virtualized")
             filmstripEl.style.removeProperty("--yorozu-media-filmstrip-item-size")
