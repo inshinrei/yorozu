@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { attachMediaViewer } from "./attach"
-import { filmstripCurrentWidthPx, filmstripGapAfter, filmstripThumbPitchPx } from "./filmstrip"
+import {
+    filmstripCurrentWidthPx,
+    filmstripGapAfter,
+    filmstripInterpolatedWidthPx,
+    filmstripThumbPitchPx,
+} from "./filmstrip"
 import {
     MEDIA_GHOST_ANIMATING_CLASS,
     MEDIA_GHOST_CLOSE_EASING,
@@ -77,6 +82,14 @@ function fakeRect(left: number, top: number, width: number, height: number): DOM
             return {}
         },
     }
+}
+
+function mockViewportBox(viewport: HTMLElement, width = 160, height = 600): void {
+    vi.spyOn(viewport, "getBoundingClientRect").mockReturnValue(fakeRect(0, 0, width, height))
+}
+
+function flushLiveRaf(): void {
+    vi.advanceTimersByTime(16)
 }
 
 function stampOriginThumb(
@@ -2827,5 +2840,154 @@ describe("attachMediaViewer", () => {
         expect(thumbs.length).toBeGreaterThan(0)
         expect(thumbs.length).toBeLessThan(many.length)
         expect(nav.querySelector("[data-edge]")).toBeNull()
+    })
+
+    it("horizontal swipe morphs current and incoming widths before index changes", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let current = root.querySelector("[data-current]") as HTMLElement
+        let restCurrent = current.style.width
+        let incoming = [...root.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "2",
+        ) as HTMLElement
+        expect(incoming.style.width).toBe("")
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(root.querySelectorAll("[data-current]")).toHaveLength(1)
+        expect(current.hasAttribute("data-current")).toBe(true)
+        expect(current.style.width).not.toBe(restCurrent)
+        expect(Number.parseFloat(current.style.width)).toBeLessThan(Number.parseFloat(restCurrent))
+        expect(Number.parseFloat(incoming.style.width)).toBeGreaterThan(44)
+        expect(
+            (root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement).getAttribute("data-filmstrip-motion"),
+        ).toBe("swipe")
+    })
+
+    it("under-threshold bounce restores rest widths", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let current = root.querySelector("[data-current]") as HTMLElement
+        let restCurrent = current.style.width
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 380, clientY: 200 }))
+        flushLiveRaf()
+        expect(Number.parseFloat(current.style.width)).toBeLessThan(Number.parseFloat(restCurrent))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 380, clientY: 200 }))
+        vi.advanceTimersByTime(400)
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(current.style.width).toBe(restCurrent)
+        let incoming = [...root.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "2",
+        ) as HTMLElement
+        expect(incoming.style.width).toBe("")
+    })
+
+    it("vertical dismiss does not morph filmstrip widths", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let current = root.querySelector("[data-current]") as HTMLElement
+        let restCurrent = current.style.width
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 200, clientY: 280 }))
+        flushLiveRaf()
+        expect(current.style.width).toBe(restCurrent)
+        let incoming = [...root.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "2",
+        ) as HTMLElement
+        expect(incoming.style.width).toBe("")
+    })
+
+    it("commit paint keeps interpolating leftover offset instead of snapping to rest", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => false })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(2)
+        let current = root.querySelector("[data-current]") as HTMLElement
+        let rest = filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
+        expect(current.getAttribute("data-index")).toBe("2")
+        expect(current.style.width).not.toBe(`${rest}px`)
+    })
+
+    it("live swipe stamp snapshots overlay metrics once", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let reads = 0
+        let orig = window.getComputedStyle.bind(window)
+        window.getComputedStyle = ((elt: Element, pseudo?: string | null) => {
+            if (elt === overlay) reads += 1
+            return orig(elt, pseudo)
+        }) as typeof getComputedStyle
+        try {
+            viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+            viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+            flushLiveRaf()
+        } finally {
+            window.getComputedStyle = orig
+        }
+        expect(reads).toBe(1)
+    })
+
+    it("virtual horizontal swipe morphs incoming content width without replaceChildren", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let items = [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)]
+        viewer.open({ items, index: 1, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
+        viewer.setItems(items, 1)
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        let replaceChildren = vi.spyOn(track, "replaceChildren")
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let incoming = [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "2",
+        ) as HTMLElement
+        expect(incoming).toBeTruthy()
+        let restIncoming = incoming.style.width
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(replaceChildren).not.toHaveBeenCalled()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(Number.parseFloat(incoming.style.width)).toBeGreaterThan(Number.parseFloat(restIncoming || "44"))
     })
 })

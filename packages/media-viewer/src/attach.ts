@@ -4,7 +4,16 @@
 import { dualRaf, prefersReducedMotion } from "@yorozu/animations"
 import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
 import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
-import { filmstripCurrentWidthPx, filmstripGapAfter, filmstripOverflows, filmstripThumbPitchPx } from "./filmstrip"
+import {
+    filmstripCentersScrollLeft,
+    filmstripCurrentWidthPx,
+    filmstripGapAfterAtProgress,
+    filmstripInterpolatedWidthPx,
+    filmstripOverflows,
+    filmstripSwipeNeighborIndex,
+    filmstripSwipeProgress,
+    filmstripThumbPitchPx,
+} from "./filmstrip"
 import {
     computeStageFitRectFromElement,
     createMediaGhost,
@@ -266,6 +275,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         rafId = frame(() => {
             rafId = null
             applyOverlayAttrs()
+            if (filmstripEl && viewer.snapshot().filmstrip) {
+                withFilmstripMetrics(() => {
+                    stampFilmstripGeometry(viewer.snapshot())
+                })
+            }
             if (needsLiveRender()) scheduleRender()
         })
     }
@@ -1114,18 +1128,126 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
-    function filmstripVirtualPitch(index: number): number {
-        let snap = viewer.snapshot()
+    function filmstripStageViewportWidth(): number {
+        if (viewport) {
+            let box = viewport.getBoundingClientRect()
+            let width = box.width || viewport.clientWidth
+            if (width > 0) return width
+        }
+        return viewportFallback().width
+    }
+
+    function filmstripMorph(snap: MediaViewerSnapshot): {
+        progress: number
+        neighborIndex: number | null
+        live: boolean
+    } {
+        let rest = { progress: 0, neighborIndex: null as number | null, live: false }
+        if (!filmstripEl) return rest
+        if (swipe.dismissing()) return rest
+        if (!(swipe.gesturing() || swipe.settling())) return rest
+        // settleTo(0, 0) clears axis to "none" at hop start; keep morphing leftover offsetX.
+        if (swipe.axis() === "vertical") return rest
+        if (swipe.axis() !== "horizontal" && !swipe.settling()) return rest
+        let offsetX = swipe.offsetX()
+        let neighborIndex = filmstripSwipeNeighborIndex(snap.index, offsetX, snap.items.length)
+        if (neighborIndex == null) return rest
+        let progress = filmstripSwipeProgress(offsetX, filmstripStageViewportWidth())
+        return { progress, neighborIndex, live: true }
+    }
+
+    function filmstripRoleWidths(
+        snap: MediaViewerSnapshot,
+        morph: { neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): { neighborWidth: number; currentWidth: number; incomingWidth: number } {
         if (viewer.filmstripExplicitItemSize()) {
+            let live = viewer.filmstripItemSizes()
+            return { neighborWidth: live.neighbor, currentWidth: live.current, incomingWidth: live.current }
+        }
+        return {
+            neighborWidth: metrics.neighborWidth,
+            currentWidth: filmstripContentWidthPx(snap.items[snap.index], filmstripThumbAt(snap.index), metrics),
+            incomingWidth:
+                morph.neighborIndex == null
+                    ? metrics.neighborWidth
+                    : filmstripContentWidthPx(
+                          snap.items[morph.neighborIndex],
+                          filmstripThumbAt(morph.neighborIndex),
+                          metrics,
+                      ),
+        }
+    }
+
+    function filmstripWidthAt(
+        index: number,
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): number {
+        let roles = filmstripRoleWidths(snap, morph, metrics)
+        return filmstripInterpolatedWidthPx({
+            index,
+            current: snap.index,
+            neighborIndex: morph.neighborIndex,
+            progress: morph.progress,
+            neighborWidth: roles.neighborWidth,
+            currentWidth: roles.currentWidth,
+            incomingWidth: roles.incomingWidth,
+        })
+    }
+
+    function filmstripPitchAt(
+        index: number,
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): number {
+        if (viewer.filmstripExplicitItemSize() && (morph.neighborIndex == null || morph.progress <= 0)) {
             let live = viewer.filmstripItemSizes()
             return index === snap.index ? live.current : live.neighbor
         }
+        let width = filmstripWidthAt(index, snap, morph, metrics)
+        let gapAfter = filmstripGapAfterAtProgress(
+            index,
+            snap.index,
+            morph.neighborIndex,
+            morph.progress,
+            metrics.gap,
+            metrics.currentGap,
+        )
+        return filmstripThumbPitchPx(width, gapAfter)
+    }
+
+    function filmstripCenterAt(
+        index: number,
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): number {
+        if (viewer.filmstripVirtualize() && filmstripList != null) {
+            return filmstripList.rowTop(index) + filmstripWidthAt(index, snap, morph, metrics) / 2
+        }
+        let top = 0
+        for (let i = 0; i < index; i++) top += filmstripPitchAt(i, snap, morph, metrics)
+        return top + filmstripWidthAt(index, snap, morph, metrics) / 2
+    }
+
+    function filmstripInFlowTotalSize(
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): number {
+        let total = 0
+        for (let i = 0; i < snap.items.length; i++) total += filmstripPitchAt(i, snap, morph, metrics)
+        return total
+    }
+
+    function filmstripVirtualPitch(index: number): number {
+        let snap = viewer.snapshot()
         let metrics = filmstripPaintMetrics()
-        let width =
-            index === snap.index
-                ? filmstripContentWidthPx(snap.items[index], filmstripThumbAt(index), metrics)
-                : metrics.neighborWidth
-        return filmstripThumbPitchPx(width, filmstripGapAfter(index, snap.index, metrics.gap, metrics.currentGap))
+        let morph = filmstripMorph(snap)
+        return filmstripPitchAt(index, snap, morph, metrics)
     }
 
     function stampFilmstripMotion(): void {
@@ -1133,19 +1255,72 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripEl.setAttribute("data-filmstrip-motion", viewer.lastNav() === "jump" ? "tap" : "nav")
     }
 
-    function stampFilmstripCurrentWidths(snap: MediaViewerSnapshot): void {
-        if (!filmstripEl || viewer.filmstripVirtualize()) return
+    function stampFilmstripGeometry(snap: MediaViewerSnapshot): void {
+        if (!filmstripEl) return
         let metrics = filmstripPaintMetrics()
-        for (let el of filmstripEl.querySelectorAll("[data-yorozu-media-thumb]")) {
-            if (!(el instanceof HTMLElement)) continue
-            let index = Number(el.getAttribute("data-index"))
-            if (!Number.isInteger(index)) continue
-            if (index === snap.index) {
-                el.style.width = `${filmstripContentWidthPx(snap.items[index], el, metrics)}px`
-            } else {
-                el.style.width = ""
+        let morph = filmstripMorph(snap)
+        if (morph.live) filmstripEl.setAttribute("data-filmstrip-motion", "swipe")
+        else stampFilmstripMotion()
+        if (viewer.filmstripVirtualize() && filmstripList != null) {
+            if (morph.neighborIndex != null) {
+                let ids = filmstripList.viewportIds() ?? []
+                let from = filmstripList.fromOffset()
+                let last = from + ids.length - 1
+                if (morph.neighborIndex < from || morph.neighborIndex > last) {
+                    filmstripList.reanchor(snap.index)
+                }
+            }
+            filmstripList.sync()
+            let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+            if (track) rebuildVirtualThumbs(track, snap)
+        } else {
+            for (let el of filmstripEl.querySelectorAll("[data-yorozu-media-thumb]")) {
+                if (!(el instanceof HTMLElement)) continue
+                let index = Number(el.getAttribute("data-index"))
+                if (!Number.isInteger(index)) continue
+                let livePair =
+                    morph.live && morph.progress > 0 && (index === snap.index || index === morph.neighborIndex)
+                if (index === snap.index || livePair) {
+                    el.style.width = `${filmstripWidthAt(index, snap, morph, metrics)}px`
+                } else {
+                    el.style.width = ""
+                }
+                if (morph.live && morph.progress > 0) {
+                    let gapAfter = filmstripGapAfterAtProgress(
+                        index,
+                        snap.index,
+                        morph.neighborIndex,
+                        morph.progress,
+                        metrics.gap,
+                        metrics.currentGap,
+                    )
+                    el.style.marginInlineEnd = `${Math.max(0, gapAfter - metrics.gap)}px`
+                    el.style.marginInlineStart = ""
+                } else {
+                    el.style.marginInlineEnd = ""
+                    el.style.marginInlineStart = ""
+                }
             }
         }
+        stampFilmstripOverflow()
+        if (!morph.live) return
+        let viewportWidth = filmstripEl.clientWidth
+        let totalSize =
+            viewer.filmstripVirtualize() && filmstripList != null
+                ? filmstripList.totalSize()
+                : filmstripInFlowTotalSize(snap, morph, metrics)
+        let fromCenter = filmstripCenterAt(snap.index, snap, morph, metrics)
+        let toCenter =
+            morph.neighborIndex == null ? fromCenter : filmstripCenterAt(morph.neighborIndex, snap, morph, metrics)
+        let left = filmstripCentersScrollLeft({
+            fromCenter,
+            toCenter,
+            progress: morph.progress,
+            viewportWidth,
+            totalSize,
+        })
+        filmstripEl.scrollLeft = left
+        if (viewer.filmstripVirtualize()) syncFilmstripScroll(left)
     }
 
     function stampFilmstripOverflow(): void {
@@ -1197,14 +1372,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (hasItemNaturals) return
         let snap = viewer.snapshot()
         withFilmstripMetrics(() => {
-            if (viewer.filmstripVirtualize() && !viewer.filmstripExplicitItemSize() && filmstripList != null) {
-                filmstripList.sync()
-                let track = filmstripEl?.querySelector('[role="list"]') as HTMLElement | null
-                if (track) rebuildVirtualThumbs(track, snap)
-            } else {
-                stampFilmstripCurrentWidths(snap)
-            }
-            stampFilmstripOverflow()
+            stampFilmstripGeometry(snap)
         })
     }
 
@@ -1273,10 +1441,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripList = createVirtualList({
             getItems: (): readonly string[] => viewer.snapshot().items.map((item) => item.id),
             itemSize: (index: number): number => {
-                if (viewer.filmstripExplicitItemSize()) {
-                    let live = viewer.filmstripItemSizes()
-                    return index === viewer.snapshot().index ? live.current : live.neighbor
-                }
                 return filmstripVirtualPitch(index)
             },
             listSlice: filmstripSlice(filmstripEl?.clientWidth ?? 0),
@@ -1328,6 +1492,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     function rebuildVirtualThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
         if (!filmstripList) return
         let metrics = filmstripPaintMetrics()
+        let morph = filmstripMorph(snap)
         let ids = filmstripList.viewportIds() ?? []
         let from = filmstripList.fromOffset()
         let prev = new Map<string, HTMLButtonElement>()
@@ -1358,12 +1523,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             btn.setAttribute("data-index", String(index))
             btn.style.position = "absolute"
             btn.style.left = `${filmstripList.rowTop(index)}px`
-            if (viewer.filmstripExplicitItemSize()) {
-                btn.style.width = `${filmstripList.rowHeight(index)}px`
-            } else {
-                let width = index === snap.index ? filmstripContentWidthPx(item, btn, metrics) : metrics.neighborWidth
-                btn.style.width = `${width}px`
-            }
+            btn.style.width = `${filmstripWidthAt(index, snap, morph, metrics)}px`
             markThumbCurrent(btn, index === snap.index)
             fillThumb(btn, item)
             if (!btn.isConnected) track.append(btn)
@@ -1527,14 +1687,15 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                     syncThumbs(track, snap)
                 }
             }
-            stampFilmstripCurrentWidths(snap)
-            stampFilmstripOverflow()
+            stampFilmstripGeometry(snap)
+            if (filmstripMorph(snap).live) return
             if (!shouldCenter) return
             let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
             let behavior: ScrollBehavior = instant ? "instant" : "smooth"
             centerCurrentThumb(behavior)
             void dualRaf().then(() => {
                 if (detached || !filmstripEl) return
+                if (filmstripMorph(viewer.snapshot()).live) return
                 centerCurrentThumb(behavior)
             })
         } finally {
