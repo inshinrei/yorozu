@@ -2655,4 +2655,34 @@ describe("attachMediaViewer", () => {
         let left = rowTop + w / 2 - 100
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left }))
     })
+
+    it("virtual default short strip mounts every thumb and stamps edges", () => {
+        let items = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
+        viewer.setItems(items, 0)
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
+        expect(thumbs).toHaveLength(items.length)
+        expect(nav.getAttribute("data-overflow")).toBe("false")
+        expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
+        expect(thumbs[thumbs.length - 1]?.getAttribute("data-edge")).toBe("end")
+    })
+
+    it("virtual index change keeps thumbs connected without replaceChildren", () => {
+        let items = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
+        viewer.setItems(items, 0)
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        let kept = nav.querySelector('[data-id="id-0"]') as HTMLButtonElement
+        expect(kept).toBeTruthy()
+        let replaceChildren = vi.spyOn(track, "replaceChildren")
+        viewer.goTo(1)
+        expect(replaceChildren).not.toHaveBeenCalled()
+        expect(kept.isConnected).toBe(true)
+        expect(nav.querySelector('[data-id="id-0"]')).toBe(kept)
+        expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("1")
+    })
 })

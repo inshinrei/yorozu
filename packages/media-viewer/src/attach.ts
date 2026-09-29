@@ -1149,6 +1149,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (typeof ResizeObserver !== "function") return
         filmstripResizeObserver = new ResizeObserver(() => {
             if (detached || !filmstripEl) return
+            if (viewer.filmstripVirtualize() && filmstripList != null) {
+                applyFilmstripFitSlice(filmstripList, viewer.snapshot())
+                let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+                if (track) rebuildVirtualThumbs(track, viewer.snapshot())
+            }
             stampFilmstripOverflow()
         })
         filmstripResizeObserver.observe(nav)
@@ -1187,6 +1192,28 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
+    function resolveFilmstripListSlice(list: VirtualList<string>, viewportWidth: number): number {
+        let slice = filmstripSlice(viewportWidth)
+        let count = viewer.snapshot().items.length
+        let totalSize = list.totalSize()
+        if (count > 0 && totalSize > 0 && !filmstripOverflows(totalSize, viewportWidth)) {
+            return Math.max(slice, count)
+        }
+        return slice
+    }
+
+    function applyFilmstripFitSlice(list: VirtualList<string>, snap: MediaViewerSnapshot): void {
+        if (!filmstripEl) return
+        let slice = resolveFilmstripListSlice(list, filmstripEl.clientWidth)
+        list.setListSlice(slice)
+        let count = snap.items.length
+        let mounted = list.viewportIds()?.length ?? 0
+        if (count > 0 && slice >= count && mounted < count) {
+            list.reanchor(snap.index)
+            list.sync()
+        }
+    }
+
     function onFilmstripWindowChange(): void {
         if (detached || !filmstripEl || !filmstripList) return
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
@@ -1203,7 +1230,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             filmstripListNeighborSize === sizes.neighbor &&
             filmstripListCurrentSize === sizes.current
         ) {
-            filmstripList.setListSlice(filmstripSlice(filmstripEl?.clientWidth ?? 0))
+            filmstripList.setListSlice(resolveFilmstripListSlice(filmstripList, filmstripEl?.clientWidth ?? 0))
             return filmstripList
         }
         destroyFilmstripList()
@@ -1230,7 +1257,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function syncFilmstripScroll(scrollLeft: number): void {
         if (!filmstripList || !filmstripEl) return
-        filmstripList.setListSlice(filmstripSlice(filmstripEl.clientWidth))
+        filmstripList.setListSlice(resolveFilmstripListSlice(filmstripList, filmstripEl.clientWidth))
         // Engine is vertical: map strip scrollLeft → scrollTop, clientWidth → viewportHeight.
         filmstripList.onScroll({
             scrollTop: scrollLeft,
@@ -1268,7 +1295,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let id = el.getAttribute("data-id")
             if (id) prev.set(id, el)
         }
-        let next: HTMLButtonElement[] = []
+        let keep = new Set<string>()
         for (let i = 0; i < ids.length; i++) {
             let id = ids[i]!
             let index = from + i
@@ -1279,6 +1306,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 index = found
                 item = snap.items[found]!
             }
+            keep.add(id)
             let btn = prev.get(id)
             if (!btn) {
                 btn = document.createElement("button")
@@ -1298,12 +1326,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             }
             markThumbCurrent(btn, index === snap.index)
             fillThumb(btn, item)
-            next.push(btn)
+            if (!btn.isConnected) track.append(btn)
+        }
+        for (let el of [...track.querySelectorAll("[data-yorozu-media-thumb]")]) {
+            if (!(el instanceof HTMLButtonElement)) continue
+            let id = el.getAttribute("data-id")
+            if (id == null || !keep.has(id)) el.remove()
         }
         track.style.width = `${filmstripList.totalSize()}px`
         track.style.flexShrink = "0"
         track.style.flexGrow = "0"
-        track.replaceChildren(...next)
     }
 
     function syncThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
@@ -1436,6 +1468,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             // First sync windows from sourceIds[0]; reanchor before that emit.
             if (shouldReanchor || list.viewportIds() === undefined) list.reanchor(snap.index)
             list.sync()
+            applyFilmstripFitSlice(list, snap)
             rebuildVirtualThumbs(track, snap)
             filmstripIds = ids
             if (shouldReanchor) filmstripCenteredIndex = snap.index
