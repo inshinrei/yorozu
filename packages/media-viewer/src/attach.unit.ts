@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
 import { attachMediaViewer } from "./attach"
 import {
+    filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
     filmstripGapAfter,
     filmstripInterpolatedWidthPx,
@@ -2989,5 +2990,63 @@ describe("attachMediaViewer", () => {
         expect(replaceChildren).not.toHaveBeenCalled()
         expect(viewer.snapshot().index).toBe(1)
         expect(Number.parseFloat(incoming.style.width)).toBeGreaterThan(Number.parseFloat(restIncoming || "44"))
+    })
+
+    it("reduced-motion commit lands rest scrollLeft not leftover pair-center", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let stripViewport = 80
+        let storedLeft = 0
+        Object.defineProperty(nav, "clientWidth", { value: stripViewport, configurable: true })
+        Object.defineProperty(nav, "scrollLeft", {
+            configurable: true,
+            get: () => storedLeft,
+            set: (value: number) => {
+                storedLeft = Number(value)
+            },
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 300, clientY: 200 }))
+        let leftoverLeft = nav.scrollLeft
+        let restIndex = 2
+        let neighborWidth = 44
+        let currentWidth = filmstripCurrentWidthPx({
+            neighborWidth,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })
+        let restWidths = [neighborWidth, neighborWidth, currentWidth]
+        let restTotal = 0
+        let restCenter = 0
+        for (let i = 0; i < restWidths.length; i++) {
+            let width = restWidths[i]!
+            let pitch = filmstripThumbPitchPx(width, filmstripGapAfter(i, restIndex, 2, 8))
+            if (i < restIndex) restCenter += pitch
+            restTotal += pitch
+        }
+        restCenter += currentWidth / 2
+        let restLeft = filmstripCentersScrollLeft({
+            fromCenter: restCenter,
+            toCenter: restCenter,
+            progress: 0,
+            viewportWidth: stripViewport,
+            totalSize: restTotal,
+        })
+        expect(leftoverLeft).not.toBe(restLeft)
+        flushLiveRaf()
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(2)
+        expect(nav.scrollLeft).toBe(restLeft)
     })
 })

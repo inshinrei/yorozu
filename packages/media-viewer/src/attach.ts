@@ -148,6 +148,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let filmstripEl: HTMLElement | null = null
     let filmstripIds: string | null = null
     let filmstripCenteredIndex: number | null = null
+    let filmstripLiveScroll = false
     let filmstripList: VirtualList<string> | null = null
     let filmstripListNeighborSize: number | null = null
     let filmstripListCurrentSize: number | null = null
@@ -1303,7 +1304,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             }
         }
         stampFilmstripOverflow()
-        if (!morph.live) return
+        let landRestScroll = filmstripLiveScroll && !morph.live
+        filmstripLiveScroll = morph.live
+        if (!morph.live && !landRestScroll) return
         let viewportWidth = filmstripEl.clientWidth
         let totalSize =
             viewer.filmstripVirtualize() && filmstripList != null
@@ -1618,6 +1621,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripEl = null
         filmstripIds = null
         filmstripCenteredIndex = null
+        filmstripLiveScroll = false
     }
 
     function paintFilmstrip(snap: MediaViewerSnapshot): void {
@@ -2007,6 +2011,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripEl = null
         filmstripIds = null
         filmstripCenteredIndex = null
+        filmstripLiveScroll = false
         paneIds = {}
         if (viewer.decodeFn()) decodePort.abortExcept([])
         let currentShell = shell
