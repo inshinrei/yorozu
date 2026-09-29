@@ -5,6 +5,8 @@ import {
     currentThumb,
     expectIndex,
     expectIndexNow,
+    MEDIA_FILMSTRIP_CURRENT_GAP_PX,
+    MEDIA_FILMSTRIP_MOBILE_MAX_PX,
     MEDIA_VIEWER_SETTLE_MS,
     MEDIA_VIEWER_WHEEL_RELEASE_MS,
     openFromThumb,
@@ -370,7 +372,7 @@ test("filmstrip current is the same height and fatter than neighbors", async ({ 
     expect(n).not.toBeNull()
     expect(Math.abs(c!.height - n!.height)).toBeLessThanOrEqual(1)
     expect(c!.width).toBeGreaterThan(n!.width + 1)
-    expect(c!.x - (n!.x + n!.width)).toBeGreaterThanOrEqual(7)
+    expect(c!.x - (n!.x + n!.width)).toBeGreaterThanOrEqual(MEDIA_FILMSTRIP_CURRENT_GAP_PX - 1)
 })
 
 test("landscape current is wider than portrait current", async ({ page }) => {
@@ -400,7 +402,9 @@ test("long filmstrip overflows without edge fade", async ({ page }) => {
 })
 
 test("640px overlay uses a full-width strip and zero stage pad-x", async ({ page }) => {
-    await openMediaViewer(page, "img-0", { viewport: { width: 640, height: 800 } })
+    await openMediaViewer(page, "img-0", {
+        viewport: { width: MEDIA_FILMSTRIP_MOBILE_MAX_PX, height: 800 },
+    })
     let overlay = viewer(page)
     let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
     let pane = page.locator("[data-side=active]")
@@ -409,8 +413,26 @@ test("640px overlay uses a full-width strip and zero stage pad-x", async ({ page
     expect(o).not.toBeNull()
     expect(c).not.toBeNull()
     expect(Math.abs(c!.width - o!.width)).toBeLessThanOrEqual(2)
-    let padX = await pane.evaluate((el) => getComputedStyle(el).paddingLeft)
-    expect(padX).toBe("0px")
+    let pad = await pane.evaluate((el) => {
+        let cs = getComputedStyle(el)
+        let host = el.closest("[data-yorozu-media-viewer]")
+        let ocs = host ? getComputedStyle(host) : cs
+        let rootPx = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+        let tokenPx = (name: string, fallbackRem: number): number => {
+            let v = ocs.getPropertyValue(name).trim()
+            if (v.endsWith("px")) return Number.parseFloat(v)
+            if (v.endsWith("rem")) return Number.parseFloat(v) * rootPx
+            return fallbackRem * rootPx
+        }
+        return {
+            padX: cs.paddingLeft,
+            paddingBottom: Number.parseFloat(cs.paddingBottom),
+            expected:
+                tokenPx("--yorozu-media-filmstrip-thumb-h", 4) + tokenPx("--yorozu-media-filmstrip-stage-gap", 0.75),
+        }
+    })
+    expect(pad.padX).toBe("0px")
+    expect(Math.abs(pad.paddingBottom - pad.expected)).toBeLessThanOrEqual(1)
 })
 
 test("1280px overlay keeps a compact strip", async ({ page }) => {
@@ -422,7 +444,7 @@ test("1280px overlay keeps a compact strip", async ({ page }) => {
     expect(o).not.toBeNull()
     expect(c).not.toBeNull()
     expect(c!.width).toBeLessThan(o!.width * 0.5)
-    expect(Math.abs(c!.width - o!.width * 0.36)).toBeLessThanOrEqual(o!.width * 0.02 + 2)
+    expect(Math.abs(c!.width - o!.width * 0.36)).toBeLessThanOrEqual(2)
 })
 
 test("current width animates on next when motion is on", async ({ page }) => {
