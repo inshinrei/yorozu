@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/confirm-tooltip",
-    "version": "1.0.109",
+    "version": "1.0.110",
     "type": "module",
     "sideEffects": [
         "*.css"

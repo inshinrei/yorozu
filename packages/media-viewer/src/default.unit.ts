@@ -37,6 +37,7 @@ let tokenNames = [
     "--yorozu-media-filmstrip-radius",
     "--yorozu-media-filmstrip-max-width",
     "--yorozu-media-filmstrip-stage-gap",
+    "--yorozu-media-filmstrip-clip-fade",
 ]
 
 describe("default media viewer styles", () => {
@@ -74,6 +75,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5)")
         expect(css).toContain("--yorozu-media-filmstrip-radius: 0.25rem")
         expect(css).toContain("--yorozu-media-filmstrip-max-width: 36%")
+        expect(css).toContain("--yorozu-media-filmstrip-clip-fade: 2rem")
         expect(css).toContain("[data-yorozu-media-viewer]")
     })
 
@@ -295,10 +297,46 @@ describe("default media viewer styles", () => {
         expect(css).toContain("linear-gradient(to left, transparent, #000 50%)")
     })
 
+    it("overflowing clip fades at both edges without :has()", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-yorozu-media-filmstrip-clip][data-overflow="true"]')
+        expect(css).toContain("--yorozu-media-filmstrip-clip-fade")
+        expect(css).toContain("-webkit-mask-image")
+        let clipOverflow =
+            css.match(/(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\[data-overflow="true"\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(clipOverflow).toContain("mask-image")
+        expect(clipOverflow).not.toContain(":has(")
+    })
+
+    it("fitting overflow-false keeps thumb data-edge fades and does not mask the clip", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-overflow="false"]')
+        expect(css).toContain('[data-edge="start"]')
+        expect(css).toContain('[data-edge="end"]')
+        expect(css).toContain("linear-gradient(to right, transparent, #000 50%)")
+        expect(css).toContain("linear-gradient(to left, transparent, #000 50%)")
+        let clipFalse =
+            css.match(/(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\[data-overflow="false"\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(clipFalse).toBe("")
+    })
+
     it("tap motion uses filmstrip-tap-ms", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain('[data-filmstrip-motion="tap"]')
         expect(css).toContain("--yorozu-media-filmstrip-tap-ms")
+    })
+
+    it("swipe motion zeros thumb transitions and in-flow current margin-inline", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-filmstrip-motion="swipe"]')
+        let swipeThumbs =
+            css.match(/(?:^|\n)\[data-filmstrip-motion="swipe"\]\s*\[data-yorozu-media-thumb\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(swipeThumbs).toContain("transition: none")
+        let swipeCurrent =
+            css.match(
+                /(?:^|\n)\[data-filmstrip-motion="swipe"\]:not\(\[data-virtualized\]\)\s*\[data-yorozu-media-thumb\]\[data-current\]\s*\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(swipeCurrent).toContain("margin-inline: 0")
     })
 
     it("40rem full-bleed forces clip 100% and zero pad-x", () => {
