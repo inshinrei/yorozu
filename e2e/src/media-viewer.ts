@@ -11,11 +11,23 @@ const IMG_SRC: string = "/media/img.jpg"
 const GIF_SRC: string = "/media/loop.gif"
 const VID_SRC: string = "/media/clip.mp4"
 
-const items: MediaViewerItem[] = [
+const album: MediaViewerItem[] = [
     ...Array.from({ length: 20 }, (_, i): MediaViewerItem => ({ id: `img-${i}`, kind: "image", src: IMG_SRC })),
     { id: "gif-0", kind: "gif", src: GIF_SRC },
     { id: "vid-0", kind: "video", src: VID_SRC },
+    { id: "img-wide", kind: "image", src: IMG_SRC, naturalWidth: 1600, naturalHeight: 900 },
+    { id: "img-tall", kind: "image", src: IMG_SRC, naturalWidth: 900, naturalHeight: 1600 },
 ]
+
+let items: MediaViewerItem[] = album
+if (new URLSearchParams(location.search).get("strip") === "short") {
+    let byId = new Map(album.map((item) => [item.id, item]))
+    items = ["img-wide", "img-0", "img-tall"].map((id) => {
+        let item = byId.get(id)
+        if (item == null) throw new Error(`missing ${id}`)
+        return item
+    })
+}
 
 const prefersReducedMotion = (): boolean => new URLSearchParams(location.search).get("motion") !== "1"
 

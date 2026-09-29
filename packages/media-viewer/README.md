@@ -58,7 +58,11 @@ Map `stage` to `pri: "visible"` and peeks/thumbs to `"preload"`. Abort ids that 
 
 ## Filmstrip
 
-`filmstrip: false` turns the package strip off. `true` or omit paints today's full in-flow strip. `{ virtualize: true }` windows thumbs with `@yorozu/virtual-list` using absolute `left` (not a `translateX` window). Virtualize defaults to mixed pitches: the current cell matches `--yorozu-media-filmstrip-current-w`, neighbors `--yorozu-media-filmstrip-thumb-w`, plus the 1px gap (CSS `gap` does not apply to absolute thumbs). Pass a number for `itemSizePx` for a uniform pitch, or `{ neighbor, current }` for explicit pitches.
+`filmstrip: false` turns the package strip off. `true` or omit paints today's full in-flow strip. `{ virtualize: true }` windows thumbs with `@yorozu/virtual-list` using absolute `left` (not a `translateX` window).
+
+Current and neighbors share `--yorozu-media-filmstrip-thumb-h`. Current width follows the item aspect at that height, capped by `--yorozu-media-filmstrip-current-w` (`10rem`) and floored at neighbor width. Extra `--yorozu-media-filmstrip-current-gap` (`8px`) sits beside current; neighbors use `2px`. When the strip does not overflow, the first and last thumbs fade on the outer half. `@media (max-width: 40rem)` makes the clip 100% wide and sets `--yorozu-media-pad-x: 0`; stage-gap is kept. Selection motion is 0.2s (nav) / 0.4s (tap) with hero ease.
+
+Virtualize mixed default uses those pitches: the current cell from aspect at `thumb-h` (capped by `--yorozu-media-filmstrip-current-w`), neighbors `--yorozu-media-filmstrip-thumb-w`, plus the current/neighbor gaps (CSS `gap` does not apply to absolute thumbs). Pass a number for `itemSizePx` for a uniform pitch, or `{ neighbor, current }` for explicit pitches. `itemSizePx` stays an explicit-pitch override.
 
 Host either virtualizes the package strip **or** keeps `filmstrip: false` and virtualizes its own strip — not both.
 

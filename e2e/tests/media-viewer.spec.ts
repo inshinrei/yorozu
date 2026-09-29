@@ -8,6 +8,7 @@ import {
     MEDIA_VIEWER_SETTLE_MS,
     MEDIA_VIEWER_WHEEL_RELEASE_MS,
     openFromThumb,
+    openMediaViewer,
     openViewer,
     swipeViewport,
     thumbCenterDelta,
@@ -356,4 +357,83 @@ test("trackpad leftover after a committed switch does not skip another item", as
     await page.mouse.wheel(80, 0)
     await waitMs(MEDIA_VIEWER_WHEEL_RELEASE_MS + 50)
     expect(await currentThumb(page).getAttribute("data-index")).toBe("2")
+})
+
+test("filmstrip current is the same height and fatter than neighbors", async ({ page }) => {
+    await openFromThumb(page, "img-wide")
+    let current = currentThumb(page)
+    let index = Number(await current.getAttribute("data-index"))
+    let neighbor = page.locator(`[data-yorozu-media-thumb][data-index="${index - 1}"]`)
+    let c = await current.boundingBox()
+    let n = await neighbor.boundingBox()
+    expect(c).not.toBeNull()
+    expect(n).not.toBeNull()
+    expect(Math.abs(c!.height - n!.height)).toBeLessThanOrEqual(1)
+    expect(c!.width).toBeGreaterThan(n!.width + 1)
+    expect(c!.x - (n!.x + n!.width)).toBeGreaterThanOrEqual(7)
+})
+
+test("landscape current is wider than portrait current", async ({ page }) => {
+    await openFromThumb(page, "img-wide")
+    let wide = (await currentThumb(page).boundingBox())!.width
+    await page.locator('[data-yorozu-media-thumb][data-id="img-tall"]').click()
+    await expect(currentThumb(page)).toHaveAttribute("data-id", "img-tall")
+    let tall = (await currentThumb(page).boundingBox())!.width
+    expect(wide).toBeGreaterThan(tall + 1)
+})
+
+test("short filmstrip fades first and last thumbs and does not overflow", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { strip: "short" })
+    let nav = page.locator("[data-yorozu-media-filmstrip]")
+    await expect(nav).toHaveAttribute("data-overflow", "false")
+    await expect(page.locator("[data-yorozu-media-thumb]").first()).toHaveAttribute("data-edge", "start")
+    await expect(page.locator("[data-yorozu-media-thumb]").last()).toHaveAttribute("data-edge", "end")
+    let box = await nav.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
+    expect(box.sw).toBeLessThanOrEqual(box.cw)
+})
+
+test("long filmstrip overflows without edge fade", async ({ page }) => {
+    await openFromThumb(page, "img-0")
+    let nav = page.locator("[data-yorozu-media-filmstrip]")
+    await expect(nav).toHaveAttribute("data-overflow", "true")
+    await expect(page.locator("[data-yorozu-media-thumb][data-edge]")).toHaveCount(0)
+})
+
+test("640px overlay uses a full-width strip and zero stage pad-x", async ({ page }) => {
+    await openMediaViewer(page, "img-0", { viewport: { width: 640, height: 800 } })
+    let overlay = viewer(page)
+    let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
+    let pane = page.locator("[data-side=active]")
+    let o = await overlay.boundingBox()
+    let c = await clip.boundingBox()
+    expect(o).not.toBeNull()
+    expect(c).not.toBeNull()
+    expect(Math.abs(c!.width - o!.width)).toBeLessThanOrEqual(2)
+    let padX = await pane.evaluate((el) => getComputedStyle(el).paddingLeft)
+    expect(padX).toBe("0px")
+})
+
+test("1280px overlay keeps a compact strip", async ({ page }) => {
+    await openMediaViewer(page, "img-0", { viewport: { width: 1280, height: 800 } })
+    let overlay = viewer(page)
+    let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
+    let o = await overlay.boundingBox()
+    let c = await clip.boundingBox()
+    expect(o).not.toBeNull()
+    expect(c).not.toBeNull()
+    expect(c!.width).toBeLessThan(o!.width * 0.5)
+    expect(Math.abs(c!.width - o!.width * 0.36)).toBeLessThanOrEqual(o!.width * 0.02 + 2)
+})
+
+test("current width animates on next when motion is on", async ({ page }) => {
+    await openMediaViewer(page, "img-tall", { motion: true })
+    let start = (await currentThumb(page).boundingBox())!.width
+    await page.locator('[data-yorozu-media-thumb][data-id="img-wide"]').click()
+    await page.waitForTimeout(80)
+    let mid = (await currentThumb(page).boundingBox())!.width
+    await expect(currentThumb(page)).toHaveAttribute("data-id", "img-wide")
+    await page.waitForTimeout(400)
+    let end = (await currentThumb(page).boundingBox())!.width
+    expect(mid).not.toBe(end)
+    expect(start).not.toBe(end)
 })

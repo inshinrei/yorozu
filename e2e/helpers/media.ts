@@ -7,15 +7,31 @@ export const activeStage = (page: Page) => page.locator("[data-side=active] [dat
 export const activeZoom = (page: Page) => page.locator("[data-side=active] [data-yorozu-media-zoom]")
 export const currentThumb = (page: Page) => page.locator("[data-yorozu-media-thumb][data-current]")
 
+export const MEDIA_FILMSTRIP_MOBILE_MAX_PX: number = 640
+export const MEDIA_FILMSTRIP_CURRENT_GAP_PX: number = 8
+
 export async function waitOpen(page: Page): Promise<void> {
     await expect(openViewer(page)).toHaveCount(1)
 }
 
-export async function openFromThumb(page: Page, id: string, opts?: { motion?: boolean }): Promise<void> {
-    let url = opts?.motion ? "/media-viewer.html?motion=1" : "/media-viewer.html"
-    await page.goto(url)
+export async function openMediaViewer(
+    page: Page,
+    id: string,
+    opts?: { motion?: boolean; strip?: "short"; viewport?: { width: number; height: number } },
+): Promise<void> {
+    let params = new URLSearchParams()
+    if (opts?.motion) params.set("motion", "1")
+    if (opts?.strip === "short") params.set("strip", "short")
+    let qs = params.toString()
+    if (opts?.viewport) await page.setViewportSize(opts.viewport)
+    await page.emulateMedia({ reducedMotion: opts?.motion ? "no-preference" : "reduce" })
+    await page.goto(qs ? `/media-viewer.html?${qs}` : "/media-viewer.html")
     await page.locator(`[data-id="${id}"]`).click()
     await waitOpen(page)
+}
+
+export async function openFromThumb(page: Page, id: string, opts?: { motion?: boolean }): Promise<void> {
+    await openMediaViewer(page, id, opts)
 }
 
 export async function expectIndex(page: Page, index: number): Promise<void> {
