@@ -50,6 +50,13 @@ export async function swipeViewport(page: Page, dx: number, dy: number): Promise
     await mouseDrag(page, from, { x: from.x + dx, y: from.y + dy })
 }
 
+export async function swipeViewportHold(page: Page, dx: number, dy: number): Promise<void> {
+    let from = await viewportCenter(page)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(from.x + dx, from.y + dy, { steps: 12 })
+}
+
 export const MEDIA_VIEWER_WHEEL_RELEASE_MS: number = 140
 export const MEDIA_VIEWER_SETTLE_MS: number = 250
 

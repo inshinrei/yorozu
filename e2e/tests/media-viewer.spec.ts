@@ -13,6 +13,7 @@ import {
     openMediaViewer,
     openViewer,
     swipeViewport,
+    swipeViewportHold,
     thumbCenterDelta,
     viewportCenter,
     viewer,
@@ -388,17 +389,32 @@ test("short filmstrip fades first and last thumbs and does not overflow", async 
     await openMediaViewer(page, "img-wide", { strip: "short" })
     let nav = page.locator("[data-yorozu-media-filmstrip]")
     await expect(nav).toHaveAttribute("data-overflow", "false")
+    let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
+    await expect(clip).toHaveAttribute("data-overflow", "false")
     await expect(page.locator("[data-yorozu-media-thumb]").first()).toHaveAttribute("data-edge", "start")
     await expect(page.locator("[data-yorozu-media-thumb]").last()).toHaveAttribute("data-edge", "end")
     let box = await nav.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
     expect(box.sw).toBeLessThanOrEqual(box.cw)
+    let mask = await clip.evaluate((el) => {
+        let cs = getComputedStyle(el)
+        return cs.maskImage || cs.webkitMaskImage
+    })
+    expect(mask === "none" || mask === "").toBe(true)
 })
 
-test("long filmstrip overflows without edge fade", async ({ page }) => {
+test("long filmstrip overflows with clip-edge fade", async ({ page }) => {
     await openFromThumb(page, "img-0")
     let nav = page.locator("[data-yorozu-media-filmstrip]")
+    let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
     await expect(nav).toHaveAttribute("data-overflow", "true")
+    await expect(clip).toHaveAttribute("data-overflow", "true")
     await expect(page.locator("[data-yorozu-media-thumb][data-edge]")).toHaveCount(0)
+    let mask = await clip.evaluate((el) => {
+        let cs = getComputedStyle(el)
+        return cs.maskImage || cs.webkitMaskImage
+    })
+    expect(mask).not.toBe("none")
+    expect(mask.toLowerCase()).toContain("linear-gradient")
 })
 
 test("640px overlay uses a full-width strip and zero stage pad-x", async ({ page }) => {
@@ -458,4 +474,31 @@ test("current width animates on next when motion is on", async ({ page }) => {
     let end = (await currentThumb(page).boundingBox())!.width
     expect(mid).not.toBe(end)
     expect(start).not.toBe(end)
+})
+
+test("album swipe morphs filmstrip current and next before index changes", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true })
+    let startIndex = await currentThumb(page).getAttribute("data-index")
+    let rest = (await currentThumb(page).boundingBox())!.width
+    let next = page.locator(`[data-yorozu-media-thumb][data-index="${Number(startIndex) + 1}"]`)
+    let nextRestWidth = await next.evaluate((el) => (el as HTMLElement).style.width)
+    await swipeViewportHold(page, -80, 0)
+    await expect(currentThumb(page)).toHaveAttribute("data-index", String(startIndex))
+    let live = (await currentThumb(page).boundingBox())!.width
+    let nextLiveWidth = await next.evaluate((el) => (el as HTMLElement).style.width)
+    expect(live).toBeLessThan(rest)
+    // img-tall incoming floors at neighbor width; live pair stamps inline width
+    expect(nextLiveWidth).not.toBe(nextRestWidth)
+    expect(nextLiveWidth).not.toBe("")
+    await page.mouse.up()
+})
+
+test("album swipe under 50px restores filmstrip rest widths", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true })
+    let rest = (await currentThumb(page).boundingBox())!.width
+    await swipeViewportHold(page, -20, 0)
+    await page.mouse.up()
+    await page.waitForTimeout(400)
+    let end = (await currentThumb(page).boundingBox())!.width
+    expect(Math.abs(end - rest)).toBeLessThanOrEqual(1)
 })
