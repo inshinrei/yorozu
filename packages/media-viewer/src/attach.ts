@@ -1156,6 +1156,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             viewer.filmstripVirtualize() && filmstripList != null ? filmstripList.totalSize() : filmstripEl.scrollWidth
         let overflows = filmstripOverflows(totalSize, viewportWidth)
         filmstripEl.setAttribute("data-overflow", overflows ? "true" : "false")
+        let clip = filmstripEl.parentElement
+        if (clip?.hasAttribute("data-yorozu-media-filmstrip-clip")) {
+            clip.setAttribute("data-overflow", overflows ? "true" : "false")
+        }
         let lastIndex = snap.items.length - 1
         for (let el of filmstripEl.querySelectorAll("[data-yorozu-media-thumb]")) {
             if (!(el instanceof HTMLElement)) continue

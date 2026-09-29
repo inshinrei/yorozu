@@ -2700,10 +2700,12 @@ describe("attachMediaViewer", () => {
     it("short strip stamps overflow false and edge attrs; long strip clears edges", () => {
         viewer.open({ items: [img("a"), img("b")], index: 0 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
         Object.defineProperty(nav, "scrollWidth", { value: 200, configurable: true })
         viewer.setItems([img("a"), img("b")], 0)
         expect(nav.getAttribute("data-overflow")).toBe("false")
+        expect(clip.getAttribute("data-overflow")).toBe("false")
         let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
         expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
         expect(thumbs[1]?.getAttribute("data-edge")).toBe("end")
@@ -2712,7 +2714,9 @@ describe("attachMediaViewer", () => {
         Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
         viewer.setItems(many, 0)
         nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
         expect(nav.getAttribute("data-overflow")).toBe("true")
+        expect(clip.getAttribute("data-overflow")).toBe("true")
         expect(nav.querySelector("[data-edge]")).toBeNull()
     })
 
@@ -2777,11 +2781,13 @@ describe("attachMediaViewer", () => {
         let items = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
         viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
         viewer.setItems(items, 0)
         let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
         expect(thumbs).toHaveLength(items.length)
         expect(nav.getAttribute("data-overflow")).toBe("false")
+        expect(clip.getAttribute("data-overflow")).toBe("false")
         expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
         expect(thumbs[thumbs.length - 1]?.getAttribute("data-edge")).toBe("end")
     })
@@ -2807,14 +2813,17 @@ describe("attachMediaViewer", () => {
         let short = Array.from({ length: 8 }, (_, i) => img(`id-${i}`))
         viewer.open({ items: short, index: 0, filmstrip: { virtualize: true } })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 400, configurable: true })
         viewer.setItems(short, 0)
         expect(nav.querySelectorAll("[data-yorozu-media-thumb]")).toHaveLength(8)
         expect(nav.getAttribute("data-overflow")).toBe("false")
+        expect(clip.getAttribute("data-overflow")).toBe("false")
         let many = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
         viewer.setItems(many, 0)
         let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
         expect(nav.getAttribute("data-overflow")).toBe("true")
+        expect(clip.getAttribute("data-overflow")).toBe("true")
         expect(thumbs.length).toBeGreaterThan(0)
         expect(thumbs.length).toBeLessThan(many.length)
         expect(nav.querySelector("[data-edge]")).toBeNull()
