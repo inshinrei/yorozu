@@ -480,16 +480,22 @@ test("album swipe morphs filmstrip current and next before index changes", async
     await openMediaViewer(page, "img-wide", { motion: true })
     let startIndex = await currentThumb(page).getAttribute("data-index")
     let rest = (await currentThumb(page).boundingBox())!.width
-    let next = page.locator(`[data-yorozu-media-thumb][data-index="${Number(startIndex) + 1}"]`)
-    let nextRestWidth = await next.evaluate((el) => (el as HTMLElement).style.width)
     await swipeViewportHold(page, -80, 0)
     await expect(currentThumb(page)).toHaveAttribute("data-index", String(startIndex))
     let live = (await currentThumb(page).boundingBox())!.width
-    let nextLiveWidth = await next.evaluate((el) => (el as HTMLElement).style.width)
     expect(live).toBeLessThan(rest)
-    // img-tall incoming floors at neighbor width; live pair stamps inline width
-    expect(nextLiveWidth).not.toBe(nextRestWidth)
-    expect(nextLiveWidth).not.toBe("")
+    await page.mouse.up()
+})
+
+test("album swipe fattens incoming filmstrip thumb before index changes", async ({ page }) => {
+    await openMediaViewer(page, "img-tall", { motion: true })
+    let startIndex = await currentThumb(page).getAttribute("data-index")
+    let incoming = page.locator(`[data-yorozu-media-thumb][data-index="${Number(startIndex) - 1}"]`)
+    let incomingRest = (await incoming.boundingBox())!.width
+    await swipeViewportHold(page, 80, 0)
+    await expect(currentThumb(page)).toHaveAttribute("data-index", String(startIndex))
+    let incomingLive = (await incoming.boundingBox())!.width
+    expect(incomingLive).toBeGreaterThan(incomingRest)
     await page.mouse.up()
 })
 
