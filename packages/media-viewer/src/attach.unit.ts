@@ -2570,6 +2570,93 @@ describe("attachMediaViewer", () => {
         expect(b.style.width).toBe("44px")
     })
 
+    it("in-flow current thumb has aspect width before first append", () => {
+        let expected = `${filmstripCurrentWidthPx({
+            neighborWidth: 44,
+            height: 64,
+            cap: 160,
+            naturalWidth: 16,
+            naturalHeight: 9,
+        })}px`
+        let widthsAtAppend: string[] = []
+        let origAppend = HTMLElement.prototype.append
+        let spy = vi.spyOn(HTMLElement.prototype, "append").mockImplementation(function (
+            this: HTMLElement,
+            ...nodes: (Node | string)[]
+        ) {
+            for (let node of nodes) {
+                if (
+                    node instanceof HTMLElement &&
+                    node.hasAttribute("data-yorozu-media-thumb") &&
+                    node.hasAttribute("data-current")
+                ) {
+                    widthsAtAppend.push(node.style.width)
+                }
+            }
+            origAppend.apply(this, nodes)
+        })
+        try {
+            viewer.open({
+                items: [imgAspect("a", 16, 9), imgAspect("b", 9, 16)],
+                index: 0,
+            })
+        } finally {
+            spy.mockRestore()
+        }
+        expect(widthsAtAppend[0]).toBe(expected)
+    })
+
+    it("decode apply restamps current width from adopted img naturals", async () => {
+        let decoded = document.createElement("img")
+        decoded.src = "blob:decoded-thumb"
+        Object.defineProperty(decoded, "naturalWidth", { value: 16, configurable: true })
+        Object.defineProperty(decoded, "naturalHeight", { value: 9, configurable: true })
+        let decode = vi.fn<DecodeFn>(async (req) => {
+            if (req.role === "thumb" && req.id === "a") return decoded
+            let other = document.createElement("img")
+            other.src = `blob:${req.role}:${req.id}`
+            return other
+        })
+        viewer.destroy()
+        viewer = createMediaViewer({ decode, onIndexChange })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        await vi.waitFor(() => {
+            let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLElement
+            expect(current.querySelector("img")).toBe(decoded)
+            expect(current.style.width).toBe(
+                `${filmstripCurrentWidthPx({
+                    neighborWidth: 44,
+                    height: 64,
+                    cap: 160,
+                    naturalWidth: 16,
+                    naturalHeight: 9,
+                })}px`,
+            )
+        })
+    })
+
+    it("compat img load restamps current width when item naturals are missing", () => {
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        let current = root.querySelector("[data-yorozu-media-thumb][data-current]") as HTMLElement
+        expect(current.style.width).toBe("44px")
+        let thumbImg = current.querySelector("img") as HTMLImageElement
+        expect(thumbImg).toBeTruthy()
+        Object.defineProperty(thumbImg, "naturalWidth", { value: 16, configurable: true })
+        Object.defineProperty(thumbImg, "naturalHeight", { value: 9, configurable: true })
+        thumbImg.dispatchEvent(new Event("load"))
+        expect(current.style.width).toBe(
+            `${filmstripCurrentWidthPx({
+                neighborWidth: 44,
+                height: 64,
+                cap: 160,
+                naturalWidth: 16,
+                naturalHeight: 9,
+            })}px`,
+        )
+    })
+
     it("filmstrip-motion is nav on next and tap on goTo", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement

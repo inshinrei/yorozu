@@ -142,6 +142,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let filmstripList: VirtualList<string> | null = null
     let filmstripListNeighborSize: number | null = null
     let filmstripListCurrentSize: number | null = null
+    let filmstripPaintMetricsCache: FilmstripMetrics | null = null
     let shell: MediaShell | null = null
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
@@ -997,7 +998,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                         return
                     }
                     btn.replaceChildren()
-                    if (source) applyCanvasImageSource(btn, source, { alt: item.alt ?? "" })
+                    if (source) {
+                        applyCanvasImageSource(btn, source, { alt: item.alt ?? "" })
+                        restampCurrentFilmstripWidth(btn, item, key)
+                    }
                 })
             return
         }
@@ -1012,7 +1016,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 btn.replaceChildren()
             }
             let onThumbLoad = (): void => {
-                applyFilmstripThumbImageLoad(btn, item, key)
+                restampCurrentFilmstripWidth(btn, item, key)
             }
             if (image instanceof HTMLImageElement) {
                 image.alt = item.alt ?? ""
@@ -1065,14 +1069,23 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
+    function filmstripPaintMetrics(): FilmstripMetrics {
+        if (filmstripPaintMetricsCache) return filmstripPaintMetricsCache
+        return readFilmstripMetrics()
+    }
+
     function filmstripThumbAt(index: number): HTMLElement | null {
         if (!filmstripEl) return null
         let el = filmstripEl.querySelector(`[data-yorozu-media-thumb][data-index="${index}"]`)
         return el instanceof HTMLElement ? el : null
     }
 
-    function filmstripContentWidthPx(item: MediaViewerItem | undefined, thumb: Element | null): number {
-        let metrics = readFilmstripMetrics()
+    function filmstripContentWidthPx(
+        item: MediaViewerItem | undefined,
+        thumb: Element | null,
+        metrics?: FilmstripMetrics,
+    ): number {
+        let m = metrics ?? filmstripPaintMetrics()
         let naturalWidth = item?.naturalWidth
         let naturalHeight = item?.naturalHeight
         if (!(naturalWidth != null && naturalHeight != null && naturalWidth > 0 && naturalHeight > 0)) {
@@ -1083,9 +1096,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             }
         }
         return filmstripCurrentWidthPx({
-            neighborWidth: metrics.neighborWidth,
-            height: metrics.height,
-            cap: metrics.cap,
+            neighborWidth: m.neighborWidth,
+            height: m.height,
+            cap: m.cap,
             naturalWidth,
             naturalHeight,
         })
@@ -1097,10 +1110,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             let live = viewer.filmstripItemSizes()
             return index === snap.index ? live.current : live.neighbor
         }
-        let metrics = readFilmstripMetrics()
+        let metrics = filmstripPaintMetrics()
         let width =
             index === snap.index
-                ? filmstripContentWidthPx(snap.items[index], filmstripThumbAt(index))
+                ? filmstripContentWidthPx(snap.items[index], filmstripThumbAt(index), metrics)
                 : metrics.neighborWidth
         return filmstripThumbPitchPx(width, filmstripGapAfter(index, snap.index, metrics.gap, metrics.currentGap))
     }
@@ -1112,12 +1125,13 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function stampFilmstripCurrentWidths(snap: MediaViewerSnapshot): void {
         if (!filmstripEl || viewer.filmstripVirtualize()) return
+        let metrics = filmstripPaintMetrics()
         for (let el of filmstripEl.querySelectorAll("[data-yorozu-media-thumb]")) {
             if (!(el instanceof HTMLElement)) continue
             let index = Number(el.getAttribute("data-index"))
             if (!Number.isInteger(index)) continue
             if (index === snap.index) {
-                el.style.width = `${filmstripContentWidthPx(snap.items[index], el)}px`
+                el.style.width = `${filmstripContentWidthPx(snap.items[index], el, metrics)}px`
             } else {
                 el.style.width = ""
             }
@@ -1159,7 +1173,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripResizeObserver.observe(nav)
     }
 
-    function applyFilmstripThumbImageLoad(btn: HTMLButtonElement, item: MediaViewerItem, key: string): void {
+    function restampCurrentFilmstripWidth(btn: HTMLButtonElement, item: MediaViewerItem, key: string): void {
         if (detached || !btn.isConnected || thumbDecodeKeys.get(btn) !== key) return
         if (!btn.hasAttribute("data-current")) return
         let hasItemNaturals =
@@ -1273,6 +1287,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
+        let metrics = filmstripPaintMetrics()
         track.replaceChildren()
         for (let i = 0; i < snap.items.length; i++) {
             let item = snap.items[i]!
@@ -1283,12 +1298,18 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             btn.setAttribute("data-index", String(i))
             markThumbCurrent(btn, i === snap.index)
             fillThumb(btn, item)
+            if (i === snap.index) {
+                btn.style.width = `${filmstripContentWidthPx(item, btn, metrics)}px`
+            } else {
+                btn.style.width = ""
+            }
             track.append(btn)
         }
     }
 
     function rebuildVirtualThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
         if (!filmstripList) return
+        let metrics = filmstripPaintMetrics()
         let ids = filmstripList.viewportIds() ?? []
         let from = filmstripList.fromOffset()
         let prev = new Map<string, HTMLButtonElement>()
@@ -1322,8 +1343,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (viewer.filmstripExplicitItemSize()) {
                 btn.style.width = `${filmstripList.rowHeight(index)}px`
             } else {
-                let metrics = readFilmstripMetrics()
-                let width = index === snap.index ? filmstripContentWidthPx(item, btn) : metrics.neighborWidth
+                let width = index === snap.index ? filmstripContentWidthPx(item, btn, metrics) : metrics.neighborWidth
                 btn.style.width = `${width}px`
             }
             markThumbCurrent(btn, index === snap.index)
@@ -1460,44 +1480,49 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
         if (!track) return
-        let shouldCenter = true
-        if (virtualize) {
-            let ids = itemIdKey(snap.items)
-            let idsChanged = filmstripIds !== ids
-            let indexChanged = filmstripCenteredIndex !== snap.index
-            let shouldReanchor = idsChanged || indexChanged || filmstripCenteredIndex == null
-            let list = ensureFilmstripList()
-            // First sync windows from sourceIds[0]; reanchor before that emit.
-            if (shouldReanchor || list.viewportIds() === undefined) list.reanchor(snap.index)
-            list.sync()
-            applyFilmstripFitSlice(list, snap)
-            rebuildVirtualThumbs(track, snap)
-            filmstripIds = ids
-            if (shouldReanchor) filmstripCenteredIndex = snap.index
-            shouldCenter = shouldReanchor
-        } else {
-            track.style.width = ""
-            track.style.flexShrink = ""
-            track.style.flexGrow = ""
-            filmstripCenteredIndex = null
-            let ids = itemIdKey(snap.items)
-            if (filmstripIds !== ids) {
-                rebuildThumbs(track, snap)
+        filmstripPaintMetricsCache = readFilmstripMetrics()
+        try {
+            let shouldCenter = true
+            if (virtualize) {
+                let ids = itemIdKey(snap.items)
+                let idsChanged = filmstripIds !== ids
+                let indexChanged = filmstripCenteredIndex !== snap.index
+                let shouldReanchor = idsChanged || indexChanged || filmstripCenteredIndex == null
+                let list = ensureFilmstripList()
+                // First sync windows from sourceIds[0]; reanchor before that emit.
+                if (shouldReanchor || list.viewportIds() === undefined) list.reanchor(snap.index)
+                list.sync()
+                applyFilmstripFitSlice(list, snap)
+                rebuildVirtualThumbs(track, snap)
                 filmstripIds = ids
+                if (shouldReanchor) filmstripCenteredIndex = snap.index
+                shouldCenter = shouldReanchor
             } else {
-                syncThumbs(track, snap)
+                track.style.width = ""
+                track.style.flexShrink = ""
+                track.style.flexGrow = ""
+                filmstripCenteredIndex = null
+                let ids = itemIdKey(snap.items)
+                if (filmstripIds !== ids) {
+                    rebuildThumbs(track, snap)
+                    filmstripIds = ids
+                } else {
+                    syncThumbs(track, snap)
+                }
             }
-        }
-        stampFilmstripCurrentWidths(snap)
-        stampFilmstripOverflow()
-        if (!shouldCenter) return
-        let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
-        let behavior: ScrollBehavior = instant ? "instant" : "smooth"
-        centerCurrentThumb(behavior)
-        void dualRaf().then(() => {
-            if (detached || !filmstripEl) return
+            stampFilmstripCurrentWidths(snap)
+            stampFilmstripOverflow()
+            if (!shouldCenter) return
+            let instant = reducedMotion() || createdThisPaint || (shell != null && shell.openPhase() !== "open")
+            let behavior: ScrollBehavior = instant ? "instant" : "smooth"
             centerCurrentThumb(behavior)
-        })
+            void dualRaf().then(() => {
+                if (detached || !filmstripEl) return
+                centerCurrentThumb(behavior)
+            })
+        } finally {
+            filmstripPaintMetricsCache = null
+        }
     }
 
     function pinchDistance(): number {
