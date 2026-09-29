@@ -26,11 +26,13 @@ let tokenNames = [
     "--yorozu-media-chrome-hide-ease",
     "--yorozu-media-radius",
     "--yorozu-media-filmstrip-ms",
+    "--yorozu-media-filmstrip-tap-ms",
+    "--yorozu-media-filmstrip-ease",
     "--yorozu-media-filmstrip-thumb-h",
     "--yorozu-media-filmstrip-thumb-w",
     "--yorozu-media-filmstrip-current-w",
-    "--yorozu-media-filmstrip-current-h",
     "--yorozu-media-filmstrip-gap",
+    "--yorozu-media-filmstrip-current-gap",
     "--yorozu-media-filmstrip-bg",
     "--yorozu-media-filmstrip-radius",
     "--yorozu-media-filmstrip-max-width",
@@ -62,11 +64,13 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-chrome-hide-ease: ease-in-out")
         expect(css).toContain("--yorozu-media-radius: 0.75rem")
         expect(css).toContain("--yorozu-media-filmstrip-ms: 0.2s")
+        expect(css).toContain("--yorozu-media-filmstrip-tap-ms: 0.4s")
+        expect(css).toContain("--yorozu-media-filmstrip-ease: cubic-bezier(0.38, 0.70, 0.125, 1)")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-w: 2.75rem")
-        expect(css).toContain("--yorozu-media-filmstrip-current-w: 3.75rem")
-        expect(css).toContain("--yorozu-media-filmstrip-current-h: 5.5rem")
-        expect(css).toContain("--yorozu-media-filmstrip-gap: 1px")
+        expect(css).toContain("--yorozu-media-filmstrip-current-w: 10rem")
+        expect(css).toContain("--yorozu-media-filmstrip-gap: 2px")
+        expect(css).toContain("--yorozu-media-filmstrip-current-gap: 8px")
         expect(css).toContain("--yorozu-media-filmstrip-bg: rgba(0, 0, 0, 0.5)")
         expect(css).toContain("--yorozu-media-filmstrip-radius: 0.25rem")
         expect(css).toContain("--yorozu-media-filmstrip-max-width: 36%")
@@ -100,10 +104,10 @@ describe("default media viewer styles", () => {
         expect(css).toContain("[data-yorozu-media-filmstrip]")
         expect(css).toContain("[data-yorozu-media-thumb]")
         expect(css).toContain("[data-current]")
-        expect(css).toContain("opacity: 0.55")
+        expect(css).toContain("opacity: 1")
         expect(css).toContain("--yorozu-media-filmstrip-ms")
         expect(css).toContain("touch-action: pan-x")
-        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
     })
 
     it("filmstrip overrides inherited touch-action none so overflow-x pan works", () => {
@@ -240,43 +244,79 @@ describe("default media viewer styles", () => {
         expect(css).toContain(
             "[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-footer]",
         )
-        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
     })
 
-    it("tokens include filmstrip stage gap and taller current thumb height", () => {
+    it("tokens include filmstrip stage gap and shared thumb height", () => {
         let css = readFileSync(join(here, "tokens.css"), "utf8")
         expect(css).toContain("--yorozu-media-filmstrip-stage-gap: 0.75rem")
-        expect(css).toContain("--yorozu-media-filmstrip-current-h: 5.5rem")
         expect(css).toContain("--yorozu-media-filmstrip-thumb-h: 4rem")
+        expect(css).not.toContain("--yorozu-media-filmstrip-current-h")
     })
 
     it("filmstrip presence adds pane bottom padding above the strip", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain("[data-yorozu-media-viewer]:has([data-yorozu-media-filmstrip]) [data-yorozu-media-pane]")
         expect(css).toContain(
-            "padding-bottom: calc(var(--yorozu-media-filmstrip-current-h) + var(--yorozu-media-filmstrip-stage-gap))",
+            "padding-bottom: calc(var(--yorozu-media-filmstrip-thumb-h) + var(--yorozu-media-filmstrip-stage-gap))",
         )
     })
 
-    it("current filmstrip thumb is taller; bar and chrome clear current-h", () => {
+    it("current filmstrip thumb is the same height; bar and chrome clear thumb-h", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let filmstripBlock =
             css.match(
-                /(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\s*\{[^}]*height:\s*var\(--yorozu-media-filmstrip-current-h\)[^}]*\}/,
+                /(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\s*\{[^}]*height:\s*var\(--yorozu-media-filmstrip-thumb-h\)[^}]*\}/,
             )?.[0] ?? ""
-        expect(filmstripBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
-        let listBlock = css.match(/(?:^|\n)\[data-yorozu-media-filmstrip\]\s*\[role="list"\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(listBlock).toContain("align-items: flex-end")
+        expect(filmstripBlock).toContain("height: var(--yorozu-media-filmstrip-thumb-h)")
         let thumbBlock = css.match(/(?:^|\n)\[data-yorozu-media-thumb\]\s*\{[^}]*\}/)?.[0] ?? ""
         expect(thumbBlock).toContain("height: var(--yorozu-media-filmstrip-thumb-h)")
-        expect(thumbBlock).toContain("height var(--yorozu-media-filmstrip-ms)")
-        let currentBlock = css.match(/(?:^|\n)\[data-yorozu-media-thumb\]\[data-current\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(currentBlock).toContain("width: var(--yorozu-media-filmstrip-current-w)")
-        expect(currentBlock).toContain("height: var(--yorozu-media-filmstrip-current-h)")
-        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-current-h)")
+        expect(thumbBlock).toContain("opacity: 1")
+        expect(thumbBlock).toContain("--yorozu-media-filmstrip-ease")
+        expect(thumbBlock).not.toContain("height var(--yorozu-media-filmstrip-ms)")
         expect(css).toContain(
-            "padding-bottom: calc(var(--yorozu-media-filmstrip-current-h) + var(--yorozu-media-filmstrip-stage-gap))",
+            "[data-yorozu-media-filmstrip]:not([data-virtualized]) [data-yorozu-media-thumb][data-current]",
         )
+        expect(css).toContain("--yorozu-media-filmstrip-current-gap")
+        expect(css).not.toContain("height: var(--yorozu-media-filmstrip-current-h)")
+        expect(css).toContain("bottom: var(--yorozu-media-filmstrip-thumb-h)")
+        expect(css).toContain(
+            "padding-bottom: calc(var(--yorozu-media-filmstrip-thumb-h) + var(--yorozu-media-filmstrip-stage-gap))",
+        )
+        expect(css).not.toContain("--yorozu-media-filmstrip-current-h")
+    })
+
+    it("edge thumbs fade only when the strip does not overflow", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-overflow="false"]')
+        expect(css).toContain('[data-edge="start"]')
+        expect(css).toContain('[data-edge="end"]')
+        expect(css).toContain("linear-gradient(to right, transparent, #000 50%)")
+        expect(css).toContain("linear-gradient(to left, transparent, #000 50%)")
+    })
+
+    it("tap motion uses filmstrip-tap-ms", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-filmstrip-motion="tap"]')
+        expect(css).toContain("--yorozu-media-filmstrip-tap-ms")
+    })
+
+    it("40rem full-bleed forces clip 100% and zero pad-x", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain("@media (max-width: 40rem)")
+        expect(css).toContain("width: 100%")
+        expect(css).toContain("max-width: 100%")
+        expect(css).toContain("--yorozu-media-pad-x: 0")
+    })
+
+    it("reduced-motion chrome snaps filmstrip thumbs", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let chromeReduce =
+            [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/g)]
+                .map((match) => match[0])
+                .find((block) => block.includes("[data-yorozu-media-header]")) ?? ""
+        expect(chromeReduce).toContain("@media (prefers-reduced-motion: reduce)")
+        expect(chromeReduce).toContain("[data-yorozu-media-thumb]")
     })
 
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {
