@@ -2768,6 +2768,49 @@ describe("attachMediaViewer", () => {
         expect(current.style.left).toBe("20px")
     })
 
+    it("virtual explicit itemSizePx morph does not jump pitch or left at small live t", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let neighbor = 20
+        let current = 30
+        let items = [img("a"), img("b"), img("c")]
+        viewer.open({
+            items,
+            index: 1,
+            filmstrip: { virtualize: true, itemSizePx: { neighbor, current } },
+        })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
+        viewer.setItems(items, 1)
+        let thumbAt = (index: number): HTMLElement =>
+            [...nav.querySelectorAll("[data-yorozu-media-thumb]")].find(
+                (el) => el.getAttribute("data-index") === String(index),
+            ) as HTMLElement
+        let restLefts = [0, 1, 2].map((i) => Number.parseFloat(thumbAt(i).style.left))
+        expect(restLefts).toEqual([0, neighbor, neighbor + current])
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 380, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(thumbAt(1).hasAttribute("data-current")).toBe(true)
+        let liveLefts = [0, 1, 2].map((i) => Number.parseFloat(thumbAt(i).style.left))
+        let liveWidths = [0, 1, 2].map((i) => Number.parseFloat(thumbAt(i).style.width))
+        let expectedLeft = 0
+        for (let i = 0; i < liveLefts.length; i++) {
+            expect(liveLefts[i]).toBeCloseTo(expectedLeft)
+            expectedLeft += liveWidths[i]!
+        }
+        expect(liveLefts[1]).toBe(restLefts[1])
+        expect(liveLefts[2]).toBeLessThan(restLefts[2]!)
+        expect(restLefts[2]! - liveLefts[2]!).toBeLessThan(2)
+        expect(liveWidths[0]).toBe(neighbor)
+        expect(liveWidths[1]!).toBeLessThan(current)
+        expect(liveWidths[1]!).toBeGreaterThan(neighbor)
+        expect(liveWidths[2]!).toBeGreaterThan(neighbor)
+        expect(liveWidths[2]!).toBeLessThan(current)
+    })
+
     it("virtual default centerCurrentThumb uses content width not pitch", () => {
         let items = Array.from({ length: 10 }, (_, i) => imgAspect(`id-${i}`, 16, 9))
         viewer.open({ items, index: 0, filmstrip: { virtualize: true } })

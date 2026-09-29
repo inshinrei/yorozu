@@ -1204,9 +1204,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         morph: { progress: number; neighborIndex: number | null },
         metrics: FilmstripMetrics,
     ): number {
-        if (viewer.filmstripExplicitItemSize() && (morph.neighborIndex == null || morph.progress <= 0)) {
-            let live = viewer.filmstripItemSizes()
-            return index === snap.index ? live.current : live.neighbor
+        // Host itemSizePx is already pitch (gap included). Interpolate those pitches; do not add gapAfter.
+        if (viewer.filmstripExplicitItemSize()) {
+            return filmstripWidthAt(index, snap, morph, metrics)
         }
         let width = filmstripWidthAt(index, snap, morph, metrics)
         let gapAfter = filmstripGapAfterAtProgress(
