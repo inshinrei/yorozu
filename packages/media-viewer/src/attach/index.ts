@@ -17,7 +17,6 @@ import {
 import {
     computeStageFitRectFromElement,
     createMediaGhost,
-    DEFAULT_MEDIA_INSETS,
     MEDIA_GHOST_CLOSE_EASING,
     MEDIA_GHOST_CLOSE_MS,
     MEDIA_GHOST_EASING,
@@ -50,6 +49,15 @@ import type {
 } from "../types"
 import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "../zoom"
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
+import {
+    isZoomable,
+    readPadding,
+    rootFontSizePx,
+    TAP_MOVE_PX,
+    tokenLengthPx,
+    viewportFallback,
+    type FilmstripMetrics,
+} from "./css"
 
 export type AttachMediaViewerOpts = {
     getGhostHost?: () => HTMLElement | null
@@ -58,68 +66,7 @@ export type AttachMediaViewerOpts = {
     ariaLabel?: string
 }
 
-const TAP_MOVE_PX: number = 10
-
 type SlotName = "header" | "footer" | "overlay"
-
-function isZoomable(item: MediaViewerItem | MediaViewerNeighbor | null | undefined): boolean {
-    return item?.kind === "image"
-}
-
-function paddingPx(raw: string | undefined, fallback: number): number {
-    if (raw == null || raw === "") return fallback
-    let n = parseFloat(raw)
-    return Number.isFinite(n) ? n : fallback
-}
-
-function rootFontSizePx(): number {
-    if (typeof document === "undefined" || typeof getComputedStyle !== "function") return 16
-    let n = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
-    return Number.isFinite(n) && n > 0 ? n : 16
-}
-
-function parseCssLengthPx(raw: string, rootFontSize: number): number | null {
-    let match = /^(-?\d+(?:\.\d+)?)(px|rem)$/i.exec(raw.trim())
-    if (!match) return null
-    let n = Number.parseFloat(match[1]!)
-    if (!Number.isFinite(n)) return null
-    if (match[2]!.toLowerCase() === "rem") n *= rootFontSize
-    return n
-}
-
-function tokenLengthPx(
-    style: CSSStyleDeclaration | null,
-    name: string,
-    fallback: number,
-    rootFontSize: number,
-): number {
-    if (style == null) return fallback
-    let parsed = parseCssLengthPx(style.getPropertyValue(name), rootFontSize)
-    return parsed == null ? fallback : parsed
-}
-
-type FilmstripMetrics = {
-    neighborWidth: number
-    height: number
-    cap: number
-    gap: number
-    currentGap: number
-}
-
-function readPadding(el: HTMLElement): { top: number; right: number; bottom: number; left: number } {
-    let style = typeof getComputedStyle === "function" ? getComputedStyle(el) : null
-    return {
-        top: paddingPx(style?.paddingTop, DEFAULT_MEDIA_INSETS.top),
-        right: paddingPx(style?.paddingRight, DEFAULT_MEDIA_INSETS.right),
-        bottom: paddingPx(style?.paddingBottom, DEFAULT_MEDIA_INSETS.bottom),
-        left: paddingPx(style?.paddingLeft, DEFAULT_MEDIA_INSETS.left),
-    }
-}
-
-function viewportFallback(): { width: number; height: number } {
-    if (typeof window === "undefined") return { width: 800, height: 800 }
-    return { width: window.innerWidth || 800, height: window.innerHeight || 800 }
-}
 
 export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?: AttachMediaViewerOpts): () => void {
     root.setAttribute("data-yorozu-media-root", "")
