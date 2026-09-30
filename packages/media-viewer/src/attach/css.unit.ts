@@ -68,6 +68,7 @@ describe("isZoomable", () => {
 describe("viewportFallback", () => {
     afterEach(() => {
         vi.unstubAllGlobals()
+        vi.restoreAllMocks()
     })
 
     it("uses innerWidth and innerHeight when they are positive", () => {
@@ -81,10 +82,25 @@ describe("viewportFallback", () => {
         vi.stubGlobal("innerHeight", 0)
         expect(viewportFallback()).toEqual({ width: 800, height: 800 })
     })
+
+    it("falls back to 800 when window is undefined", () => {
+        vi.stubGlobal("window", undefined)
+        expect(viewportFallback()).toEqual({ width: 800, height: 800 })
+    })
 })
 
 describe("rootFontSizePx", () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
     it("returns 16 when computed font-size is missing", () => {
-        expect(rootFontSizePx()).toBeGreaterThan(0)
+        vi.spyOn(globalThis, "getComputedStyle").mockReturnValue({ fontSize: "" } as CSSStyleDeclaration)
+        expect(rootFontSizePx()).toBe(16)
+    })
+
+    it("returns 16 when computed font-size is not positive", () => {
+        vi.spyOn(globalThis, "getComputedStyle").mockReturnValue({ fontSize: "0px" } as CSSStyleDeclaration)
+        expect(rootFontSizePx()).toBe(16)
     })
 })
