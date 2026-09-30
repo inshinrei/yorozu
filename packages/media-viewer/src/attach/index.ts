@@ -3,23 +3,15 @@
  */
 import { prefersReducedMotion } from "@yorozu/animations"
 import { createMediaDecodePort } from "../decode"
-import { bindMediaViewerKeys } from "../keyboard"
 import { createMediaShell, type MediaShell } from "../shell"
 import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
-import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "../swipe"
-import type {
-    MediaViewer,
-    MediaViewerChrome,
-    MediaViewerChromeApi,
-    MediaViewerNavFrom,
-    MediaViewerOpenOpts,
-    MediaViewerSnapshot,
-    MediaVisibleIds,
-} from "../types"
+import type { MediaViewer, MediaViewerNavFrom, MediaViewerOpenOpts, MediaVisibleIds } from "../types"
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
+import { createChrome } from "./chrome"
 import { isZoomable, viewportFallback } from "./css"
 import { createFilmstripDom } from "./filmstrip-dom"
 import { createGhostFlight } from "./ghost-flight"
+import { createOverlay, type AttachOverlayNodes } from "./overlay"
 import { createPanes } from "./panes"
 import { createZoomInput, type AttachZoomInput } from "./zoom-input"
 
@@ -30,8 +22,6 @@ export type AttachMediaViewerOpts = {
     ariaLabel?: string
 }
 
-type SlotName = "header" | "footer" | "overlay"
-
 export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?: AttachMediaViewerOpts): () => void {
     root.setAttribute("data-yorozu-media-root", "")
 
@@ -41,36 +31,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let startedOpen = false
     let lastContentId: string | null = null
     let rafId: number | null = null
-    let abort: AbortController | null = null
-    let scrollLockLinger: AbortController | null = null
-    let scrollLockLingerTimer: ReturnType<typeof setTimeout> | null = null
-    let resizeObserver: ResizeObserver | null = null
-    let unbindKeys: (() => void) | null = null
-
-    let overlay: HTMLElement | null = null
-    let viewport: HTMLElement | null = null
-    let strip: HTMLElement | null = null
-    let header: HTMLElement | null = null
-    let footer: HTMLElement | null = null
-    let chromeEl: HTMLElement | null = null
-    let backdrop: HTMLElement | null = null
     let shell: MediaShell | null = null
-
-    let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
-    let unmounts: { header?: () => void; footer?: () => void; overlay?: () => void } = {}
-    // Zoom lives for attach; chrome remounts each open. Track overlay-scoped unsubs.
-    let chromeZoomUnsubs: (() => void)[] = []
-    let decodePort = createMediaDecodePort({ budget: viewer.decodeBudget() })
-
-    let zoomInput: AttachZoomInput
-    let panes = createPanes({
-        getStrip: (): HTMLElement | null => strip,
-        viewer,
-        decodePort,
-        isDetached: (): boolean => detached,
-        reducedMotion,
-        measureZoom: (): void => zoomInput.measureZoom(),
-    })
 
     let openSeq = 0
     let paintedOpenSeq = -1
@@ -88,20 +49,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return opts?.getGhostHost?.() ?? document.body
     }
 
-    let ghostFlight = createGhostFlight({
-        getOverlay: (): HTMLElement | null => overlay,
-        getViewport: (): HTMLElement | null => viewport,
-        getGhostHost: ghostHost,
-        getHistoryClipRoot: (): HTMLElement | null => opts?.getHistoryClipRoot?.() ?? null,
-        viewer,
-        isDetached: (): boolean => detached,
-        applyOverlayAttrs,
-    })
     let zoom: MediaImageZoom = createMediaImageZoom({ prefersReducedMotion: reducedMotion })
     zoom.onChange(() => scheduleRender())
     let swipe: MediaSwipe = createMediaSwipe({
         getEnabled: (): boolean => {
-            if (!overlay || !viewer.snapshot().open) return false
+            if (!overlayNodes() || !viewer.snapshot().open) return false
             if (shell && shell.openPhase() !== "open") return false
             let current = viewer.snapshot().current
             if (isZoomable(current) && zoom.isZoomed()) return false
@@ -111,6 +63,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         getCanNewer: (): boolean => viewer.snapshot().canNewer,
         getPrefersReducedMotion: reducedMotion,
         getViewport: (): { width: number; height: number } => {
+            let viewport = overlayNodes()?.viewport
             if (viewport) {
                 let box = viewport.getBoundingClientRect()
                 let width = box.width || viewport.clientWidth
@@ -140,10 +93,22 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             afterSwipeSettle()
         },
     })
+    let decodePort = createMediaDecodePort({ budget: viewer.decodeBudget() })
+
+    let zoomInput: AttachZoomInput
+    let overlayHandle = createOverlay({
+        root,
+        ariaLabel: (): string => opts?.ariaLabel ?? "Media viewer",
+        measureZoom: (): void => zoomInput.measureZoom(),
+    })
+
+    function overlayNodes(): AttachOverlayNodes | null {
+        return overlayHandle.nodes()
+    }
 
     zoomInput = createZoomInput({
-        getOverlay: (): HTMLElement | null => overlay,
-        getViewport: (): HTMLElement | null => viewport,
+        getOverlay: (): HTMLElement | null => overlayNodes()?.overlay ?? null,
+        getViewport: (): HTMLElement | null => overlayNodes()?.viewport ?? null,
         viewer,
         zoom,
         swipe,
@@ -151,16 +116,47 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         scheduleRender,
     })
 
+    let ghostFlight = createGhostFlight({
+        getOverlay: (): HTMLElement | null => overlayNodes()?.overlay ?? null,
+        getViewport: (): HTMLElement | null => overlayNodes()?.viewport ?? null,
+        getGhostHost: ghostHost,
+        getHistoryClipRoot: (): HTMLElement | null => opts?.getHistoryClipRoot?.() ?? null,
+        viewer,
+        isDetached: (): boolean => detached,
+        applyOverlayAttrs,
+    })
+
+    let panes = createPanes({
+        getStrip: (): HTMLElement | null => overlayNodes()?.strip ?? null,
+        viewer,
+        decodePort,
+        isDetached: (): boolean => detached,
+        reducedMotion,
+        measureZoom: (): void => zoomInput.measureZoom(),
+    })
+
     let filmstrip = createFilmstripDom({
-        getOverlay: (): HTMLElement | null => overlay,
-        getViewport: (): HTMLElement | null => viewport,
-        getAbortSignal: (): AbortSignal | null => abort?.signal ?? null,
+        getOverlay: (): HTMLElement | null => overlayNodes()?.overlay ?? null,
+        getViewport: (): HTMLElement | null => overlayNodes()?.viewport ?? null,
+        getAbortSignal: (): AbortSignal | null => overlayHandle.abortSignal(),
         viewer,
         swipe,
         decodePort,
         isDetached: (): boolean => detached,
         reducedMotion,
         emitVisible,
+        openPhase: (): "opening" | "open" | "closing" | null => shell?.openPhase() ?? null,
+    })
+
+    let chrome = createChrome({
+        getHeader: (): HTMLElement | null => overlayNodes()?.header ?? null,
+        getFooter: (): HTMLElement | null => overlayNodes()?.footer ?? null,
+        getChromeEl: (): HTMLElement | null => overlayNodes()?.chromeEl ?? null,
+        viewer,
+        zoom,
+        requestClose: requestViewerClose,
+        forceClose: forceViewerClose,
+        scheduleRender,
         openPhase: (): "opening" | "open" | "closing" | null => shell?.openPhase() ?? null,
     })
 
@@ -175,7 +171,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function scheduleRender(): void {
-        if (detached || overlay == null) return
+        if (detached || overlayNodes() == null) return
         if (rafId != null) return
         const frame = (cb: FrameRequestCallback): number => {
             if (typeof requestAnimationFrame === "function") return requestAnimationFrame(cb)
@@ -194,7 +190,10 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function applyOverlayAttrs(): void {
-        if (!overlay) return
+        let nodes = overlayNodes()
+        if (!nodes) return
+        let overlay = nodes.overlay
+        let strip = nodes.strip
         let phase = shell?.openPhase() ?? "open"
         overlay.setAttribute("data-phase", phase)
         if (shell?.scrimSolid()) overlay.setAttribute("data-scrim", "")
@@ -207,20 +206,18 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         else overlay.removeAttribute("data-swipe-dismiss")
         overlay.style.setProperty("--yorozu-media-dismiss-alpha", String(swipe.dismissOpacity()))
         overlay.style.setProperty("--yorozu-media-filmstrip-max-width", viewer.snapshot().filmstripMaxWidth)
-        if (strip) {
-            let next = swipe.transformStyle()
-            strip.style.transform = next ?? ""
-            let dir = shell?.switchDir() ?? "none"
-            let key = String(shell?.switchAnimKey() ?? 0)
-            if (dir === "none") {
-                strip.removeAttribute("data-switch")
-                strip.removeAttribute("data-switch-key")
-            } else if (strip.getAttribute("data-switch") !== dir || strip.getAttribute("data-switch-key") !== key) {
-                strip.removeAttribute("data-switch")
-                void strip.offsetWidth
-                strip.setAttribute("data-switch-key", key)
-                strip.setAttribute("data-switch", dir)
-            }
+        let next = swipe.transformStyle()
+        strip.style.transform = next ?? ""
+        let dir = shell?.switchDir() ?? "none"
+        let key = String(shell?.switchAnimKey() ?? 0)
+        if (dir === "none") {
+            strip.removeAttribute("data-switch")
+            strip.removeAttribute("data-switch-key")
+        } else if (strip.getAttribute("data-switch") !== dir || strip.getAttribute("data-switch-key") !== key) {
+            strip.removeAttribute("data-switch")
+            void strip.offsetWidth
+            strip.setAttribute("data-switch-key", key)
+            strip.setAttribute("data-switch", dir)
         }
         let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]") as HTMLElement | null
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
@@ -243,38 +240,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
-    function clearScrollLockLinger(): void {
-        if (scrollLockLingerTimer != null) {
-            clearTimeout(scrollLockLingerTimer)
-            scrollLockLingerTimer = null
-        }
-        scrollLockLinger?.abort()
-        scrollLockLinger = null
-    }
-
-    function startScrollLockLingerTimer(): void {
-        if (scrollLockLingerTimer != null) clearTimeout(scrollLockLingerTimer)
-        scrollLockLingerTimer = setTimeout(() => {
-            scrollLockLingerTimer = null
-            clearScrollLockLinger()
-        }, MEDIA_SWIPE_WHEEL_COOLDOWN_MS)
-    }
-
-    function armScrollLockLinger(): void {
-        clearScrollLockLinger()
-        scrollLockLinger = new AbortController()
-        let signal = scrollLockLinger.signal
-        const onLingerScroll = (e: Event): void => {
-            e.preventDefault()
-        }
-        window.addEventListener("wheel", onLingerScroll, { capture: true, passive: false, signal })
-        window.addEventListener("touchmove", onLingerScroll, { capture: true, passive: false, signal })
-        startScrollLockLingerTimer()
-    }
-
     function requestViewerClose(closeOpts?: { ghost?: boolean }): void {
         if (!viewer.snapshot().open) return
-        if (!swipe.dismissing()) clearScrollLockLinger()
+        if (!swipe.dismissing()) overlayHandle.clearLinger()
         let wants = viewer.beginClose(closeOpts)
         applyOverlayAttrs()
         if (!wants) {
@@ -292,130 +260,11 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function forceViewerClose(): void {
-        clearScrollLockLinger()
+        overlayHandle.clearLinger()
         ghostFlight.cancel()
         tearDownOverlay({ linger: false })
-        clearScrollLockLinger()
+        overlayHandle.clearLinger()
         if (viewer.snapshot().open) viewer.forceClose()
-    }
-
-    let api: MediaViewerChromeApi = {
-        close: (closeOpts?: { ghost?: boolean }): void => {
-            requestViewerClose(closeOpts)
-        },
-        forceClose: (): void => {
-            forceViewerClose()
-        },
-        prev: (): void => {
-            viewer.prev("prev")
-        },
-        next: (): void => {
-            viewer.next("next")
-        },
-        goTo: (index: number): void => {
-            viewer.goTo(index)
-        },
-        zoomIn: (): void => {
-            if (!isZoomable(viewer.snapshot().current)) return
-            zoom.zoomIn()
-            scheduleRender()
-        },
-        zoomOut: (): void => {
-            if (!isZoomable(viewer.snapshot().current)) return
-            zoom.zoomOut()
-            scheduleRender()
-        },
-        resetZoom: (): void => {
-            if (!isZoomable(viewer.snapshot().current)) return
-            zoom.reset()
-            scheduleRender()
-        },
-        percentLabel: (): string => zoom.percentLabel(),
-        scale: (): number => zoom.scale(),
-        onZoomChange: (listener: () => void): (() => void) => {
-            let unsub = zoom.onChange(listener)
-            chromeZoomUnsubs.push(unsub)
-            return (): void => {
-                unsub()
-                let i = chromeZoomUnsubs.indexOf(unsub)
-                if (i >= 0) chromeZoomUnsubs.splice(i, 1)
-            }
-        },
-        isGesturing: (): boolean => viewer.isGesturing(),
-        snapshot: (): MediaViewerSnapshot => viewer.snapshot(),
-    }
-
-    function bindKeys(): void {
-        if (unbindKeys) return
-        unbindKeys = bindMediaViewerKeys({
-            close: (): void => {
-                requestViewerClose()
-            },
-            prev: (): void => {
-                viewer.prev("prev")
-            },
-            next: (): void => {
-                viewer.next("next")
-            },
-            zoomIn: (): void => {
-                api.zoomIn()
-            },
-            zoomOut: (): void => {
-                api.zoomOut()
-            },
-            resetZoom: (): void => {
-                api.resetZoom()
-            },
-            getAllowSwitch: (): boolean => {
-                if (!viewer.snapshot().open) return false
-                if (shell && shell.openPhase() !== "open") return false
-                let current = viewer.snapshot().current
-                if (isZoomable(current) && zoom.isZoomed()) return false
-                return true
-            },
-            getAllowZoom: (): boolean => isZoomable(viewer.snapshot().current),
-        })
-    }
-
-    function slotEl(name: SlotName): HTMLElement | null {
-        if (name === "header") return header
-        if (name === "footer") return footer
-        return chromeEl
-    }
-
-    function syncSlot(name: SlotName, fn: MediaViewerChrome | undefined): void {
-        let el = slotEl(name)
-        if (!el) return
-        if (mounted[name] === fn) return
-        unmounts[name]?.()
-        unmounts[name] = undefined
-        el.replaceChildren()
-        mounted[name] = fn
-        if (!fn) return
-        let cleanup = fn(el, api)
-        if (typeof cleanup === "function") unmounts[name] = cleanup
-    }
-
-    function flushChromeZoomUnsubs(): void {
-        let pending = chromeZoomUnsubs
-        chromeZoomUnsubs = []
-        for (let unsub of pending) unsub()
-    }
-
-    function unmountAllChrome(): void {
-        flushChromeZoomUnsubs()
-        syncSlot("header", undefined)
-        syncSlot("footer", undefined)
-        syncSlot("overlay", undefined)
-        mounted = {}
-        unmounts = {}
-    }
-
-    function syncChrome(): void {
-        let slots = viewer.chrome()
-        syncSlot("header", slots?.header)
-        syncSlot("footer", slots?.footer)
-        syncSlot("overlay", slots?.overlay)
     }
 
     function syncSwipeGesturing(): void {
@@ -430,7 +279,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function afterSwipeSettle(): void {
         syncSwipeGesturing()
-        if (detached || overlay == null || abort == null) return
+        if (detached || overlayNodes() == null || overlayHandle.abortSignal() == null) return
         if (viewer.isGesturing()) return
         if (viewer.decodeFn()) {
             let snap = viewer.snapshot()
@@ -453,149 +302,44 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     }
 
     function emitVisible(): void {
-        if (detached || overlay == null) return
+        if (detached || overlayNodes() == null) return
         viewer.notifyVisible(visibleIds())
     }
 
-    function createOverlay(): void {
-        clearScrollLockLinger()
-        abort = new AbortController()
-        let signal = abort.signal
-        overlay = document.createElement("div")
-        overlay.setAttribute("data-yorozu-media-viewer", "")
-        overlay.setAttribute("role", "dialog")
-        overlay.setAttribute("aria-modal", "true")
-        overlay.setAttribute("aria-label", opts?.ariaLabel ?? "Media viewer")
-        overlay.tabIndex = -1
-
-        viewport = document.createElement("div")
-        viewport.setAttribute("data-yorozu-media-viewport", "")
-        strip = document.createElement("div")
-        strip.setAttribute("data-yorozu-media-strip", "")
-        strip.style.setProperty("--yorozu-media-slide-gap", "40px")
-        viewport.append(strip)
-
-        backdrop = document.createElement("div")
-        backdrop.setAttribute("data-yorozu-media-backdrop", "")
-        header = document.createElement("div")
-        header.setAttribute("data-yorozu-media-header", "")
-        footer = document.createElement("div")
-        footer.setAttribute("data-yorozu-media-footer", "")
-        chromeEl = document.createElement("div")
-        chromeEl.setAttribute("data-yorozu-media-chrome", "")
-
-        overlay.append(backdrop, viewport, header, footer, chromeEl)
-        root.append(overlay)
-
-        let filmstripTouchX: number | null = null
-        let filmstripTouchY: number | null = null
-        const clearFilmstripTouchSample = (): void => {
-            filmstripTouchX = null
-            filmstripTouchY = null
-        }
-        const lockPageScroll = (e: Event): void => {
-            let t = e.target
-            // Window/document are not Elements (jsdom also breaks `currentTarget === window`).
-            if (!(e.currentTarget instanceof Element)) {
-                if (overlay != null && t instanceof Node && overlay.contains(t)) return
-                e.preventDefault()
-                e.stopPropagation()
-                return
-            }
-            if (t instanceof Element && t.closest("[data-yorozu-media-filmstrip]")) {
-                e.stopPropagation()
-                if (!isFilmstripPanX(e)) e.preventDefault()
-                return
-            }
-            clearFilmstripTouchSample()
-            if (
-                t instanceof Element &&
-                t.closest("[data-yorozu-media-header], [data-yorozu-media-footer], [data-yorozu-media-chrome]")
-            ) {
-                e.stopPropagation()
-                return
-            }
-            e.preventDefault()
-            e.stopPropagation()
-        }
-
-        function isFilmstripPanX(e: Event): boolean {
-            if (e instanceof WheelEvent) return Math.abs(e.deltaX) > Math.abs(e.deltaY)
-            if (!(e instanceof TouchEvent)) return false
-            let touch = e.touches[0] ?? e.changedTouches[0]
-            if (!touch) return false
-            let x = touch.clientX
-            let y = touch.clientY
-            if (filmstripTouchX == null || filmstripTouchY == null) {
-                filmstripTouchX = x
-                filmstripTouchY = y
-                return false
-            }
-            let panX = Math.abs(x - filmstripTouchX) > Math.abs(y - filmstripTouchY)
-            filmstripTouchX = x
-            filmstripTouchY = y
-            return panX
-        }
-        overlay.addEventListener("wheel", lockPageScroll, { passive: false, signal })
-        overlay.addEventListener("touchmove", lockPageScroll, { passive: false, signal })
-        window.addEventListener("wheel", lockPageScroll, { capture: true, passive: false, signal })
-        window.addEventListener("touchmove", lockPageScroll, { capture: true, passive: false, signal })
-        overlay.addEventListener("touchend", clearFilmstripTouchSample, { signal })
-        overlay.addEventListener("touchcancel", clearFilmstripTouchSample, { signal })
-        overlay.addEventListener("pointerup", clearFilmstripTouchSample, { signal })
-        overlay.addEventListener("pointercancel", clearFilmstripTouchSample, { signal })
-
-        viewport.addEventListener("pointerdown", zoomInput.onPointerDown, { signal })
-        viewport.addEventListener("pointermove", zoomInput.onPointerMove, { signal, passive: false })
-        viewport.addEventListener("pointerup", zoomInput.onPointerUp, { signal })
-        viewport.addEventListener("pointercancel", zoomInput.onPointerCancel, { signal })
-        viewport.addEventListener("wheel", zoomInput.onWheel, { signal, passive: false })
-
-        if (typeof ResizeObserver === "function") {
-            resizeObserver = new ResizeObserver(() => zoomInput.measureZoom())
-            resizeObserver.observe(viewport)
-        }
-        startedOpen = false
+    function bindZoomInputListeners(nodes: AttachOverlayNodes): void {
+        let signal = overlayHandle.abortSignal()!
+        nodes.viewport.addEventListener("pointerdown", zoomInput.onPointerDown, { signal })
+        nodes.viewport.addEventListener("pointermove", zoomInput.onPointerMove, { signal, passive: false })
+        nodes.viewport.addEventListener("pointerup", zoomInput.onPointerUp, { signal })
+        nodes.viewport.addEventListener("pointercancel", zoomInput.onPointerCancel, { signal })
+        nodes.viewport.addEventListener("wheel", zoomInput.onWheel, { signal, passive: false })
     }
 
-    function tearDownOverlay(opts?: { linger?: boolean }): void {
-        let shouldLinger = opts?.linger !== false && swipe.dismissing()
-        unbindKeys?.()
-        unbindKeys = null
-        unmountAllChrome()
-        resizeObserver?.disconnect()
-        resizeObserver = null
+    function tearDownOverlay(unmountOpts?: { linger?: boolean }): void {
+        chrome.unbindKeys()
+        chrome.unmountAll()
         filmstrip.destroy()
-        abort?.abort()
-        abort = null
-        cancelRaf()
+        panes.reset()
         zoomInput.reset()
         ghostFlight.cancel()
         ghostFlight.uncover()
+        let linger = unmountOpts?.linger ?? swipe.dismissing()
         swipe.reset()
         viewer.setGesturing(false)
+        cancelRaf()
         zoom.reset()
-        lastContentId = null
-        startedOpen = false
-        panes.reset()
         if (viewer.decodeFn()) decodePort.abortExcept([])
         let currentShell = shell
         shell = null
         currentShell?.destroy()
-        if (overlay != null) {
+        if (overlayNodes() != null) {
             viewer.notifyVisible({ stage: "", peeks: [], thumbs: [] })
         }
-        overlay?.remove()
-        overlay = null
+        lastContentId = null
+        startedOpen = false
         // zoom.reset may have scheduled a frame while overlay was still set.
         cancelRaf()
-        viewport = null
-        strip = null
-        header = null
-        footer = null
-        chromeEl = null
-        backdrop = null
-        if (shouldLinger) armScrollLockLinger()
+        overlayHandle.unmount({ linger })
     }
 
     function paintOpen(): void {
@@ -605,10 +349,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             paintedOpenSeq = -1
             return
         }
-        let isFreshOpen = overlay == null || openSeq !== paintedOpenSeq
-        if (isFreshOpen && overlay != null) tearDownOverlay()
-        let created = overlay == null
-        if (created) createOverlay()
+        let isFreshOpen = overlayNodes() == null || openSeq !== paintedOpenSeq
+        if (isFreshOpen && overlayNodes() != null) tearDownOverlay()
+        let created = overlayNodes() == null
+        if (created) {
+            let nodes = overlayHandle.mount()
+            bindZoomInputListeners(nodes)
+            startedOpen = false
+        }
         paintedOpenSeq = openSeq
         ensureShell()
         panes.paintPanes(snap)
@@ -622,14 +370,15 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             if (nav) shell.markNav(nav)
             shell.trackContentKey(`${snap.index}:${snap.current.id}`)
         }
-        syncChrome()
+        chrome.sync()
         filmstrip.paint(snap)
-        if (!overlay) return
-        bindKeys()
+        let nodes = overlayNodes()
+        if (!nodes) return
+        chrome.bindKeys()
         if (created) {
-            overlay.setAttribute("data-phase", "opening")
-            overlay.removeAttribute("data-scrim")
-            void overlay.offsetWidth
+            nodes.overlay.setAttribute("data-phase", "opening")
+            nodes.overlay.removeAttribute("data-scrim")
+            void nodes.overlay.offsetWidth
         }
         applyOverlayAttrs()
         zoomInput.measureZoom()
@@ -641,7 +390,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 if (filmstrip.morph(viewer.snapshot()).live) return
                 filmstrip.centerCurrent("instant")
             })
-            overlay.focus({ preventScroll: true })
+            nodes.overlay.focus({ preventScroll: true })
         }
         emitVisible()
     }
@@ -672,7 +421,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         viewer.open = innerOpen
         unsub()
         tearDownOverlay()
-        clearScrollLockLinger()
+        overlayHandle.clearLinger()
         decodePort.destroy()
         swipe.destroy()
         zoom.destroy()
