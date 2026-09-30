@@ -12,6 +12,7 @@ export type AttachZoomInput = {
     onPointerUp: (e: PointerEvent) => void
     onPointerCancel: (e: PointerEvent) => void
     onWheel: (e: WheelEvent) => void
+    clearWheelZoomRelease: () => void
     reset: () => void
 }
 
@@ -304,6 +305,7 @@ export function createZoomInput(opts: {
         onPointerUp: onViewportPointerUp,
         onPointerCancel: onViewportPointerCancel,
         onWheel: onViewportWheel,
+        clearWheelZoomRelease,
         reset,
     }
 }

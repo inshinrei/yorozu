@@ -361,7 +361,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         ensureShell()
         panes.paintPanes(snap)
         if (snap.current?.id !== lastContentId) {
-            zoomInput.reset()
+            zoomInput.clearWheelZoomRelease()
             zoom.reset()
             lastContentId = snap.current?.id ?? null
         }

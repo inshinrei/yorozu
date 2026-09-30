@@ -95,6 +95,28 @@ describe("attachMediaViewer", () => {
         expect(api!.scale()).toBeLessThanOrEqual(20)
     })
 
+    it("index change during pinch keeps pinch live on the new item", () => {
+        let api: MediaViewerChromeApi | undefined
+        viewer.open({
+            items: [img("a"), img("b")],
+            chrome: {
+                header: (_el, chromeApi) => {
+                    api = chromeApi
+                },
+            },
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 1, clientX: 350, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerdown", { pointerId: 2, clientX: 450, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { pointerId: 2, clientX: 650, clientY: 200 }))
+        expect(api!.scale()).toBeGreaterThan(1)
+        viewer.goTo(1)
+        expect(viewer.snapshot().current?.id).toBe("b")
+        expect(api!.scale()).toBe(1)
+        viewport.dispatchEvent(pointer("pointermove", { pointerId: 2, clientX: 850, clientY: 200 }))
+        expect(api!.scale()).toBeGreaterThan(1)
+    })
+
     it("trapWheel is bound on the viewport; chrome footer wheel is not preventDefault", () => {
         viewer.open({
             items: [img("a")],
