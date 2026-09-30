@@ -508,3 +508,23 @@ test("album swipe under 50px restores filmstrip rest widths", async ({ page }) =
     let end = (await currentThumb(page).boundingBox())!.width
     expect(Math.abs(end - rest)).toBeLessThanOrEqual(1)
 })
+
+test("album swipe stamps data-pager-field and shows both panes before index changes", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true })
+    let startIndex = await currentThumb(page).getAttribute("data-index")
+    await swipeViewportHold(page, -80, 0)
+    await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
+    await expect(page.locator("[data-yorozu-media-pane][data-side=active]")).toHaveCount(1)
+    await expect(page.locator("[data-yorozu-media-pane][data-side=newer]")).toHaveCount(1)
+    expect(await currentThumb(page).getAttribute("data-index")).toBe(String(startIndex))
+    await page.mouse.up()
+})
+
+test("album swipe under 50px clears data-pager-field after settle", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true })
+    await swipeViewportHold(page, -20, 0)
+    await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
+    await page.mouse.up()
+    await waitMs(MEDIA_VIEWER_SETTLE_MS + 50)
+    await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
+})
