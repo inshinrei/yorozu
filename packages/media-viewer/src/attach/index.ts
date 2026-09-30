@@ -4,7 +4,6 @@
 import { prefersReducedMotion } from "@yorozu/animations"
 import { createMediaDecodePort } from "../decode"
 import { bindMediaViewerKeys } from "../keyboard"
-import { fitContain, stageContentSize } from "../layout"
 import { createMediaShell, type MediaShell } from "../shell"
 import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "../swipe"
@@ -17,12 +16,12 @@ import type {
     MediaViewerSnapshot,
     MediaVisibleIds,
 } from "../types"
-import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "../zoom"
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
-import { isZoomable, readPadding, TAP_MOVE_PX, viewportFallback } from "./css"
+import { isZoomable, viewportFallback } from "./css"
 import { createFilmstripDom } from "./filmstrip-dom"
 import { createGhostFlight } from "./ghost-flight"
 import { createPanes } from "./panes"
+import { createZoomInput, type AttachZoomInput } from "./zoom-input"
 
 export type AttachMediaViewerOpts = {
     getGhostHost?: () => HTMLElement | null
@@ -63,30 +62,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let chromeZoomUnsubs: (() => void)[] = []
     let decodePort = createMediaDecodePort({ budget: viewer.decodeBudget() })
 
+    let zoomInput: AttachZoomInput
     let panes = createPanes({
         getStrip: (): HTMLElement | null => strip,
         viewer,
         decodePort,
         isDetached: (): boolean => detached,
         reducedMotion,
-        measureZoom,
+        measureZoom: (): void => zoomInput.measureZoom(),
     })
 
-    let tapPointerId: number | null = null
-    let tapX = 0
-    let tapY = 0
-    let tapMoved = false
-    let zoomDragging = false
-    let dragOriginX = 0
-    let dragOriginY = 0
-    let dragStartX = 0
-    let dragStartY = 0
-    let pointers = new Map<number, { x: number; y: number }>()
-    let pinching = false
-    let pinchDist = 0
-    let pinchOrigin: MediaPoint | null = null
-    let wheelZoomReleaseTimer: ReturnType<typeof setTimeout> | null = null
-    let lastWheelZoomOrigin: MediaPoint | null = null
     let openSeq = 0
     let paintedOpenSeq = -1
     let innerOpen = viewer.open
@@ -156,6 +141,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         },
     })
 
+    zoomInput = createZoomInput({
+        getOverlay: (): HTMLElement | null => overlay,
+        getViewport: (): HTMLElement | null => viewport,
+        viewer,
+        zoom,
+        swipe,
+        isDetached: (): boolean => detached,
+        scheduleRender,
+    })
+
     let filmstrip = createFilmstripDom({
         getOverlay: (): HTMLElement | null => overlay,
         getViewport: (): HTMLElement | null => viewport,
@@ -179,22 +174,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return swipe.gesturing() || swipe.settling() || swipe.dismissing()
     }
 
-    function clearWheelZoomRelease(): void {
-        if (wheelZoomReleaseTimer == null) return
-        clearTimeout(wheelZoomReleaseTimer)
-        wheelZoomReleaseTimer = null
-    }
-
-    function armWheelZoomRelease(origin: MediaPoint): void {
-        lastWheelZoomOrigin = origin
-        clearWheelZoomRelease()
-        wheelZoomReleaseTimer = setTimeout(() => {
-            wheelZoomReleaseTimer = null
-            zoom.endDrag({ withInertia: false, pinchOrigin: lastWheelZoomOrigin })
-            scheduleRender()
-        }, MEDIA_WHEEL_ZOOM_RELEASE_MS)
-    }
-
     function scheduleRender(): void {
         if (detached || overlay == null) return
         if (rafId != null) return
@@ -212,58 +191,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             }
             if (needsLiveRender()) scheduleRender()
         })
-    }
-
-    function pointFromEvent(e: { clientX: number; clientY: number }): MediaPoint {
-        let el = (overlay?.querySelector("[data-yorozu-media-zoom]") as HTMLElement | null) ?? viewport
-        if (!el) return { offsetX: 0, offsetY: 0 }
-        let box = el.getBoundingClientRect()
-        return {
-            offsetX: e.clientX - (box.left + box.width / 2),
-            offsetY: e.clientY - (box.top + box.height / 2),
-        }
-    }
-
-    function measureStageEl(): HTMLElement | null {
-        if (!overlay) return viewport
-        let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]")
-        if (zoomEl instanceof HTMLElement) return zoomEl
-        let active = overlay.querySelector('[data-side="active"]')
-        if (active instanceof HTMLElement) return active
-        return viewport
-    }
-
-    function measureZoom(): void {
-        if (detached || !viewport) return
-        let current = viewer.snapshot().current
-        let stage = measureStageEl() ?? viewport
-        let fallback = viewportFallback()
-        let vw = stage.clientWidth || fallback.width
-        let vh = stage.clientHeight || fallback.height
-        let content = stageContentSize(vw, vh, readPadding(stage))
-        zoom.setViewportSize(content.width, content.height)
-        let nw = current?.naturalWidth || 0
-        let nh = current?.naturalHeight || 0
-        let stageImg = viewport.querySelector("[data-side=active] [data-yorozu-media-stage]")
-        if (stageImg instanceof HTMLImageElement) {
-            if (stageImg.naturalWidth > 0) nw = stageImg.naturalWidth
-            if (stageImg.naturalHeight > 0) nh = stageImg.naturalHeight
-        } else if (stageImg instanceof HTMLCanvasElement) {
-            if (stageImg.width > 0) nw = stageImg.width
-            if (stageImg.height > 0) nh = stageImg.height
-        } else if (stageImg instanceof HTMLVideoElement) {
-            if (stageImg.videoWidth > 0) nw = stageImg.videoWidth
-            if (stageImg.videoHeight > 0) nh = stageImg.videoHeight
-        }
-        if (nw > 0 && nh > 0) {
-            zoom.setNaturalSize(nw, nh)
-            let fit = fitContain({ width: nw, height: nh }, content)
-            if (fit) zoom.setLayoutSize(fit.width, fit.height)
-            else zoom.setLayoutSize(content.width, content.height)
-        } else {
-            zoom.setLayoutSize(content.width, content.height)
-        }
-        scheduleRender()
     }
 
     function applyOverlayAttrs(): void {
@@ -530,178 +457,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         viewer.notifyVisible(visibleIds())
     }
 
-    function pinchDistance(): number {
-        if (pointers.size < 2) return 0
-        let pts = [...pointers.values()]
-        return Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y)
-    }
-
-    function pinchMidpoint(): MediaPoint {
-        let pts = [...pointers.values()]
-        if (pts.length < 2) return { offsetX: 0, offsetY: 0 }
-        return pointFromEvent({
-            clientX: (pts[0]!.x + pts[1]!.x) / 2,
-            clientY: (pts[0]!.y + pts[1]!.y) / 2,
-        })
-    }
-
-    function startPinch(): void {
-        if (!isZoomable(viewer.snapshot().current)) return
-        pinching = true
-        tapMoved = true
-        if (zoomDragging) {
-            zoomDragging = false
-            zoom.endDrag({ withInertia: false })
-        }
-        swipe.reset()
-        pinchDist = pinchDistance()
-        pinchOrigin = pinchMidpoint()
-        zoom.beginDrag()
-    }
-
-    function endPinch(): void {
-        if (!pinching) return
-        pinching = false
-        zoomDragging = false
-        zoom.endDrag({ pinchOrigin, withInertia: false })
-        pinchOrigin = null
-        pinchDist = 0
-    }
-
-    function onViewportPointerDown(e: PointerEvent): void {
-        let t = e.target
-        if (!(t instanceof Element && t.closest("button, a, input, textarea, select, video"))) {
-            try {
-                viewport?.setPointerCapture(e.pointerId)
-            } catch {
-                // optional
-            }
-        }
-        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-        if (isZoomable(viewer.snapshot().current) && pointers.size >= 2) {
-            if (!pinching) startPinch()
-            scheduleRender()
-            return
-        }
-        tapPointerId = e.pointerId
-        tapX = e.clientX
-        tapY = e.clientY
-        tapMoved = false
-        dragOriginX = e.clientX
-        dragOriginY = e.clientY
-        if (swipe.onPointerDown(e)) {
-            zoomDragging = false
-            scheduleRender()
-            return
-        }
-        scheduleRender()
-    }
-
-    function onViewportPointerMove(e: PointerEvent): void {
-        if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-        if (pinching && pointers.size >= 2) {
-            e.preventDefault()
-            let dist = pinchDistance()
-            if (pinchDist > 0 && dist > 0) {
-                let amount = dist / pinchDist - 1
-                pinchOrigin = pinchMidpoint()
-                zoom.applyRelativeZoomSoft(amount, pinchOrigin)
-                pinchDist = dist
-            }
-            scheduleRender()
-            return
-        }
-        if (tapPointerId === e.pointerId) {
-            if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > TAP_MOVE_PX) {
-                tapMoved = true
-                if (!zoomDragging && !pinching && isZoomable(viewer.snapshot().current) && zoom.isZoomed()) {
-                    zoom.beginDrag()
-                    zoomDragging = true
-                    let start = zoom.getDragStartTranslate()
-                    dragStartX = start.translateX
-                    dragStartY = start.translateY
-                    try {
-                        viewport?.setPointerCapture(e.pointerId)
-                    } catch {
-                        // optional
-                    }
-                }
-            }
-        }
-        if (zoomDragging) {
-            e.preventDefault()
-            zoom.moveDrag(e.clientX - dragOriginX, e.clientY - dragOriginY, dragStartX, dragStartY)
-            scheduleRender()
-            return
-        }
-        swipe.onPointerMove(e)
-        scheduleRender()
-    }
-
-    function onViewportPointerUp(e: PointerEvent): void {
-        pointers.delete(e.pointerId)
-        if (pinching) {
-            if (pointers.size < 2) endPinch()
-            if (tapPointerId === e.pointerId) tapPointerId = null
-            scheduleRender()
-            return
-        }
-        if (zoomDragging) {
-            zoomDragging = false
-            zoom.endDrag()
-            if (tapPointerId === e.pointerId) tapPointerId = null
-            scheduleRender()
-            return
-        }
-        swipe.onPointerUp(e)
-        if (tapPointerId === e.pointerId) {
-            tapPointerId = null
-        }
-        scheduleRender()
-    }
-
-    function onViewportPointerCancel(e: PointerEvent): void {
-        pointers.delete(e.pointerId)
-        if (pinching) {
-            if (pointers.size < 2) endPinch()
-            if (tapPointerId === e.pointerId) tapPointerId = null
-            scheduleRender()
-            return
-        }
-        if (zoomDragging) {
-            zoomDragging = false
-            zoom.endDrag({ withInertia: false })
-        }
-        swipe.onPointerCancel(e)
-        if (tapPointerId === e.pointerId) tapPointerId = null
-        scheduleRender()
-    }
-
-    function onViewportWheel(e: WheelEvent): void {
-        if (isZoomable(viewer.snapshot().current)) {
-            let intent = wheelIntent(zoom.isZoomed(), e.ctrlKey || e.metaKey)
-            if (intent === "zoom") {
-                e.preventDefault()
-                e.stopPropagation()
-                let origin = pointFromEvent(e)
-                zoom.applyWheel(e.deltaY, origin)
-                armWheelZoomRelease(origin)
-                scheduleRender()
-                return
-            }
-            if (intent === "pan") {
-                e.preventDefault()
-                e.stopPropagation()
-                let pan = wheelPanDeltas(e.deltaX, e.deltaY, e.deltaMode)
-                zoom.panBy(-pan.deltaX, -pan.deltaY)
-                scheduleRender()
-                return
-            }
-        }
-        swipe.trapWheel(e)
-        scheduleRender()
-    }
-
     function createOverlay(): void {
         clearScrollLockLinger()
         abort = new AbortController()
@@ -790,14 +545,14 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         overlay.addEventListener("pointerup", clearFilmstripTouchSample, { signal })
         overlay.addEventListener("pointercancel", clearFilmstripTouchSample, { signal })
 
-        viewport.addEventListener("pointerdown", onViewportPointerDown, { signal })
-        viewport.addEventListener("pointermove", onViewportPointerMove, { signal, passive: false })
-        viewport.addEventListener("pointerup", onViewportPointerUp, { signal })
-        viewport.addEventListener("pointercancel", onViewportPointerCancel, { signal })
-        viewport.addEventListener("wheel", onViewportWheel, { signal, passive: false })
+        viewport.addEventListener("pointerdown", zoomInput.onPointerDown, { signal })
+        viewport.addEventListener("pointermove", zoomInput.onPointerMove, { signal, passive: false })
+        viewport.addEventListener("pointerup", zoomInput.onPointerUp, { signal })
+        viewport.addEventListener("pointercancel", zoomInput.onPointerCancel, { signal })
+        viewport.addEventListener("wheel", zoomInput.onWheel, { signal, passive: false })
 
         if (typeof ResizeObserver === "function") {
-            resizeObserver = new ResizeObserver(() => measureZoom())
+            resizeObserver = new ResizeObserver(() => zoomInput.measureZoom())
             resizeObserver.observe(viewport)
         }
         startedOpen = false
@@ -814,19 +569,12 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         abort?.abort()
         abort = null
         cancelRaf()
-        clearWheelZoomRelease()
-        lastWheelZoomOrigin = null
+        zoomInput.reset()
         ghostFlight.cancel()
         ghostFlight.uncover()
         swipe.reset()
         viewer.setGesturing(false)
         zoom.reset()
-        zoomDragging = false
-        tapPointerId = null
-        pointers.clear()
-        pinching = false
-        pinchOrigin = null
-        pinchDist = 0
         lastContentId = null
         startedOpen = false
         panes.reset()
@@ -865,7 +613,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         ensureShell()
         panes.paintPanes(snap)
         if (snap.current?.id !== lastContentId) {
-            clearWheelZoomRelease()
+            zoomInput.reset()
             zoom.reset()
             lastContentId = snap.current?.id ?? null
         }
@@ -884,7 +632,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             void overlay.offsetWidth
         }
         applyOverlayAttrs()
-        measureZoom()
+        zoomInput.measureZoom()
         if (created && !startedOpen) {
             startedOpen = true
             void shell?.startOpen().then(() => {
