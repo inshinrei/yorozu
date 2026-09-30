@@ -9,6 +9,7 @@ import {
     commitSwipe,
     horizontalSlideStepPx,
     lastDeltaAgrees,
+    mediaPagerFieldActive,
     projectSwipeOffset,
     rebasedOffsetAfterNav,
     resolveSwipeAxis,
@@ -229,5 +230,19 @@ describe("media-viewer swipe math", () => {
         expect(swipeSettleDurationMs("bounce", false)).toBe(MOTION_SETTLE_MS)
         expect(swipeSettleDurationMs("nav", true)).toBe(0)
         expect(swipeSettleDurationMs("bounce", true)).toBe(0)
+    })
+})
+
+describe("mediaPagerFieldActive", () => {
+    it("is off at rest and on for nonzero horizontal offset", () => {
+        expect(mediaPagerFieldActive(0, 0, false)).toBe(false)
+        expect(mediaPagerFieldActive(40, 0, false)).toBe(true)
+        expect(mediaPagerFieldActive(-40, 0, false)).toBe(true)
+    })
+
+    it("is off while dismissing or offsetY is down", () => {
+        expect(mediaPagerFieldActive(40, 10, false)).toBe(false)
+        expect(mediaPagerFieldActive(40, 0, true)).toBe(false)
+        expect(mediaPagerFieldActive(0, 80, false)).toBe(false)
     })
 })

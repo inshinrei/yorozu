@@ -127,3 +127,8 @@ export function verticalDismissOpacity(offsetY: number, viewportHeight: number):
     let t = Math.min(1, Math.abs(offsetY) / (h * 0.35))
     return Math.max(0.45, 1 - t * 0.55)
 }
+
+export function mediaPagerFieldActive(offsetX: number, offsetY: number, dismissing: boolean): boolean {
+    if (dismissing || offsetY > 0) return false
+    return offsetX !== 0
+}

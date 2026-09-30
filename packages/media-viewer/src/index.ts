@@ -47,6 +47,7 @@ export {
     lastDeltaAgrees,
     commitSwipe,
     verticalDismissOpacity,
+    mediaPagerFieldActive,
 } from "./swipe"
 export type { MediaSwipeAxis, MediaSwipeCommit, CommitSwipeArgs } from "./swipe"
 export { createMediaSwipe } from "./swipe-controller"
