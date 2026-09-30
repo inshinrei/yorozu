@@ -28,6 +28,10 @@
     box-sizing: border-box;
 }
 
+[data-yorozu-media-viewport][data-pager-field] {
+    background-color: var(--yorozu-media-pager-field);
+}
+
 [data-yorozu-media-strip] {
     position: absolute;
     inset: 0;

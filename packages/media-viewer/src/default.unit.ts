@@ -9,6 +9,7 @@ let pkgRoot = join(here, "..")
 let tokenNames = [
     "--yorozu-media-z",
     "--yorozu-media-scrim",
+    "--yorozu-media-pager-field",
     "--yorozu-media-pad-top",
     "--yorozu-media-pad-bottom",
     "--yorozu-media-pad-x",
@@ -48,6 +49,7 @@ describe("default media viewer styles", () => {
         }
         expect(css).toContain("--yorozu-media-z: 1400")
         expect(css).toContain("--yorozu-media-scrim: rgba(25, 25, 26, 0.5)")
+        expect(css).toContain("--yorozu-media-pager-field: rgba(25, 25, 26, 1)")
         expect(css).toContain("--yorozu-media-pad-top: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-bottom: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-x: 0.75rem")
@@ -368,6 +370,14 @@ describe("default media viewer styles", () => {
         expect(paneBlock).toContain("--yorozu-media-pad-top")
         expect(paneBlock).toContain("--yorozu-media-pad-x")
         expect(paneBlock).toContain("--yorozu-media-pad-bottom")
+    })
+
+    it("pager field paints opaque viewport background", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain("[data-yorozu-media-viewport][data-pager-field]")
+        expect(css).toContain("background-color: var(--yorozu-media-pager-field)")
+        let viewportBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(viewportBlock).not.toContain("background-color")
     })
 
     it("package.json exports tokens.css and default.css", () => {
