@@ -1,20 +1,10 @@
 /**
  * Overlay + stage + optional filmstrip + chrome slots. Host paints chrome; this module owns gestures and ghost flight.
  */
-import { dualRaf, prefersReducedMotion } from "@yorozu/animations"
+import { prefersReducedMotion } from "@yorozu/animations"
 import { createMediaDecodePort } from "../decode"
-import {
-    computeStageFitRectFromElement,
-    createMediaGhost,
-    MEDIA_GHOST_CLOSE_EASING,
-    MEDIA_GHOST_CLOSE_MS,
-    MEDIA_GHOST_EASING,
-    MEDIA_GHOST_MS,
-    type MediaGhost,
-} from "../ghost"
 import { bindMediaViewerKeys } from "../keyboard"
 import { fitContain, stageContentSize } from "../layout"
-import { captureOriginFromDom, isMediaOriginLandable, queryMediaOriginEl } from "../origin"
 import { createMediaShell, type MediaShell } from "../shell"
 import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
 import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "../swipe"
@@ -31,6 +21,7 @@ import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoi
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
 import { isZoomable, readPadding, TAP_MOVE_PX, viewportFallback } from "./css"
 import { createFilmstripDom } from "./filmstrip-dom"
+import { createGhostFlight } from "./ghost-flight"
 import { createPanes } from "./panes"
 
 export type AttachMediaViewerOpts = {
@@ -58,7 +49,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let unbindKeys: (() => void) | null = null
 
     let overlay: HTMLElement | null = null
-    let originCover: { el: HTMLElement; prev: string } | null = null
     let viewport: HTMLElement | null = null
     let strip: HTMLElement | null = null
     let header: HTMLElement | null = null
@@ -113,7 +103,15 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         return opts?.getGhostHost?.() ?? document.body
     }
 
-    let ghost: MediaGhost = createMediaGhost()
+    let ghostFlight = createGhostFlight({
+        getOverlay: (): HTMLElement | null => overlay,
+        getViewport: (): HTMLElement | null => viewport,
+        getGhostHost: ghostHost,
+        getHistoryClipRoot: (): HTMLElement | null => opts?.getHistoryClipRoot?.() ?? null,
+        viewer,
+        isDetached: (): boolean => detached,
+        applyOverlayAttrs,
+    })
     let zoom: MediaImageZoom = createMediaImageZoom({ prefersReducedMotion: reducedMotion })
     zoom.onChange(() => scheduleRender())
     let swipe: MediaSwipe = createMediaSwipe({
@@ -226,52 +224,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
-    function paintedStageEl(): HTMLElement | null {
-        if (!overlay) return viewport
-        let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]")
-        if (zoomEl instanceof HTMLElement) return zoomEl
-        let active = overlay.querySelector('[data-side="active"]')
-        if (active instanceof HTMLElement) return active
-        return viewport
-    }
-
-    function ghostBitmap(): CanvasImageSource | undefined {
-        let scope = overlay ?? viewport
-        if (!scope) return undefined
-        let active = scope.querySelector('[data-side="active"]')
-        if (!(active instanceof HTMLElement)) return undefined
-        let stage = active.querySelector("[data-yorozu-media-stage]")
-        if (stage instanceof HTMLImageElement || stage instanceof HTMLCanvasElement) return stage
-        let peek = active.querySelector("[data-yorozu-media-peek]")
-        if (peek instanceof HTMLImageElement || peek instanceof HTMLCanvasElement) return peek
-        return undefined
-    }
-
-    function naturalForFit(snap: MediaViewerSnapshot): { width: number; height: number } {
-        let current = snap.current
-        let seed = snap.origin
-        let width = current?.naturalWidth || seed?.naturalWidth || 0
-        let height = current?.naturalHeight || seed?.naturalHeight || 0
-        let stageEl = viewport?.querySelector("[data-side=active] [data-yorozu-media-stage]")
-        if (stageEl instanceof HTMLImageElement) {
-            if (stageEl.naturalWidth > 0) width = stageEl.naturalWidth
-            if (stageEl.naturalHeight > 0) height = stageEl.naturalHeight
-        } else if (stageEl instanceof HTMLCanvasElement) {
-            if (stageEl.width > 0) width = stageEl.width
-            if (stageEl.height > 0) height = stageEl.height
-        } else if (stageEl instanceof HTMLVideoElement) {
-            if (stageEl.videoWidth > 0) width = stageEl.videoWidth
-            if (stageEl.videoHeight > 0) height = stageEl.videoHeight
-        } else {
-            let imgEl = viewport?.querySelector("[data-side=active] img")
-            if (imgEl instanceof HTMLImageElement) {
-                if (imgEl.naturalWidth > 0) width = imgEl.naturalWidth
-                if (imgEl.naturalHeight > 0) height = imgEl.naturalHeight
-            }
-        }
-        return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
-    }
-
     function measureStageEl(): HTMLElement | null {
         if (!overlay) return viewport
         let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]")
@@ -347,92 +299,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
     }
 
-    function coverOriginEl(el: HTMLElement | null): void {
-        if (!el) return
-        if (originCover?.el === el) return
-        uncoverOriginEl()
-        originCover = { el, prev: el.style.visibility }
-        el.style.visibility = "hidden"
-    }
-
-    function uncoverOriginEl(): void {
-        if (!originCover) return
-        originCover.el.style.visibility = originCover.prev
-        originCover = null
-    }
-
-    async function runOpenGhost(hooks: { onLand: () => void | Promise<void> }): Promise<boolean> {
-        let snap = viewer.snapshot()
-        let seed = snap.origin
-        if (!seed) return false
-        applyOverlayAttrs()
-        await dualRaf()
-        if (detached || !viewport || !overlay) return false
-        applyOverlayAttrs()
-        let stage = paintedStageEl() ?? viewport
-        let to = computeStageFitRectFromElement(stage, naturalForFit(snap))
-        let handle = ghost.playOpen({
-            host: ghostHost(),
-            seed,
-            to,
-            hideTarget: viewport,
-            bitmap: ghostBitmap(),
-            durationMs: MEDIA_GHOST_MS,
-            easing: MEDIA_GHOST_EASING,
-            onLand: async () => {
-                await hooks.onLand()
-                applyOverlayAttrs()
-            },
-        })
-        if (!handle) return false
-        coverOriginEl(queryMediaOriginEl(seed.id))
-        let ran = await handle.done
-        applyOverlayAttrs()
-        return ran
-    }
-
-    async function runCloseGhost(): Promise<boolean> {
-        applyOverlayAttrs()
-        let snap = viewer.snapshot()
-        let current = snap.current
-        let live = current ? captureOriginFromDom(current.id) : null
-        let stage = paintedStageEl() ?? viewport
-        let fromStage = stage ? computeStageFitRectFromElement(stage, naturalForFit(snap)) : null
-        if (!fromStage && stage) {
-            let box = stage.getBoundingClientRect()
-            if (box.width > 0 && box.height > 0) {
-                fromStage = { top: box.top, left: box.left, width: box.width, height: box.height }
-            }
-        }
-        if (!fromStage) {
-            let fb = viewportFallback()
-            fromStage = { top: 0, left: 0, width: fb.width, height: fb.height }
-        }
-        let fb = viewportFallback()
-        let viewportRect = { top: 0, left: 0, width: fb.width, height: fb.height }
-        let clipEl = opts?.getHistoryClipRoot?.()
-        let clip: { top: number; left: number; width: number; height: number } | null = null
-        if (clipEl) {
-            let box = clipEl.getBoundingClientRect()
-            clip = { top: box.top, left: box.left, width: box.width, height: box.height }
-        }
-        let landable = live != null && isMediaOriginLandable(live.rect, { viewport: viewportRect, clip })
-        let handle = ghost.playClose({
-            host: ghostHost(),
-            fromStage,
-            target: landable ? live : null,
-            imageUrl: current?.src ?? live?.imageUrl ?? null,
-            bitmap: ghostBitmap(),
-            durationMs: MEDIA_GHOST_CLOSE_MS,
-            easing: MEDIA_GHOST_CLOSE_EASING,
-            onLand: uncoverOriginEl,
-        })
-        if (!handle) return false
-        let ran = await handle.done
-        applyOverlayAttrs()
-        return ran
-    }
-
     function ensureShell(): void {
         if (shell) return
         shell = createMediaShell({
@@ -440,11 +306,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             hasOpenOrigin: (): boolean => viewer.snapshot().origin != null,
             getOpenPinnedUrl: (): string | null =>
                 viewer.snapshot().origin?.imageUrl ?? viewer.snapshot().current?.src ?? null,
-            runOpenGhost,
-            runCloseGhost,
-            cancelGhost: (): void => {
-                ghost.cancel()
-            },
+            runOpenGhost: ghostFlight.runOpenGhost,
+            runCloseGhost: ghostFlight.runCloseGhost,
+            cancelGhost: ghostFlight.cancel,
             onFinishClose: (): void => {
                 if (viewer.snapshot().open) viewer.close()
             },
@@ -487,7 +351,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let wants = viewer.beginClose(closeOpts)
         applyOverlayAttrs()
         if (!wants) {
-            ghost.cancel()
+            ghostFlight.cancel()
             tearDownOverlay()
             viewer.close()
             return
@@ -502,7 +366,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function forceViewerClose(): void {
         clearScrollLockLinger()
-        ghost.cancel()
+        ghostFlight.cancel()
         tearDownOverlay({ linger: false })
         clearScrollLockLinger()
         if (viewer.snapshot().open) viewer.forceClose()
@@ -952,8 +816,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         cancelRaf()
         clearWheelZoomRelease()
         lastWheelZoomOrigin = null
-        ghost.cancel()
-        uncoverOriginEl()
+        ghostFlight.cancel()
+        ghostFlight.uncover()
         swipe.reset()
         viewer.setGesturing(false)
         zoom.reset()
@@ -1064,6 +928,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         decodePort.destroy()
         swipe.destroy()
         zoom.destroy()
-        ghost.cancel()
+        ghostFlight.cancel()
     }
 }
