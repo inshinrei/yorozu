@@ -3,7 +3,7 @@
  */
 import { dualRaf, prefersReducedMotion } from "@yorozu/animations"
 import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
-import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "../decode"
+import { applyCanvasImageSource, createMediaDecodePort } from "../decode"
 import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
@@ -42,7 +42,6 @@ import type {
     MediaViewerChromeApi,
     MediaViewerItem,
     MediaViewerNavFrom,
-    MediaViewerNeighbor,
     MediaViewerOpenOpts,
     MediaViewerSnapshot,
     MediaVisibleIds,
@@ -58,6 +57,7 @@ import {
     viewportFallback,
     type FilmstripMetrics,
 } from "./css"
+import { createPanes } from "./panes"
 
 export type AttachMediaViewerOpts = {
     getGhostHost?: () => HTMLElement | null
@@ -116,10 +116,17 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let unmounts: { header?: () => void; footer?: () => void; overlay?: () => void } = {}
     // Zoom lives for attach; chrome remounts each open. Track overlay-scoped unsubs.
     let chromeZoomUnsubs: (() => void)[] = []
-    let paneKeys = new WeakMap<HTMLElement, string>()
-    let paneIds: { older?: string; active?: string; newer?: string } = {}
     let thumbDecodeKeys = new WeakMap<HTMLElement, string>()
     let decodePort = createMediaDecodePort({ budget: viewer.decodeBudget() })
+
+    let panes = createPanes({
+        getStrip: (): HTMLElement | null => strip,
+        viewer,
+        decodePort,
+        isDetached: (): boolean => detached,
+        reducedMotion,
+        measureZoom,
+    })
 
     let tapPointerId: number | null = null
     let tapX = 0
@@ -653,217 +660,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         syncSlot("overlay", slots?.overlay)
     }
 
-    function placePane(el: HTMLElement, side: "older" | "active" | "newer"): void {
-        if (!strip) return
-        if (side === "older") {
-            strip.insertBefore(el, strip.firstChild)
-            return
-        }
-        if (side === "newer") {
-            strip.append(el)
-            return
-        }
-        let newer = strip.querySelector('[data-side="newer"]')
-        if (newer) strip.insertBefore(el, newer)
-        else strip.append(el)
-    }
-
-    function paneContentKey(side: string, item: MediaViewerItem | MediaViewerNeighbor): string {
-        let poster = "poster" in item && item.poster ? item.poster : ""
-        let alt = "alt" in item && item.alt ? item.alt : ""
-        let motion = reducedMotion() ? "rm" : "full"
-        return `${side}:${item.id}:${item.kind}:${item.src ?? ""}:${poster}:${alt}:${motion}`
-    }
-
-    function peekBitmapSrc(item: MediaViewerNeighbor): string | null {
-        if (item.kind === "video") {
-            return typeof item.poster === "string" && item.poster.length > 0 ? item.poster : null
-        }
-        return item.src ?? null
-    }
-
-    function fillPeek(pane: HTMLElement, item: MediaViewerNeighbor, side: "older" | "newer"): void {
-        let hostDecode = viewer.decodeFn()
-        let src = peekBitmapSrc(item)
-        if (hostDecode && src) {
-            let loading = document.createElement("div")
-            loading.setAttribute("data-yorozu-media-loading", "")
-            pane.append(loading)
-            let key = paneKeys.get(pane)
-            let role: MediaDecodeRole = side === "older" ? "peek-older" : "peek-newer"
-            void decodePort
-                .request({ id: item.id, role, src, decode: hostDecode })
-                .then((source: CanvasImageSource | null): void => {
-                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-                    pane.replaceChildren()
-                    if (source) applyCanvasImageSource(pane, source, { peek: true, alt: "" })
-                })
-            return
-        }
-        if (item.kind === "video") {
-            let poster = item.poster
-            if (typeof poster === "string" && poster.length > 0) {
-                let image = document.createElement("img")
-                image.setAttribute("data-yorozu-media-peek", "")
-                image.alt = ""
-                image.draggable = false
-                let key = paneKeys.get(pane)
-                image.onerror = (): void => {
-                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-                    pane.replaceChildren()
-                }
-                pane.append(image)
-                image.src = poster
-                return
-            }
-            let loading = document.createElement("div")
-            loading.setAttribute("data-yorozu-media-loading", "")
-            pane.append(loading)
-            return
-        }
-        if (item.src) {
-            let image = document.createElement("img")
-            image.setAttribute("data-yorozu-media-peek", "")
-            image.alt = ""
-            image.draggable = false
-            let key = paneKeys.get(pane)
-            image.onerror = (): void => {
-                if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-                pane.replaceChildren()
-            }
-            pane.append(image)
-            image.src = item.src
-            return
-        }
-        let loading = document.createElement("div")
-        loading.setAttribute("data-yorozu-media-loading", "")
-        pane.append(loading)
-    }
-
-    function activeBitmapSrc(item: MediaViewerItem | MediaViewerNeighbor): string | null {
-        if (item.kind === "gif" && reducedMotion()) {
-            return item.poster || item.src || null
-        }
-        return item.src || null
-    }
-
-    function fillActive(pane: HTMLElement, item: MediaViewerItem | MediaViewerNeighbor): void {
-        if (item.kind === "video") {
-            let video = document.createElement("video")
-            video.setAttribute("data-yorozu-media-stage", "")
-            video.controls = true
-            video.autoplay = true
-            video.playsInline = true
-            video.setAttribute("playsinline", "")
-            if (item.src) video.src = item.src
-            if ("poster" in item && item.poster) video.poster = item.poster
-            let loading = document.createElement("div")
-            loading.setAttribute("data-yorozu-media-loading", "")
-            pane.append(video, loading)
-            let clearLoading = (): void => {
-                loading.remove()
-                video.removeEventListener("loadeddata", clearLoading)
-            }
-            video.addEventListener("loadeddata", clearLoading)
-            return
-        }
-        let src = activeBitmapSrc(item)
-        if (!src) {
-            let loading = document.createElement("div")
-            loading.setAttribute("data-yorozu-media-loading", "")
-            pane.append(loading)
-            return
-        }
-        let hostDecode = viewer.decodeFn()
-        let zoomable = isZoomable(item)
-        let host: HTMLElement = pane
-        if (zoomable) {
-            let wrap = document.createElement("div")
-            wrap.setAttribute("data-yorozu-media-zoom", "")
-            pane.append(wrap)
-            host = wrap
-        }
-        if (hostDecode) {
-            let loading = document.createElement("div")
-            loading.setAttribute("data-yorozu-media-loading", "")
-            host.append(loading)
-            let key = paneKeys.get(pane)
-            let alt = "alt" in item && item.alt ? item.alt : ""
-            void decodePort
-                .request({ id: item.id, role: "active", src, decode: hostDecode })
-                .then((source: CanvasImageSource | null): void => {
-                    if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-                    host.replaceChildren()
-                    if (source) {
-                        let painted = applyCanvasImageSource(host, source, { stage: true, alt })
-                        if (zoomable && painted instanceof HTMLImageElement) {
-                            painted.addEventListener("load", () => measureZoom())
-                            if (painted.complete) measureZoom()
-                            return
-                        }
-                    }
-                    if (zoomable) measureZoom()
-                })
-            return
-        }
-        let image = document.createElement("img")
-        image.setAttribute("data-yorozu-media-stage", "")
-        image.alt = "alt" in item && item.alt ? item.alt : ""
-        image.draggable = false
-        let key = paneKeys.get(pane)
-        image.onerror = (): void => {
-            if (detached || !pane.isConnected || paneKeys.get(pane) !== key) return
-            host.replaceChildren()
-        }
-        if (zoomable) image.addEventListener("load", () => measureZoom())
-        host.append(image)
-        image.src = src
-        if (zoomable && image.complete) measureZoom()
-    }
-
-    function syncPane(
-        side: "older" | "active" | "newer",
-        item: MediaViewerItem | MediaViewerNeighbor | null,
-        keep: Set<string>,
-    ): void {
-        if (!strip) return
-        let existing = strip.querySelector(`[data-side="${side}"]`) as HTMLElement | null
-        let prevId = paneIds[side]
-        if (item == null) {
-            existing?.remove()
-            delete paneIds[side]
-            if (viewer.decodeFn() && prevId && !keep.has(prevId)) decodePort.abort(prevId)
-            return
-        }
-        let key = paneContentKey(side, item)
-        if (!existing) {
-            existing = document.createElement("div")
-            existing.setAttribute("data-yorozu-media-pane", "")
-            existing.setAttribute("data-side", side)
-            placePane(existing, side)
-        } else if (paneKeys.get(existing) === key) {
-            return
-        } else if (viewer.decodeFn() && prevId && !keep.has(prevId)) {
-            decodePort.abort(prevId)
-        }
-        paneIds[side] = item.id
-        paneKeys.set(existing, key)
-        existing.replaceChildren()
-        if (side === "active") fillActive(existing, item)
-        else fillPeek(existing, item, side)
-    }
-
-    function paintPanes(snap: MediaViewerSnapshot): void {
-        let keep = new Set<string>()
-        if (snap.neighbors.older) keep.add(snap.neighbors.older.id)
-        if (snap.current) keep.add(snap.current.id)
-        if (snap.neighbors.newer) keep.add(snap.neighbors.newer.id)
-        if (viewer.decodeFn() && viewer.isGesturing()) decodePort.abortExcept(keep)
-        syncPane("older", snap.neighbors.older, keep)
-        syncPane("active", snap.current, keep)
-        syncPane("newer", snap.neighbors.newer, keep)
-    }
-
     function syncSwipeGesturing(): void {
         let on = swipe.gesturing() || swipe.settling() || swipe.dismissing()
         viewer.setGesturing(on)
@@ -880,7 +676,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (viewer.isGesturing()) return
         if (viewer.decodeFn()) {
             let snap = viewer.snapshot()
-            paintPanes(snap)
+            panes.paintPanes(snap)
             if (filmstripEl && snap.filmstrip) {
                 let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
                 if (track) {
@@ -2002,7 +1798,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         filmstripIds = null
         filmstripCenteredIndex = null
         filmstripLiveScroll = false
-        paneIds = {}
+        panes.reset()
         if (viewer.decodeFn()) decodePort.abortExcept([])
         let currentShell = shell
         shell = null
@@ -2036,7 +1832,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (created) createOverlay()
         paintedOpenSeq = openSeq
         ensureShell()
-        paintPanes(snap)
+        panes.paintPanes(snap)
         if (snap.current?.id !== lastContentId) {
             clearWheelZoomRelease()
             zoom.reset()
