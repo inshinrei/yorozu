@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest"
-import { attachMediaViewer } from "./attach"
+import { attachMediaViewer } from "./index"
 import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
     filmstripGapAfter,
     filmstripThumbPitchPx,
-} from "./filmstrip"
+} from "../filmstrip"
 import {
     MEDIA_GHOST_ANIMATING_CLASS,
     MEDIA_GHOST_CLOSE_EASING,
@@ -14,17 +14,17 @@ import {
     MEDIA_GHOST_EASING,
     MEDIA_GHOST_HANDOFF_CLASS,
     MEDIA_GHOST_MS,
-} from "./ghost"
-import { createMediaViewer, type MediaViewer } from "./session"
-import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "./swipe"
+} from "../ghost"
+import { createMediaViewer, type MediaViewer } from "../session"
+import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "../swipe"
 import type {
     MediaViewerChromeApi,
     MediaViewerItem,
     MediaViewerOrigin,
     MediaViewerSessionOpts,
     MediaVisibleIds,
-} from "./types"
-import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "./zoom"
+} from "../types"
+import { MEDIA_WHEEL_ZOOM_RELEASE_MS, MEDIA_ZOOM_SETTLE_MS } from "../zoom"
 
 type IndexChangeFn = NonNullable<MediaViewerSessionOpts["onIndexChange"]>
 type RequestFn = NonNullable<MediaViewerSessionOpts["onRequestOlder"]>

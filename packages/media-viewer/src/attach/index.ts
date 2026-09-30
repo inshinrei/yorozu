@@ -3,7 +3,7 @@
  */
 import { dualRaf, prefersReducedMotion } from "@yorozu/animations"
 import { createVirtualList, listSliceForViewport, type VirtualList } from "@yorozu/virtual-list"
-import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "./decode"
+import { applyCanvasImageSource, createMediaDecodePort, type MediaDecodeRole } from "../decode"
 import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
@@ -13,7 +13,7 @@ import {
     filmstripSwipeNeighborIndex,
     filmstripSwipeProgress,
     filmstripThumbPitchPx,
-} from "./filmstrip"
+} from "../filmstrip"
 import {
     computeStageFitRectFromElement,
     createMediaGhost,
@@ -23,20 +23,20 @@ import {
     MEDIA_GHOST_EASING,
     MEDIA_GHOST_MS,
     type MediaGhost,
-} from "./ghost"
-import { bindMediaViewerKeys } from "./keyboard"
-import { fitContain, stageContentSize } from "./layout"
-import { captureOriginFromDom, isMediaOriginLandable, queryMediaOriginEl } from "./origin"
+} from "../ghost"
+import { bindMediaViewerKeys } from "../keyboard"
+import { fitContain, stageContentSize } from "../layout"
+import { captureOriginFromDom, isMediaOriginLandable, queryMediaOriginEl } from "../origin"
 import {
     DEFAULT_FILMSTRIP_CURRENT_GAP_PX,
     DEFAULT_FILMSTRIP_CURRENT_ITEM_SIZE_PX,
     DEFAULT_FILMSTRIP_GAP_PX,
     DEFAULT_FILMSTRIP_ITEM_SIZE_PX,
     DEFAULT_FILMSTRIP_THUMB_HEIGHT_PX,
-} from "./session"
-import { createMediaShell, type MediaShell } from "./shell"
-import { createMediaSwipe, type MediaSwipe } from "./swipe-controller"
-import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "./swipe"
+} from "../session"
+import { createMediaShell, type MediaShell } from "../shell"
+import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
+import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS } from "../swipe"
 import type {
     MediaViewer,
     MediaViewerChrome,
@@ -47,9 +47,9 @@ import type {
     MediaViewerOpenOpts,
     MediaViewerSnapshot,
     MediaVisibleIds,
-} from "./types"
-import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "./zoom"
-import { createMediaImageZoom, type MediaImageZoom } from "./zoom-controller"
+} from "../types"
+import { MEDIA_WHEEL_ZOOM_RELEASE_MS, wheelIntent, wheelPanDeltas, type MediaPoint } from "../zoom"
+import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
 
 export type AttachMediaViewerOpts = {
     getGhostHost?: () => HTMLElement | null
