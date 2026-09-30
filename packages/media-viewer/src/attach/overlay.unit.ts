@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { MOTION_NAV_MS, MOTION_SETTLE_MS } from "@yorozu/animations"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./index"
 import { createMediaViewer } from "../session"
@@ -6,8 +7,10 @@ import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "../
 import type { MediaViewerChromeApi } from "../types"
 import {
     DecodeFn,
+    flushLiveRaf,
     img,
     imgAspect,
+    mockViewportBox,
     mountAttach,
     origin,
     pointer,
@@ -418,4 +421,76 @@ describe("attachMediaViewer", () => {
             expect(nextFirst.defaultPrevented).toBe(true)
         },
     )
+
+    it("rest open has no data-pager-field", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+    })
+
+    it("horizontal drag stamps data-pager-field and not data-swipe-dismiss", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewport.hasAttribute("data-pager-field")).toBe(true)
+        expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(false)
+    })
+
+    it("vertical down drag sets data-swipe-dismiss and not data-pager-field", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a"), img("b")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        flushLiveRaf()
+        expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(true)
+        expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+    })
+
+    it("horizontal drag under 50px clears data-pager-field after bounce settle", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 380, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewport.hasAttribute("data-pager-field")).toBe(true)
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 380, clientY: 200 }))
+        await vi.advanceTimersByTimeAsync(MOTION_SETTLE_MS + 32)
+        flushLiveRaf()
+        expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+    })
+
+    it("commit hop leftover offset keeps data-pager-field until offset returns to 0", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewport.hasAttribute("data-pager-field")).toBe(true)
+        await vi.advanceTimersByTimeAsync(MOTION_NAV_MS + 32)
+        flushLiveRaf()
+        expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+    })
+
+    it("keyboard switch does not stamp data-pager-field", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
+        let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        expect(strip.getAttribute("data-switch")).toBe("newer")
+        expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+    })
 })

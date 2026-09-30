@@ -4,6 +4,7 @@
 import { prefersReducedMotion } from "@yorozu/animations"
 import { createMediaDecodePort } from "../decode"
 import { createMediaShell, type MediaShell } from "../shell"
+import { mediaPagerFieldActive } from "../swipe"
 import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
 import type { MediaViewer, MediaViewerNavFrom, MediaViewerOpenOpts, MediaVisibleIds } from "../types"
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
@@ -204,6 +205,12 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let dismiss = swipe.dismissing() || swipe.offsetY() > 0
         if (dismiss) overlay.setAttribute("data-swipe-dismiss", "")
         else overlay.removeAttribute("data-swipe-dismiss")
+        let viewport = nodes.viewport
+        if (mediaPagerFieldActive(swipe.offsetX(), swipe.offsetY(), swipe.dismissing())) {
+            viewport.setAttribute("data-pager-field", "")
+        } else {
+            viewport.removeAttribute("data-pager-field")
+        }
         overlay.style.setProperty("--yorozu-media-dismiss-alpha", String(swipe.dismissOpacity()))
         overlay.style.setProperty("--yorozu-media-filmstrip-max-width", viewer.snapshot().filmstripMaxWidth)
         let next = swipe.transformStyle()

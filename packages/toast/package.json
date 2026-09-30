@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/toast",
-    "version": "1.0.118",
+    "version": "1.0.119",
     "type": "module",
     "sideEffects": [
         "*.css"
