@@ -150,6 +150,29 @@ describe("attachMediaViewer", () => {
         expect(seen.at(-1)).toEqual({ stage: "", peeks: [], thumbs: [] })
     })
 
+    it("forceClose during swipe-dismiss does not emit live ids after teardown starts", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let seen: MediaVisibleIds[] = []
+        viewer.destroy()
+        viewer = createMediaViewer({
+            onVisible: (ids) => {
+                seen.push({ stage: ids.stage, peeks: [...ids.peeks], thumbs: [...ids.thumbs] })
+            },
+        })
+        stop?.()
+        stop = attachMediaViewer(viewer, root)
+        viewer.open({ items: [img("a")], filmstrip: false, ghost: false })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
+        await vi.advanceTimersByTimeAsync(16)
+        let n = seen.length
+        viewer.forceClose()
+        let tail = seen.slice(n)
+        expect(tail.filter((ids) => ids.stage !== "")).toEqual([])
+        expect(seen.at(-1)).toEqual({ stage: "", peeks: [], thumbs: [] })
+    })
+
     it("onVisible filmstrip on reports all item ids as thumbs", () => {
         let seen: MediaVisibleIds[] = []
         viewer.destroy()
