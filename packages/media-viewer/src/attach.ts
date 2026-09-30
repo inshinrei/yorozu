@@ -153,6 +153,16 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
     let filmstripListNeighborSize: number | null = null
     let filmstripListCurrentSize: number | null = null
     let filmstripPaintMetricsCache: FilmstripMetrics | null = null
+    let filmstripMorphCache: {
+        progress: number
+        neighborIndex: number | null
+        live: boolean
+    } | null = null
+    let filmstripRoleWidthsCache: {
+        neighborWidth: number
+        currentWidth: number
+        incomingWidth: number
+    } | null = null
     let shell: MediaShell | null = null
 
     let mounted: { header?: MediaViewerChrome; footer?: MediaViewerChrome; overlay?: MediaViewerChrome } = {}
@@ -1091,11 +1101,19 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     function withFilmstripMetrics(run: () => void): void {
         let owned = filmstripPaintMetricsCache == null
-        if (owned) filmstripPaintMetricsCache = readFilmstripMetrics()
+        if (owned) {
+            filmstripPaintMetricsCache = readFilmstripMetrics()
+            filmstripMorphCache = null
+            filmstripRoleWidthsCache = null
+        }
         try {
             run()
         } finally {
-            if (owned) filmstripPaintMetricsCache = null
+            if (owned) {
+                filmstripPaintMetricsCache = null
+                filmstripMorphCache = null
+                filmstripRoleWidthsCache = null
+            }
         }
     }
 
@@ -1143,18 +1161,29 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         neighborIndex: number | null
         live: boolean
     } {
+        if (filmstripMorphCache) return filmstripMorphCache
         let rest = { progress: 0, neighborIndex: null as number | null, live: false }
-        if (!filmstripEl) return rest
-        if (swipe.dismissing()) return rest
-        if (!(swipe.gesturing() || swipe.settling())) return rest
-        // settleTo(0, 0) clears axis to "none" at hop start; keep morphing leftover offsetX.
-        if (swipe.axis() === "vertical") return rest
-        if (swipe.axis() !== "horizontal" && !swipe.settling()) return rest
-        let offsetX = swipe.offsetX()
-        let neighborIndex = filmstripSwipeNeighborIndex(snap.index, offsetX, snap.items.length)
-        if (neighborIndex == null) return rest
-        let progress = filmstripSwipeProgress(offsetX, filmstripStageViewportWidth())
-        return { progress, neighborIndex, live: true }
+        let value = rest
+        if (
+            filmstripEl &&
+            !swipe.dismissing() &&
+            (swipe.gesturing() || swipe.settling()) &&
+            swipe.axis() !== "vertical" &&
+            // settleTo(0, 0) clears axis to "none" at hop start; keep morphing leftover offsetX.
+            (swipe.axis() === "horizontal" || swipe.settling())
+        ) {
+            let offsetX = swipe.offsetX()
+            let neighborIndex = filmstripSwipeNeighborIndex(snap.index, offsetX, snap.items.length)
+            if (neighborIndex != null) {
+                value = {
+                    progress: filmstripSwipeProgress(offsetX, filmstripStageViewportWidth()),
+                    neighborIndex,
+                    live: true,
+                }
+            }
+        }
+        if (filmstripPaintMetricsCache) filmstripMorphCache = value
+        return value
     }
 
     function filmstripRoleWidths(
@@ -1180,13 +1209,24 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
     }
 
+    function filmstripPaintRoleWidths(
+        snap: MediaViewerSnapshot,
+        morph: { neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): { neighborWidth: number; currentWidth: number; incomingWidth: number } {
+        if (filmstripRoleWidthsCache) return filmstripRoleWidthsCache
+        let roles = filmstripRoleWidths(snap, morph, metrics)
+        if (filmstripPaintMetricsCache) filmstripRoleWidthsCache = roles
+        return roles
+    }
+
     function filmstripWidthAt(
         index: number,
         snap: MediaViewerSnapshot,
         morph: { progress: number; neighborIndex: number | null },
         metrics: FilmstripMetrics,
     ): number {
-        let roles = filmstripRoleWidths(snap, morph, metrics)
+        let roles = filmstripPaintRoleWidths(snap, morph, metrics)
         return filmstripInterpolatedWidthPx({
             index,
             current: snap.index,
@@ -1662,6 +1702,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
         if (!track) return
         filmstripPaintMetricsCache = readFilmstripMetrics()
+        filmstripMorphCache = null
+        filmstripRoleWidthsCache = null
         try {
             let shouldCenter = true
             if (virtualize) {
@@ -1674,7 +1716,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
                 if (shouldReanchor || list.viewportIds() === undefined) list.reanchor(snap.index)
                 list.sync()
                 applyFilmstripFitSlice(list, snap)
-                rebuildVirtualThumbs(track, snap)
                 filmstripIds = ids
                 if (shouldReanchor) filmstripCenteredIndex = snap.index
                 shouldCenter = shouldReanchor
@@ -1704,6 +1745,8 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             })
         } finally {
             filmstripPaintMetricsCache = null
+            filmstripMorphCache = null
+            filmstripRoleWidthsCache = null
         }
     }
 
@@ -2071,7 +2114,9 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         if (created && !startedOpen) {
             startedOpen = true
             void shell?.startOpen().then(() => {
+                if (detached) return
                 applyOverlayAttrs()
+                if (filmstripMorph(viewer.snapshot()).live) return
                 centerCurrentThumb("instant")
             })
             overlay.focus({ preventScroll: true })

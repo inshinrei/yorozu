@@ -5,7 +5,6 @@ import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
     filmstripGapAfter,
-    filmstripInterpolatedWidthPx,
     filmstripThumbPitchPx,
 } from "./filmstrip"
 import {
@@ -3091,5 +3090,84 @@ describe("attachMediaViewer", () => {
         flushLiveRaf()
         expect(viewer.snapshot().index).toBe(2)
         expect(nav.scrollLeft).toBe(restLeft)
+    })
+
+    it("open land does not rest-center filmstrip during live swipe morph", async () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let items = [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)]
+        viewer.open({ items, index: 1, filmstrip: { virtualize: true } })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let stripViewport = 80
+        let storedLeft = 0
+        Object.defineProperty(nav, "clientWidth", { value: stripViewport, configurable: true })
+        Object.defineProperty(nav, "scrollLeft", {
+            configurable: true,
+            get: () => storedLeft,
+            set: (value: number) => {
+                storedLeft = Number(value)
+            },
+        })
+        nav.scrollTo = ((options?: ScrollToOptions | number) => {
+            if (typeof options === "object" && options != null && options.left != null) {
+                storedLeft = Number(options.left)
+            }
+        }) as typeof nav.scrollTo
+        viewer.setItems(items, 1)
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        let liveLeft = nav.scrollLeft
+        let neighborWidth = 44
+        let currentWidth = filmstripCurrentWidthPx({
+            neighborWidth,
+            height: 64,
+            cap: 160,
+            naturalWidth: 1,
+            naturalHeight: 1,
+        })
+        let restIndex = 1
+        let restWidths = [neighborWidth, currentWidth, neighborWidth]
+        let restTotal = 0
+        let restCenter = 0
+        for (let i = 0; i < restWidths.length; i++) {
+            let width = restWidths[i]!
+            let pitch = filmstripThumbPitchPx(width, filmstripGapAfter(i, restIndex, 2, 8))
+            if (i < restIndex) restCenter += pitch
+            restTotal += pitch
+        }
+        restCenter += currentWidth / 2
+        let restLeft = filmstripCentersScrollLeft({
+            fromCenter: restCenter,
+            toCenter: restCenter,
+            progress: 0,
+            viewportWidth: stripViewport,
+            totalSize: restTotal,
+        })
+        expect(liveLeft).not.toBe(restLeft)
+        await Promise.resolve()
+        expect(nav.scrollLeft).toBe(liveLeft)
+    })
+
+    it("live swipe stamp reads current and incoming thumbs once", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        let items = Array.from({ length: 12 }, (_, i) =>
+            imgAspect(`id-${i}`, i % 2 === 0 ? 16 : 1, i % 2 === 0 ? 9 : 1),
+        )
+        viewer.open({ items, index: 5 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        let origQuery = nav.querySelector.bind(nav)
+        let indexReads = 0
+        nav.querySelector = ((selectors: string) => {
+            if (String(selectors).includes("data-index")) indexReads += 1
+            return origQuery(selectors)
+        }) as typeof nav.querySelector
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(indexReads).toBe(2)
     })
 })
