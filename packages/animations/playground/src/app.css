@@ -714,6 +714,129 @@ input {
     border-bottom: 1px solid var(--pg-color-dividers);
 }
 
+.pg-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    max-width: 22rem;
+    min-height: 28rem;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--pg-color-borders);
+    border-radius: var(--pg-radius);
+    background: var(--pg-color-background);
+}
+
+.pg-chat-header {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--pg-color-borders);
+}
+
+.pg-chat-scroller {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    gap: 8px;
+    padding: 12px;
+}
+
+.pg-chat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 80%;
+    padding: 8px 12px;
+    border-radius: var(--pg-radius);
+}
+
+.pg-chat-row.self {
+    align-self: flex-end;
+    background: var(--pg-color-primary-tint);
+}
+
+.pg-chat-row.peer {
+    align-self: flex-start;
+    background: var(--pg-color-background-secondary);
+}
+
+.pg-chat-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.pg-chat-row .pg-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.pg-chat-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 10px;
+    border-top: 1px solid var(--pg-color-borders);
+}
+
+.pg-chat-shelf {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pg-chat-chip,
+.pg-chat-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.pg-chat-chip {
+    border: 0;
+    cursor: pointer;
+    background: var(--pg-color-primary);
+    color: #fff;
+}
+
+.pg-chat-pill {
+    background: var(--pg-color-primary);
+    color: #fff;
+}
+
+.pg-chat-input {
+    width: 100%;
+    resize: none;
+    overflow: hidden;
+    border: 1px solid var(--pg-color-borders);
+    border-radius: var(--pg-radius-sm);
+    background: var(--pg-color-background-secondary);
+    color: inherit;
+    padding: 8px 10px;
+    font: inherit;
+}
+
+.pg-chat-composer-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.pg-chat-seed {
+    display: inline-block;
+    padding: 8px 12px;
+    border-radius: var(--pg-radius);
+    background: var(--pg-color-primary-tint);
+    color: var(--pg-color-text);
+}
+
 .pg-swipe-track {
     position: relative;
     overflow: hidden;

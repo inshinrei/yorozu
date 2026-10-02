@@ -133,6 +133,10 @@ shift.play()
 
 Do not use `createListReorder` for variable-height chat rows.
 
+## Send flight
+
+Own send composes `playSendFlight` with `createListShift`; incoming is list shift only. Dest `opacity: 0` until `playback.done`.
+
 ## Intensity
 
 Three playback levels. The OS `prefers-reduced-motion` query is **seed only** — after the host stores a pick, that value owns playback.
@@ -255,34 +259,34 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 
 ## Motion catalog
 
-| Name              | API                                     | Notes                                                                                      |
-| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                                                       |
-| Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                                                                  |
-| Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                                                          |
-| Cover slide       | `createViewSlide` `cover`               | Default translate + opacity (no scale); `coverMotion: "scale"` when host snapshots leave   |
-| Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim                                              |
-| Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                                                                |
-| Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                                                           |
-| Reveal            | `createViewSlide` `reveal`              | `clip-path` inset wipe                                                                     |
-| Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                                                       |
-| Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                                                                  |
-| List reorder      | `createListReorder`                     | Index FLIP, fixed height                                                                   |
-| Layout grow       | `createLayoutGrow`                      | Chrome block-size FLIP invert; observer; onDelta                                           |
-| List shift        | `createListShift`                       | Variable-height translateY FLIP                                                            |
-| Dock              | `createDock`                            | Edge open/close + backdrop fade                                                            |
-| Fade              | `createFade`                            | Opacity-only show/hide                                                                     |
-| Popover           | `createPopover`                         | Scale + fade from an origin                                                                |
-| Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`; budget resets per shared frame; skip when heavy lock held |
-| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in on 0 → N; `direction?: "in" \| "out"` (`in` default)                              |
-| Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                                                      |
-| Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                                                             |
-| Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                                                         |
-| Overscroll bounce | `createOverscrollBounce`                | Edge rubber on a native overflow scroller (AppKit-stiff wheel, iOS curve on touch).        |
-| Ripple            | `playRipple`                            | Touch ink at pointer                                                                       |
-| Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1                                                    |
-| Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                                                       |
-| Spoiler           | `createSpoiler`                         | Dot-field overlay; reveal fades it out                                                     |
+| Name              | API                                     | Notes                                                                                                          |
+| ----------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Intensity         | `AnimationLevel`                        | `low` / `med` / `high`; OS seed-only                                                                           |
+| Stack slide       | `createViewSlide` `push`                | Full-width 100% translate                                                                                      |
+| Soft slide        | `createViewSlide` `crossfade`           | ±1.5rem + opacity                                                                                              |
+| Cover slide       | `createViewSlide` `cover`               | Default translate + opacity (no scale); `coverMotion: "scale"` when host snapshots leave                       |
+| Peek slide        | `createViewSlide` `peek`                | Incoming full-width; outgoing ~20% back + dim                                                                  |
+| Lift              | `createViewSlide` `lift`                | Vertical `translateY` ±100%                                                                                    |
+| Zoom              | `createViewSlide` `zoom`                | Scale 1.1 / 0.95 + short opacity                                                                               |
+| Reveal            | `createViewSlide` `reveal`              | `clip-path` inset wipe                                                                                         |
+| Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                                                                           |
+| Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                                                                                      |
+| List reorder      | `createListReorder`                     | Index FLIP, fixed height                                                                                       |
+| Layout grow       | `createLayoutGrow`                      | Chrome block-size FLIP invert; observer; onDelta                                                               |
+| List shift        | `createListShift`                       | Variable-height translateY FLIP                                                                                |
+| Dock              | `createDock`                            | Edge open/close + backdrop fade                                                                                |
+| Fade              | `createFade`                            | Opacity-only show/hide                                                                                         |
+| Popover           | `createPopover`                         | Scale + fade from an origin                                                                                    |
+| Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`; budget resets per shared frame; skip when heavy lock held                     |
+| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in on 0 → N; `direction?: "in" \| "out"` (`in` default)                                                  |
+| Send flight       | `playSendFlight`                        | Own send composes with `createListShift`; incoming is list shift only; dest `opacity: 0` until `playback.done` |
+| Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                                                                                 |
+| Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                                                                             |
+| Overscroll bounce | `createOverscrollBounce`                | Edge rubber on a native overflow scroller (AppKit-stiff wheel, iOS curve on touch).                            |
+| Ripple            | `playRipple`                            | Touch ink at pointer                                                                                           |
+| Pinch zoom        | `createPinchZoom`                       | Clamp / origin zoom; pan when scale > 1                                                                        |
+| Waveform          | `decodeWaveform` / `fitWaveform`        | Packed 5-bit samples, resampled bars                                                                           |
+| Spoiler           | `createSpoiler`                         | Dot-field overlay; reveal fades it out                                                                         |
 
 ## Reduced motion
 

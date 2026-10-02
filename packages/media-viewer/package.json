@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/media-viewer",
-    "version": "1.0.133",
+    "version": "1.0.134",
     "type": "module",
     "sideEffects": [
         "*.css"

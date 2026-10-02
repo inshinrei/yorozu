@@ -1,3 +1,4 @@
+import { mountChatTranscript } from "./testers/chat-transcript"
 import { mountDigitFlip } from "./testers/digit-flip"
 import { mountDock } from "./testers/dock"
 import { mountFade } from "./testers/fade"
@@ -146,6 +147,13 @@ export let catalog: CatalogEntry[] = [
         description: "Auto-observe a block that gains and loses lines.",
         tags: ["layout", "resize", "composer"],
         mount: mountLayoutGrow,
+    },
+    {
+        id: "chat-transcript",
+        title: "Chat transcript",
+        description: "Composer grow, chips, send morph, incoming insert, delete, edit, and reaction.",
+        tags: ["chat", "send", "layout", "list"],
+        mount: mountChatTranscript,
     },
     {
         id: "swipe-reveal",
