@@ -41,6 +41,11 @@ export function createLayoutGrow(opts: {
     let last = natural()
     let lastEmitted = last
 
+    let rebaseToRest = (px: number): void => {
+        last = px
+        lastEmitted = px
+    }
+
     let withWriting = (fn: () => void): void => {
         writing = true
         try {
@@ -66,6 +71,7 @@ export function createLayoutGrow(opts: {
         withWriting(() => {
             overridePx = null
             el.style[sizeProp] = ""
+            rebaseToRest(natural())
         })
     }
 
@@ -85,7 +91,6 @@ export function createLayoutGrow(opts: {
             current = null
             writePx(toPx)
             applyRest()
-            last = natural()
             let { playback, resolve } = createPlayback()
             resolve(true)
             return playback
@@ -116,7 +121,7 @@ export function createLayoutGrow(opts: {
             let next = natural()
             if (Math.abs(next - last) <= LAYOUT_GROW_EPSILON_PX) return
             if (!isEnabled() || durationMs <= 0) {
-                last = next
+                rebaseToRest(next)
                 return
             }
             writePx(last)

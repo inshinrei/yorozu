@@ -194,4 +194,65 @@ describe("createLayoutGrow", () => {
         expect(fixture.style.height).toBe("")
         grow.destroy()
     })
+
+    it("rebases lastEmitted on disabled observer so later invert is a zero step", async () => {
+        let enabled = false
+        let deltas: number[] = []
+        let { fixture, el } = createFixture(40)
+        let grow = createLayoutGrow({
+            el,
+            isEnabled: () => enabled,
+            onDelta: (deltaPx) => {
+                deltas.push(deltaPx)
+            },
+        })
+        fixture.naturalH = 200
+        fireResize()
+        expect(deltas).toEqual([])
+        enabled = true
+        fixture.naturalH = 220
+        fireResize()
+        expect(fixture.style.height).toBe("200px")
+        expect(deltas).toEqual([])
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(LAYOUT_GROW_MS + 64)
+        flushDomSchedule()
+        expect(deltas.length).toBeGreaterThan(0)
+        expect(deltas.every((delta) => delta > 0)).toBe(true)
+        expect(deltas.reduce((sum, delta) => sum + delta, 0)).toBeCloseTo(20)
+        grow.destroy()
+    })
+
+    it("rebases last after snap so the next invert does not dump remainder", async () => {
+        let deltas: number[] = []
+        let { fixture, el } = createFixture(40)
+        let grow = createLayoutGrow({
+            el,
+            onDelta: (deltaPx) => {
+                deltas.push(deltaPx)
+            },
+        })
+        let playback = grow.play(80)
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(16)
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(64)
+        flushDomSchedule()
+        grow.snap()
+        flushDomSchedule()
+        expect(await playback.done).toBe(false)
+        let afterSnap = deltas.length
+        fixture.naturalH = 100
+        fireResize()
+        expect(fixture.style.height).toBe("40px")
+        expect(deltas.slice(afterSnap)).toEqual([])
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(LAYOUT_GROW_MS + 64)
+        flushDomSchedule()
+        let afterInvert = deltas.slice(afterSnap)
+        expect(afterInvert.length).toBeGreaterThan(0)
+        expect(afterInvert.every((delta) => delta > 0)).toBe(true)
+        expect(afterInvert.reduce((sum, delta) => sum + delta, 0)).toBeCloseTo(60)
+        grow.destroy()
+    })
 })

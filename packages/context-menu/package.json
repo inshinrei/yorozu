@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/context-menu",
-    "version": "1.0.128",
+    "version": "1.0.129",
     "type": "module",
     "sideEffects": [
         "*.css"
