@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/db-sqlite",
-    "version": "1.0.132",
+    "version": "1.0.133",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

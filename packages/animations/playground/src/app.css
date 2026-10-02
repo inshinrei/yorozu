@@ -702,6 +702,18 @@ input {
     background: var(--pg-color-background-secondary);
 }
 
+.pg-grow-box {
+    overflow: hidden;
+    border: 1px solid var(--pg-color-borders);
+    border-radius: var(--pg-radius);
+    background: var(--pg-color-background-secondary);
+}
+
+.pg-grow-line {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--pg-color-dividers);
+}
+
 .pg-swipe-track {
     position: relative;
     overflow: hidden;
@@ -777,11 +789,7 @@ input {
     font-weight: 600;
     color: var(--pg-color-text-secondary);
     background:
-        repeating-linear-gradient(
-            45deg,
-            var(--pg-color-primary-tint) 0 12px,
-            transparent 12px 24px
-        ),
+        repeating-linear-gradient(45deg, var(--pg-color-primary-tint) 0 12px, transparent 12px 24px),
         var(--pg-color-background);
 }
 

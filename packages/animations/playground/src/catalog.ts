@@ -1,6 +1,7 @@
 import { mountDigitFlip } from "./testers/digit-flip"
 import { mountDock } from "./testers/dock"
 import { mountFade } from "./testers/fade"
+import { mountLayoutGrow } from "./testers/layout-grow"
 import { mountListLayer } from "./testers/list-layer"
 import { mountListReorder } from "./testers/list-reorder"
 import { mountPinchZoom } from "./testers/pinch-zoom"
@@ -138,6 +139,13 @@ export let catalog: CatalogEntry[] = [
         description: "Fly a clone from the composer to the list insert point.",
         tags: ["flight", "send", "clone"],
         mount: mountSendFlight,
+    },
+    {
+        id: "layout-grow",
+        title: "Layout grow",
+        description: "Auto-observe a block that gains and loses lines.",
+        tags: ["layout", "resize", "composer"],
+        mount: mountLayoutGrow,
     },
     {
         id: "swipe-reveal",
