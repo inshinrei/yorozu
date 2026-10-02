@@ -1,7 +1,10 @@
 import { MOTION_NAV_MS, MOTION_SETTLE_MS } from "@yorozu/animations"
 import { describe, expect, it } from "vitest"
 import {
+    MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX,
+    MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
     MEDIA_SWIPE_SLIDE_GAP_PX,
+    MEDIA_SWIPE_PARALLAX_FACTOR,
     MEDIA_SWIPE_X_THRESHOLD,
     MEDIA_SWIPE_Y_THRESHOLD,
     clampSwipeOffsetX,
@@ -10,6 +13,10 @@ import {
     horizontalSlideStepPx,
     lastDeltaAgrees,
     mediaPagerFieldActive,
+    mediaSwipeParallaxScale,
+    mediaSwipeParallaxTransformStyle,
+    mediaSwipeParallaxX,
+    mediaSwipeSlideGapPx,
     projectSwipeOffset,
     rebasedOffsetAfterNav,
     resolveSwipeAxis,
@@ -49,7 +56,7 @@ describe("media-viewer swipe math", () => {
 
     describe("clampSwipeOffset", () => {
         it("limits horizontal to one viewport + gap", () => {
-            let limit = 1000 + MEDIA_SWIPE_SLIDE_GAP_PX
+            let limit = 1000 + MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX
             expect(clampSwipeOffsetX(5000, 1000)).toBe(limit)
             expect(clampSwipeOffsetX(-5000, 1000)).toBe(-limit)
             expect(clampSwipeOffsetX(100, 1000)).toBe(100)
@@ -211,7 +218,7 @@ describe("media-viewer swipe math", () => {
     describe("rebasedOffsetAfterNav", () => {
         it("shifts by one slide step so neighbor stays under the finger after swap", () => {
             let step = horizontalSlideStepPx(1000)
-            expect(step).toBe(1000 + MEDIA_SWIPE_SLIDE_GAP_PX)
+            expect(step).toBe(1000 + MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX)
             expect(rebasedOffsetAfterNav(-200, "newer", 1000)).toBe(-200 + step)
             expect(rebasedOffsetAfterNav(200, "older", 1000)).toBe(200 - step)
         })
@@ -244,5 +251,48 @@ describe("mediaPagerFieldActive", () => {
         expect(mediaPagerFieldActive(40, 10, false)).toBe(false)
         expect(mediaPagerFieldActive(40, 0, true)).toBe(false)
         expect(mediaPagerFieldActive(0, 80, false)).toBe(false)
+    })
+})
+
+describe("mediaSwipeSlideGapPx", () => {
+    it("is 40 at mobile max and 80 above", () => {
+        expect(mediaSwipeSlideGapPx(640)).toBe(MEDIA_SWIPE_SLIDE_GAP_PX)
+        expect(mediaSwipeSlideGapPx(MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX)).toBe(40)
+        expect(mediaSwipeSlideGapPx(641)).toBe(MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX)
+        expect(mediaSwipeSlideGapPx(0)).toBe(80)
+        expect(horizontalSlideStepPx(1000)).toBe(1080)
+        expect(horizontalSlideStepPx(640)).toBe(680)
+    })
+})
+
+describe("mediaSwipeParallaxX", () => {
+    it("is 0 at rest, when not live, or when reduced", () => {
+        let base = { offsetX: -80, side: "active" as const, viewportWidth: 1000 }
+        expect(mediaSwipeParallaxX({ ...base, live: false, reduced: false })).toBe(0)
+        expect(mediaSwipeParallaxX({ ...base, live: true, reduced: true })).toBe(0)
+        expect(mediaSwipeParallaxX({ ...base, offsetX: 0, live: true, reduced: false })).toBe(0)
+    })
+
+    it("lags the page by 0.14 of pane translation", () => {
+        let live = { live: true, reduced: false, offsetX: -80, viewportWidth: 1000 }
+        expect(mediaSwipeParallaxX({ ...live, side: "active" })).toBeCloseTo(11.2, 5)
+        expect(mediaSwipeParallaxX({ ...live, side: "older" })).toBeCloseTo(162.4, 5)
+        expect(mediaSwipeParallaxX({ ...live, side: "newer" })).toBeCloseTo(-140, 5)
+        expect(MEDIA_SWIPE_PARALLAX_FACTOR).toBe(0.14)
+    })
+})
+
+describe("mediaSwipeParallaxScale", () => {
+    it("is 1 at rest and when clip width is 0", () => {
+        expect(mediaSwipeParallaxScale(0, 200)).toBe(1)
+        expect(mediaSwipeParallaxScale(14, 0)).toBe(1)
+        expect(mediaSwipeParallaxScale(14, 200)).toBeCloseTo(1.14, 5)
+    })
+})
+
+describe("mediaSwipeParallaxTransformStyle", () => {
+    it("is empty at rest identity", () => {
+        expect(mediaSwipeParallaxTransformStyle(0, 1)).toBe("")
+        expect(mediaSwipeParallaxTransformStyle(11.2, 1)).toBe("translate3d(11.2px, 0, 0) scale(1)")
     })
 })

@@ -27,13 +27,22 @@ export const MEDIA_SWIPE_WHEEL_RELEASE_MS: number = WHEEL_RELEASE_MS
 export const MEDIA_SWIPE_WHEEL_COOLDOWN_MS: number = WHEEL_COOLDOWN_MS
 export const MEDIA_SWIPE_WHEEL_QUIET_PX: number = WHEEL_QUIET_PX
 export const MEDIA_SWIPE_SLIDE_GAP_PX: number = 40
+export const MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX: number = 80
+export const MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX: number = 640
+export const MEDIA_SWIPE_PARALLAX_FACTOR: number = 0.14
 export const MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO: number = 1
 export const MEDIA_SWIPE_SETTLE_MS: number = MOTION_NAV_MS
 export const MEDIA_SWIPE_EDGE_RESIST: number = 0.28
 
+export function mediaSwipeSlideGapPx(viewportWidth: number): number {
+    let w = viewportWidth > 0 ? viewportWidth : 800
+    if (w <= MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX) return MEDIA_SWIPE_SLIDE_GAP_PX
+    return MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX
+}
+
 export function horizontalSlideStepPx(viewportWidth: number): number {
     let w = viewportWidth > 0 ? viewportWidth : 800
-    return w + MEDIA_SWIPE_SLIDE_GAP_PX
+    return w + mediaSwipeSlideGapPx(w)
 }
 
 export function rebasedOffsetAfterNav(offsetX: number, dir: "older" | "newer", viewportWidth: number): number {
@@ -56,7 +65,7 @@ export function projectSwipeOffset(axis: MediaSwipeAxis, offsetX: number, offset
 
 export function clampSwipeOffsetX(offsetX: number, viewportWidth: number): number {
     let w = viewportWidth > 0 ? viewportWidth : 800
-    let limit = w * MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO + MEDIA_SWIPE_SLIDE_GAP_PX
+    let limit = w * MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO + mediaSwipeSlideGapPx(w)
     if (offsetX > limit) return limit
     if (offsetX < -limit) return -limit
     return offsetX
@@ -131,4 +140,31 @@ export function verticalDismissOpacity(offsetY: number, viewportHeight: number):
 export function mediaPagerFieldActive(offsetX: number, offsetY: number, dismissing: boolean): boolean {
     if (dismissing || offsetY > 0) return false
     return offsetX !== 0
+}
+
+export function mediaSwipeParallaxX(opts: {
+    offsetX: number
+    side: "older" | "active" | "newer"
+    viewportWidth: number
+    live: boolean
+    reduced: boolean
+}): number {
+    if (!opts.live || opts.reduced) return 0
+    let w = opts.viewportWidth > 0 ? opts.viewportWidth : 800
+    let g = mediaSwipeSlideGapPx(w)
+    let sideShift = 0
+    if (opts.side === "older") sideShift = -(w + g)
+    else if (opts.side === "newer") sideShift = w + g
+    let x = (-opts.offsetX - sideShift) * MEDIA_SWIPE_PARALLAX_FACTOR
+    return x === 0 ? 0 : x
+}
+
+export function mediaSwipeParallaxScale(parallaxX: number, clipWidth: number): number {
+    if (clipWidth <= 0) return 1
+    return 1 + (2 * Math.abs(parallaxX)) / clipWidth
+}
+
+export function mediaSwipeParallaxTransformStyle(parallaxX: number, scale: number): string {
+    if (parallaxX === 0 && scale === 1) return ""
+    return `translate3d(${parallaxX}px, 0, 0) scale(${scale})`
 }

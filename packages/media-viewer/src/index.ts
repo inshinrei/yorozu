@@ -34,10 +34,14 @@ export {
     MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
     MEDIA_SWIPE_WHEEL_QUIET_PX,
     MEDIA_SWIPE_SLIDE_GAP_PX,
+    MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX,
+    MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
+    MEDIA_SWIPE_PARALLAX_FACTOR,
     MEDIA_SWIPE_MAX_X_VIEWPORT_RATIO,
     MEDIA_SWIPE_SETTLE_MS,
     MEDIA_SWIPE_EDGE_RESIST,
     horizontalSlideStepPx,
+    mediaSwipeSlideGapPx,
     rebasedOffsetAfterNav,
     swipeSettleDurationMs,
     resolveSwipeAxis,
@@ -48,6 +52,9 @@ export {
     commitSwipe,
     verticalDismissOpacity,
     mediaPagerFieldActive,
+    mediaSwipeParallaxX,
+    mediaSwipeParallaxScale,
+    mediaSwipeParallaxTransformStyle,
 } from "./swipe"
 export type { MediaSwipeAxis, MediaSwipeCommit, CommitSwipeArgs } from "./swipe"
 export { createMediaSwipe } from "./swipe-controller"
