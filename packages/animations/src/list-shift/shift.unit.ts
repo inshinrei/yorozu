@@ -30,6 +30,11 @@ function rect(
     }
 }
 
+function translateYPx(transform: string): number {
+    let match = /translateY\((-?\d+(?:\.\d+)?)px\)/.exec(transform)
+    return match ? Number(match[1]) : 0
+}
+
 type FakeNode = {
     style: { transform: string }
     animate: ReturnType<typeof createFakeAnimate>
@@ -44,7 +49,7 @@ function createFakeEl(top: number, height = 40): FakeNode {
         animate: createFakeAnimate(),
         top,
         height,
-        getBoundingClientRect: () => rect(node.top, node.height),
+        getBoundingClientRect: () => rect(node.top + translateYPx(node.style.transform), node.height),
     }
     return node
 }
@@ -207,6 +212,48 @@ describe("createListShift", () => {
             duration: LIST_SHIFT_MS,
             easing: LIST_SHIFT_EASING,
         })
+        shift.destroy()
+    })
+
+    it("rebases lastTop to layout Last, not the inverted translateY box", async () => {
+        let a = createFakeEl(0)
+        let b = createFakeEl(40)
+        let finishB!: () => void
+        let finishedB!: Promise<void>
+        b.animate = createFakeAnimate((frames) => {
+            let first = frames[0]
+            if (first && typeof first.transform === "string") {
+                b.style.transform = first.transform
+            }
+            finishedB = new Promise<void>((resolve) => {
+                finishB = (): void => {
+                    b.style.transform = ""
+                    resolve()
+                }
+            })
+            return {
+                finished: finishedB,
+                cancel: (): void => {
+                    b.style.transform = ""
+                },
+            }
+        })
+        let shift = createListShift({ root })
+        shift.register(a as unknown as HTMLElement, "a")
+        shift.register(b as unknown as HTMLElement, "b")
+        a.height = 72
+        b.top = 72
+        fireResize(a)
+        expect(b.animate).toHaveBeenCalledTimes(1)
+        expect(b.animate).toHaveBeenCalledWith([{ transform: "translateY(-32px)" }, { transform: "translateY(0)" }], {
+            duration: LIST_SHIFT_MS,
+            easing: LIST_SHIFT_EASING,
+        })
+        expect(b.getBoundingClientRect().top).toBe(40)
+        finishB()
+        await finishedB
+        fireResize(a)
+        expect(b.animate).toHaveBeenCalledTimes(1)
         shift.destroy()
     })
 

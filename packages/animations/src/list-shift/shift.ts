@@ -96,9 +96,11 @@ export function createListShift(opts: {
         }
 
         for (let [key, el] of itemEls) {
+            let now = relTop(el)
             let prev = lastTop.get(key)
+            lastTop.set(key, now)
             if (prev === undefined) continue
-            let delta = prev - relTop(el)
+            let delta = prev - now
             if (Math.abs(delta) <= LIST_SHIFT_EPSILON_PX) continue
             cancelAnim(key)
             let anim = animateElement(el, [{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
@@ -110,8 +112,6 @@ export function createListShift(opts: {
             trackAnim(key, anim)
             void anim.finished.then(finish, finish)
         }
-
-        rebaseAll()
 
         if (remaining === 0) {
             playing = false
