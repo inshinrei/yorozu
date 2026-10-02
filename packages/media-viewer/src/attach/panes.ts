@@ -41,6 +41,11 @@ export function createPanes(opts: {
         return clip
     }
 
+    function restampOnLoad(image: HTMLImageElement): void {
+        image.addEventListener("load", () => opts.measureZoom())
+        if (image.complete) opts.measureZoom()
+    }
+
     function paneContentKey(side: string, item: MediaViewerItem | MediaViewerNeighbor): string {
         let poster = "poster" in item && item.poster ? item.poster : ""
         let alt = "alt" in item && item.alt ? item.alt : ""
@@ -69,7 +74,14 @@ export function createPanes(opts: {
                 .then((source: CanvasImageSource | null): void => {
                     if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
                     pane.replaceChildren()
-                    if (source) applyCanvasImageSource(clipHost(pane), source, { peek: true, alt: "" })
+                    if (source) {
+                        let painted = applyCanvasImageSource(clipHost(pane), source, { peek: true, alt: "" })
+                        if (painted instanceof HTMLImageElement) {
+                            restampOnLoad(painted)
+                            return
+                        }
+                    }
+                    opts.measureZoom()
                 })
             return
         }
@@ -87,6 +99,7 @@ export function createPanes(opts: {
                 }
                 clipHost(pane).append(image)
                 image.src = poster
+                restampOnLoad(image)
                 return
             }
             let loading = document.createElement("div")
@@ -106,6 +119,7 @@ export function createPanes(opts: {
             }
             clipHost(pane).append(image)
             image.src = item.src
+            restampOnLoad(image)
             return
         }
         let loading = document.createElement("div")
@@ -135,10 +149,15 @@ export function createPanes(opts: {
             let clip = clipHost(pane)
             clip.append(video)
             pane.append(loading)
+            let restampClip = (): void => {
+                opts.measureZoom()
+            }
             let clearLoading = (): void => {
                 loading.remove()
                 video.removeEventListener("loadeddata", clearLoading)
+                restampClip()
             }
+            video.addEventListener("loadedmetadata", restampClip)
             video.addEventListener("loadeddata", clearLoading)
             return
         }
@@ -172,13 +191,12 @@ export function createPanes(opts: {
                     host.replaceChildren()
                     if (source) {
                         let painted = applyCanvasImageSource(host, source, { stage: true, alt })
-                        if (zoomable && painted instanceof HTMLImageElement) {
-                            painted.addEventListener("load", () => opts.measureZoom())
-                            if (painted.complete) opts.measureZoom()
+                        if (painted instanceof HTMLImageElement) {
+                            restampOnLoad(painted)
                             return
                         }
                     }
-                    if (zoomable) opts.measureZoom()
+                    opts.measureZoom()
                 })
             return
         }
@@ -191,10 +209,9 @@ export function createPanes(opts: {
             if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
             host.replaceChildren()
         }
-        if (zoomable) image.addEventListener("load", () => opts.measureZoom())
         host.append(image)
         image.src = src
-        if (zoomable && image.complete) opts.measureZoom()
+        restampOnLoad(image)
     }
 
     function syncPane(

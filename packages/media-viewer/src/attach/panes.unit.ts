@@ -2,9 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./index"
 import { createMediaViewer } from "../session"
+import { fitContain, stageContentSize } from "../layout"
 import type { MediaViewerChromeApi, MediaViewerItem } from "../types"
+import { readPadding } from "./css"
 import {
     DecodeFn,
+    flushLiveRaf,
     img,
     imgAspect,
     mountAttach,
@@ -13,6 +16,11 @@ import {
     teardownAttach,
     type AttachTestMount,
 } from "./test-helpers"
+
+function stubClientBox(el: HTMLElement, width: number, height: number): void {
+    Object.defineProperty(el, "clientWidth", { configurable: true, get: () => width })
+    Object.defineProperty(el, "clientHeight", { configurable: true, get: () => height })
+}
 
 describe("attachMediaViewer", () => {
     let viewer: AttachTestMount["viewer"]
@@ -431,5 +439,78 @@ describe("attachMediaViewer", () => {
         expect(clip).toBeTruthy()
         expect(clip.contains(video)).toBe(true)
         expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+    })
+
+    it("video loadeddata restamps the clip from videoWidth, not the content-box pin", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
+        })
+        let video = root.querySelector("video") as HTMLVideoElement
+        let clip = video.closest("[data-yorozu-media-clip]") as HTMLElement
+        let pane = root.querySelector("[data-side=active]") as HTMLElement
+        stubClientBox(pane, 800, 600)
+        flushLiveRaf()
+        let content = stageContentSize(pane.clientWidth, pane.clientHeight, readPadding(pane))
+        expect(content.width).toBeGreaterThan(0)
+        expect(content.height).toBeGreaterThan(0)
+        expect(clip.style.width).toBe(`${content.width}px`)
+        expect(clip.style.height).toBe(`${content.height}px`)
+        Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 })
+        Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 })
+        let fit = fitContain({ width: 1920, height: 1080 }, content)
+        expect(fit).toBeTruthy()
+        expect(fit!.height).not.toBe(content.height)
+        video.dispatchEvent(new Event("loadeddata"))
+        flushLiveRaf()
+        expect(clip.style.width).toBe(`${fit!.width}px`)
+        expect(clip.style.height).toBe(`${fit!.height}px`)
+    })
+
+    it("gif load restamps the clip from natural size, not the content-box pin", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [{ id: "g", kind: "gif", src: "g.gif" }] })
+        let stage = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        let clip = stage.closest("[data-yorozu-media-clip]") as HTMLElement
+        let pane = root.querySelector("[data-side=active]") as HTMLElement
+        stubClientBox(pane, 800, 600)
+        flushLiveRaf()
+        let content = stageContentSize(pane.clientWidth, pane.clientHeight, readPadding(pane))
+        expect(clip.style.width).toBe(`${content.width}px`)
+        expect(clip.style.height).toBe(`${content.height}px`)
+        Object.defineProperty(stage, "naturalWidth", { configurable: true, value: 320 })
+        Object.defineProperty(stage, "naturalHeight", { configurable: true, value: 240 })
+        let fit = fitContain({ width: 320, height: 240 }, content)
+        expect(fit).toBeTruthy()
+        expect(fit!.width).not.toBe(content.width)
+        stage.dispatchEvent(new Event("load"))
+        flushLiveRaf()
+        expect(clip.style.width).toBe(`${fit!.width}px`)
+        expect(clip.style.height).toBe(`${fit!.height}px`)
+    })
+
+    it("peek load restamps the clip from natural size, not the content-box pin", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({
+            items: [img("a"), { id: "g", kind: "gif", src: "g.gif" }],
+            index: 0,
+        })
+        let peek = root.querySelector("[data-side=newer] [data-yorozu-media-peek]") as HTMLImageElement
+        let clip = peek.closest("[data-yorozu-media-clip]") as HTMLElement
+        let pane = root.querySelector("[data-side=newer]") as HTMLElement
+        stubClientBox(pane, 800, 600)
+        flushLiveRaf()
+        let content = stageContentSize(pane.clientWidth, pane.clientHeight, readPadding(pane))
+        expect(clip.style.width).toBe(`${content.width}px`)
+        expect(clip.style.height).toBe(`${content.height}px`)
+        Object.defineProperty(peek, "naturalWidth", { configurable: true, value: 320 })
+        Object.defineProperty(peek, "naturalHeight", { configurable: true, value: 240 })
+        let fit = fitContain({ width: 320, height: 240 }, content)
+        expect(fit).toBeTruthy()
+        expect(fit!.width).not.toBe(content.width)
+        peek.dispatchEvent(new Event("load"))
+        flushLiveRaf()
+        expect(clip.style.width).toBe(`${fit!.width}px`)
+        expect(clip.style.height).toBe(`${fit!.height}px`)
     })
 })
