@@ -38,15 +38,22 @@ export function playDigitFlip(el: HTMLElement, options?: { durationMs?: number; 
     return playTransform(el, [{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }], options)
 }
 
-export function playPresencePop(el: HTMLElement, options?: { durationMs?: number; easing?: string }): Playback {
-    return playTransform(
-        el,
-        [
-            { transform: "scale(0.6)", opacity: "0" },
-            { transform: "scale(1)", opacity: "1" },
-        ],
-        options,
-        PRESENCE_POP_MS,
-        PRESENCE_POP_EASING,
-    )
+export type PresencePopOptions = {
+    durationMs?: number
+    easing?: string
+    direction?: "in" | "out"
+}
+
+export function playPresencePop(el: HTMLElement, options?: PresencePopOptions): Playback {
+    let frames: Keyframe[] =
+        options?.direction === "out"
+            ? [
+                  { transform: "scale(1)", opacity: "1" },
+                  { transform: "scale(0.6)", opacity: "0" },
+              ]
+            : [
+                  { transform: "scale(0.6)", opacity: "0" },
+                  { transform: "scale(1)", opacity: "1" },
+              ]
+    return playTransform(el, frames, options, PRESENCE_POP_MS, PRESENCE_POP_EASING)
 }

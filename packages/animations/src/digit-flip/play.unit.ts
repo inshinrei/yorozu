@@ -96,4 +96,14 @@ describe("playPresencePop", () => {
         expect(opts.duration).toBe(200)
         expect(await playback.done).toBe(true)
     })
+
+    it("direction out reverses scale and opacity frames", async () => {
+        let el = createFakeEl()
+        playPresencePop(el as unknown as HTMLElement, { direction: "out" })
+        let frames = animate.mock.calls[0]![0]
+        expect(frames).toEqual([
+            { transform: "scale(1)", opacity: "1" },
+            { transform: "scale(0.6)", opacity: "0" },
+        ])
+    })
 })

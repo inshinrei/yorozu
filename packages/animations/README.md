@@ -274,7 +274,7 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 | Fade              | `createFade`                            | Opacity-only show/hide                                                                     |
 | Popover           | `createPopover`                         | Scale + fade from an origin                                                                |
 | Digit flip        | `buildDigitSlots` / `playDigitFlip`     | Right-aligned slots + `rotateX`; budget resets per shared frame; skip when heavy lock held |
-| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in only on 0 → N                                                                     |
+| Presence pop      | `shouldPresencePop` / `playPresencePop` | Scale-in on 0 → N; `direction?: "in" \| "out"` (`in` default)                              |
 | Send flight       | `playSendFlight`                        | Clone from an origin to a list insert                                                      |
 | Swipe reveal      | `createSwipeReveal`                     | Pointer rubber + release tween                                                             |
 | Scroll tween      | `playScrollTween`                       | Animate `scrollLeft` / `scrollTop`                                                         |

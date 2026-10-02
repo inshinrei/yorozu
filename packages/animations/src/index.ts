@@ -141,6 +141,7 @@ export {
     scheduleDigitFlip,
     shouldPresencePop,
 } from "./digit-flip/slots"
+export type { PresencePopOptions } from "./digit-flip/play"
 export {
     DIGIT_FLIP_EASING,
     PRESENCE_POP_EASING,
