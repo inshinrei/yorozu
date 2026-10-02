@@ -38,9 +38,18 @@ function lerp(from: number, to: number, t: number): number {
 }
 
 export const FILMSTRIP_SWIPE_SLIDE_GAP_PX: number = 40
+export const FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX: number = 80
+export const FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX: number = 640
+
+export function filmstripSwipeSlideGapPx(viewportWidth: number): number {
+    let w = viewportWidth > 0 ? viewportWidth : 800
+    if (w <= FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX) return FILMSTRIP_SWIPE_SLIDE_GAP_PX
+    return FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX
+}
 
 export function filmstripSwipeProgress(offsetX: number, viewportWidth: number): number {
-    let step = Math.max(1, viewportWidth + FILMSTRIP_SWIPE_SLIDE_GAP_PX)
+    let w = viewportWidth > 0 ? viewportWidth : 800
+    let step = Math.max(1, w + filmstripSwipeSlideGapPx(w))
     let t = Math.abs(offsetX) / step
     if (t <= 0) return 0
     if (t >= 1) return 1

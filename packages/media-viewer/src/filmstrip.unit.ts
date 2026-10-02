@@ -1,8 +1,14 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
-import { MEDIA_SWIPE_SLIDE_GAP_PX } from "./swipe"
 import {
+    MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX,
+    MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
+    MEDIA_SWIPE_SLIDE_GAP_PX,
+} from "./swipe"
+import {
+    FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX,
+    FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_PX,
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
@@ -12,6 +18,7 @@ import {
     filmstripOverflows,
     filmstripSwipeNeighborIndex,
     filmstripSwipeProgress,
+    filmstripSwipeSlideGapPx,
     filmstripThumbPitchPx,
 } from "./filmstrip"
 
@@ -75,9 +82,13 @@ describe("filmstripOverflows", () => {
 })
 
 describe("FILMSTRIP_SWIPE_SLIDE_GAP_PX", () => {
-    it("matches MEDIA_SWIPE_SLIDE_GAP_PX", () => {
-        expect(FILMSTRIP_SWIPE_SLIDE_GAP_PX).toBe(40)
+    it("matches swipe gap constants", () => {
         expect(FILMSTRIP_SWIPE_SLIDE_GAP_PX).toBe(MEDIA_SWIPE_SLIDE_GAP_PX)
+        expect(FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX).toBe(MEDIA_SWIPE_SLIDE_GAP_DESKTOP_PX)
+        expect(FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX).toBe(MEDIA_SWIPE_SLIDE_GAP_MOBILE_MAX_PX)
+        expect(filmstripSwipeSlideGapPx(640)).toBe(40)
+        expect(filmstripSwipeSlideGapPx(641)).toBe(80)
+        expect(filmstripSwipeSlideGapPx(0)).toBe(80)
     })
 
     it("filmstrip.ts does not import swipe modules", () => {
@@ -93,20 +104,20 @@ describe("filmstripSwipeProgress", () => {
     })
 
     it("is 0.5 at half a slide step", () => {
-        let step = 800 + 40
+        let step = 800 + 80
         expect(filmstripSwipeProgress(-(step / 2), 800)).toBe(0.5)
         expect(filmstripSwipeProgress(step / 2, 800)).toBe(0.5)
     })
 
-    it("clamps at 1 when |offsetX| >= viewport + 40", () => {
-        expect(filmstripSwipeProgress(-(800 + 40), 800)).toBe(1)
-        expect(filmstripSwipeProgress(800 + 40 + 10, 800)).toBe(1)
+    it("clamps at 1 when |offsetX| >= viewport + desktop gap", () => {
+        expect(filmstripSwipeProgress(-(800 + 80), 800)).toBe(1)
+        expect(filmstripSwipeProgress(800 + 80 + 10, 800)).toBe(1)
     })
 
-    it("does not divide by zero when viewport is 0", () => {
+    it("uses fallback width 800 when viewport is 0", () => {
         expect(filmstripSwipeProgress(0, 0)).toBe(0)
-        expect(filmstripSwipeProgress(40, 0)).toBe(1)
-        expect(filmstripSwipeProgress(20, 0)).toBe(0.5)
+        expect(filmstripSwipeProgress(40, 0)).toBeCloseTo(40 / 880, 5)
+        expect(filmstripSwipeProgress(440, 0)).toBe(0.5)
     })
 })
 
