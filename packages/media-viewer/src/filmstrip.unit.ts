@@ -119,6 +119,13 @@ describe("filmstripSwipeProgress", () => {
         expect(filmstripSwipeProgress(40, 0)).toBeCloseTo(40 / 880, 5)
         expect(filmstripSwipeProgress(440, 0)).toBe(0.5)
     })
+
+    it("uses mobile gap when viewport is 640", () => {
+        let step = 640 + 40
+        expect(filmstripSwipeProgress(-(step / 2), 640)).toBe(0.5)
+        expect(filmstripSwipeProgress(-step, 640)).toBe(1)
+        expect(filmstripSwipeProgress(step + 10, 640)).toBe(1)
+    })
 })
 
 describe("filmstripSwipeNeighborIndex", () => {

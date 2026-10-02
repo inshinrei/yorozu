@@ -11,6 +11,7 @@ import {
     mediaSwipeParallaxX,
 } from "../swipe"
 import type { MediaViewerChromeApi } from "../types"
+import { viewportFallback } from "./css"
 import {
     DecodeFn,
     flushLiveRaf,
@@ -27,6 +28,57 @@ import {
 function parseTranslateX(transform: string): number {
     let match = /translate3d\(([-\d.]+)px/.exec(transform)
     return match ? Number(match[1]) : 0
+}
+
+function stubClientBox(el: HTMLElement, width: number, height: number): void {
+    Object.defineProperty(el, "clientWidth", { configurable: true, get: () => width })
+    Object.defineProperty(el, "clientHeight", { configurable: true, get: () => height })
+}
+
+function stubBitmapNaturals(root: HTMLElement, width = 800, height = 600): void {
+    for (let el of root.querySelectorAll("[data-yorozu-media-stage], [data-yorozu-media-peek]")) {
+        if (el instanceof HTMLImageElement) {
+            Object.defineProperty(el, "naturalWidth", { configurable: true, value: width })
+            Object.defineProperty(el, "naturalHeight", { configurable: true, value: height })
+        }
+    }
+}
+
+function stubClipBoxes(root: HTMLElement, width = 200, height = 150): void {
+    for (let clip of root.querySelectorAll("[data-yorozu-media-clip]")) {
+        if (clip instanceof HTMLElement) stubClientBox(clip, width, height)
+    }
+}
+
+function restampBitmaps(root: HTMLElement): void {
+    stubBitmapNaturals(root)
+    stubClipBoxes(root)
+    for (let el of root.querySelectorAll("[data-yorozu-media-stage], [data-yorozu-media-peek]")) {
+        el.dispatchEvent(new Event("load"))
+    }
+    flushLiveRaf()
+}
+
+function expectedPaneTransform(
+    root: HTMLElement,
+    side: "older" | "active" | "newer",
+    offsetX: number,
+    viewportWidth: number,
+    live: boolean,
+): string {
+    let inner = root.querySelector(
+        `[data-side=${side}] [data-yorozu-media-stage], [data-side=${side}] [data-yorozu-media-peek]`,
+    ) as HTMLElement | null
+    let clip = inner?.closest("[data-yorozu-media-clip]") as HTMLElement | null
+    let clipW = clip?.clientWidth || 0
+    let parallaxX = mediaSwipeParallaxX({
+        offsetX,
+        side,
+        viewportWidth,
+        live,
+        reduced: false,
+    })
+    return mediaSwipeParallaxTransformStyle(parallaxX, mediaSwipeParallaxScale(parallaxX, clipW))
 }
 
 describe("attachMediaViewer", () => {
@@ -434,7 +486,9 @@ describe("attachMediaViewer", () => {
     )
 
     it("rest open has no data-pager-field", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         viewer.open({ items: [img("a"), img("b")] })
+        restampBitmaps(root)
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
         expect(
@@ -448,9 +502,8 @@ describe("attachMediaViewer", () => {
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         mockViewportBox(viewport, 400, 600)
+        restampBitmaps(root)
         let stage = root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLImageElement
-        Object.defineProperty(stage, "naturalWidth", { configurable: true, value: 800 })
-        Object.defineProperty(stage, "naturalHeight", { configurable: true, value: 600 })
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
         flushLiveRaf()
@@ -459,19 +512,35 @@ describe("attachMediaViewer", () => {
         let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
         let zoomEl = root.querySelector("[data-yorozu-media-zoom]") as HTMLElement
         let offsetX = parseTranslateX(strip.style.transform)
-        let vw = viewport.clientWidth || 800
-        let parallaxX = mediaSwipeParallaxX({
-            offsetX,
-            side: "active",
-            viewportWidth: vw,
-            live: true,
-            reduced: false,
-        })
-        let clipW = (stage.closest("[data-yorozu-media-clip]") as HTMLElement | null)?.clientWidth || 0
-        expect(stage.style.transform).toBe(
-            mediaSwipeParallaxTransformStyle(parallaxX, mediaSwipeParallaxScale(parallaxX, clipW)),
-        )
+        let vw = viewport.clientWidth || viewportFallback().width
+        expect(stage.style.transform).toBe(expectedPaneTransform(root, "active", offsetX, vw, true))
+        expect(stage.style.transform).toContain("scale(")
         expect(zoomEl.style.transform).toBe("translate3d(0px, 0px, 0) scale(1)")
+    })
+
+    it("horizontal drag pans older and newer peeks with the active bitmap", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 600)
+        restampBitmaps(root)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
+        let offsetX = parseTranslateX(strip.style.transform)
+        expect(offsetX).not.toBe(0)
+        let vw = viewport.clientWidth || viewportFallback().width
+        for (let side of ["older", "active", "newer"] as const) {
+            let inner = root.querySelector(
+                `[data-side=${side}] [data-yorozu-media-stage], [data-side=${side}] [data-yorozu-media-peek]`,
+            ) as HTMLElement
+            expect(inner.style.transform).toBe(expectedPaneTransform(root, side, offsetX, vw, true))
+            expect(inner.style.transform).toContain("translate3d(")
+            expect(inner.style.transform).toContain("scale(")
+            let scale = Number(/scale\(([-\d.]+)\)/.exec(inner.style.transform)?.[1] ?? "NaN")
+            expect(scale).toBeGreaterThan(1)
+        }
     })
 
     it("vertical down drag sets data-swipe-dismiss and not data-pager-field", async () => {
@@ -480,6 +549,7 @@ describe("attachMediaViewer", () => {
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         mockViewportBox(viewport, 400, 600)
+        restampBitmaps(root)
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointermove", { clientX: 400, clientY: 280 }))
         flushLiveRaf()
@@ -495,6 +565,7 @@ describe("attachMediaViewer", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         mockViewportBox(viewport, 400, 600)
+        restampBitmaps(root)
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointermove", { clientX: 380, clientY: 200 }))
         flushLiveRaf()
@@ -513,6 +584,7 @@ describe("attachMediaViewer", () => {
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         mockViewportBox(viewport, 400, 600)
+        restampBitmaps(root)
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
         flushLiveRaf()
@@ -520,7 +592,7 @@ describe("attachMediaViewer", () => {
         flushLiveRaf()
         expect(viewport.hasAttribute("data-pager-field")).toBe(true)
         await vi.advanceTimersByTimeAsync(MOTION_NAV_MS + 32)
-        flushLiveRaf()
+        restampBitmaps(root)
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
         expect(
             (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
@@ -528,8 +600,10 @@ describe("attachMediaViewer", () => {
     })
 
     it("keyboard switch does not stamp data-pager-field", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))
+        restampBitmaps(root)
         let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         expect(strip.getAttribute("data-switch")).toBe("newer")

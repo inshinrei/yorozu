@@ -537,8 +537,15 @@ test("album swipe pans the active bitmap on desktop before index changes", async
     expect(await currentThumb(page).getAttribute("data-index")).toBe(String(startIndex))
     let transform = await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)
     expect(transform).toContain("translate3d(")
+    expect(transform).toContain("scale(")
     let x = Number(/translate3d\(([-\d.]+)px/.exec(transform)?.[1] ?? "NaN")
+    let scale = Number(/scale\(([-\d.]+)\)/.exec(transform)?.[1] ?? "NaN")
     expect(x).toBeGreaterThan(0)
+    let clipW = await page
+        .locator("[data-side=active] [data-yorozu-media-clip]")
+        .evaluate((el) => (el as HTMLElement).clientWidth)
+    expect(clipW).toBeGreaterThan(0)
+    expect(scale).toBeGreaterThan(1)
     await page.mouse.up()
     await waitMs(MEDIA_VIEWER_SETTLE_MS + 50)
     await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
@@ -552,7 +559,7 @@ test("album swipe zeros clip radius under 40rem", async ({ page }) => {
     let radius = await page
         .locator("[data-side=active] [data-yorozu-media-clip]")
         .evaluate((el) => getComputedStyle(el).borderRadius)
-    expect(radius === "0px" || radius === "0").toBe(true)
+    expect(radius).toBe("0px")
     await page.mouse.up()
 })
 

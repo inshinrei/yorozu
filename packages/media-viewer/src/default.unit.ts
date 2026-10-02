@@ -390,8 +390,8 @@ describe("default media viewer styles", () => {
 
     it("live pager hook zeros pad-x and clip radius without opaque fill", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        expect(css).toContain("[data-yorozu-media-clip]")
-        expect(css).toContain("overflow: hidden")
+        let clipBlock = css.match(/(?:^|\n)\[data-yorozu-media-clip\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(clipBlock).toContain("overflow: hidden")
         expect(css).toContain("[data-yorozu-media-viewport][data-pager-field] [data-yorozu-media-pane]")
         expect(css).toContain("padding-left: 0")
         expect(css).toContain("padding-right: 0")
@@ -399,9 +399,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("border-radius: 0")
         expect(css).not.toContain("var(--yorozu-media-pager-field)")
         expect(css).not.toContain("--yorozu-media-pager-field")
-        let viewportField =
-            css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\[data-pager-field\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(viewportField).not.toContain("background-color")
+        expect(css).not.toMatch(/(?:^|\n)\[data-yorozu-media-viewport\]\[data-pager-field\]\s*\{/)
     })
 
     it("package.json exports tokens.css and default.css", () => {

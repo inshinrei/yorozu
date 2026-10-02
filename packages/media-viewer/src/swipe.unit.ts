@@ -62,6 +62,12 @@ describe("media-viewer swipe math", () => {
             expect(clampSwipeOffsetX(100, 1000)).toBe(100)
         })
 
+        it("limits horizontal to one mobile viewport + 40px gap", () => {
+            let limit = 640 + MEDIA_SWIPE_SLIDE_GAP_PX
+            expect(clampSwipeOffsetX(5000, 640)).toBe(limit)
+            expect(clampSwipeOffsetX(-5000, 640)).toBe(-limit)
+        })
+
         it("limits vertical to viewport height and not below 0", () => {
             expect(clampSwipeOffsetY(2000, 800)).toBe(800)
             expect(clampSwipeOffsetY(-100, 800)).toBe(0)
@@ -294,5 +300,6 @@ describe("mediaSwipeParallaxTransformStyle", () => {
     it("is empty at rest identity", () => {
         expect(mediaSwipeParallaxTransformStyle(0, 1)).toBe("")
         expect(mediaSwipeParallaxTransformStyle(11.2, 1)).toBe("translate3d(11.2px, 0, 0) scale(1)")
+        expect(mediaSwipeParallaxTransformStyle(11.2, 1.14)).toBe("translate3d(11.2px, 0, 0) scale(1.14)")
     })
 })

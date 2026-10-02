@@ -172,6 +172,21 @@ describe("attachMediaViewer", () => {
         expect(api!.isGesturing()).toBe(false)
     })
 
+    it("loading-only pane has no contain clip", () => {
+        viewer.open({ items: [{ id: "a", kind: "image", src: null }] })
+        expect(root.querySelector("[data-yorozu-media-loading]")).toBeTruthy()
+        expect(root.querySelector("[data-yorozu-media-clip]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-stage]")).toBeNull()
+        viewer.setNeighbors({
+            older: { id: "x", kind: "image", src: null },
+            newer: { id: "y", kind: "video", src: "y.mp4" },
+        })
+        expect(root.querySelector('[data-side="older"] [data-yorozu-media-loading]')).toBeTruthy()
+        expect(root.querySelector('[data-side="older"] [data-yorozu-media-clip]')).toBeNull()
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeTruthy()
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-clip]')).toBeNull()
+    })
+
     it("neighbor without src still paints older/newer loading panes; pointer swipe moves index", () => {
         let a = img("a")
         let b = img("b")
