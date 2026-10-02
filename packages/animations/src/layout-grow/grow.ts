@@ -95,6 +95,9 @@ export function createLayoutGrow(opts: {
             resolve(true)
             return playback
         }
+        if (Math.abs(toPx - last) > LAYOUT_GROW_EPSILON_PX) {
+            writePx(last)
+        }
         let playback = size.play(toPx, ms)
         current = playback
         last = toPx

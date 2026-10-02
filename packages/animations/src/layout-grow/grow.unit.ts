@@ -223,6 +223,26 @@ describe("createLayoutGrow", () => {
         grow.destroy()
     })
 
+    it("play inverts from snapshot last when observe is false", async () => {
+        let { fixture, el } = createFixture(40)
+        let grow = createLayoutGrow({ el, observe: false })
+        expect(grow.snapshot()).toBe(40)
+        fixture.naturalH = 80
+        let playback = grow.play(80)
+        expect(fixture.style.height).toBe("40px")
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(16)
+        flushDomSchedule()
+        let mid = parseFloat(fixture.style.height)
+        expect(mid).toBeGreaterThan(40)
+        expect(mid).toBeLessThan(80)
+        await vi.advanceTimersByTimeAsync(LAYOUT_GROW_MS + 64)
+        flushDomSchedule()
+        expect(await playback.done).toBe(true)
+        expect(fixture.style.height).toBe("")
+        grow.destroy()
+    })
+
     it("rebases last after snap so the next invert does not dump remainder", async () => {
         let deltas: number[] = []
         let { fixture, el } = createFixture(40)

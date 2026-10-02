@@ -62,10 +62,19 @@ type Observed = {
     disconnect: ReturnType<typeof vi.fn>
 }
 
+type FakeRoot = {
+    scrollTop: number
+    getBoundingClientRect: () => ReturnType<typeof rect>
+    addEventListener: (type: string, handler: EventListenerOrEventListenerObject) => void
+    removeEventListener: (type: string, handler: EventListenerOrEventListenerObject) => void
+}
+
 let observerRecords: Observed[] = []
 let ResizeObserverMock: ReturnType<typeof vi.fn>
 let rootTop = 0
 let root: HTMLElement
+let fakeRoot: FakeRoot
+let scrollHandlers: EventListener[] = []
 
 function fireResize(el: unknown): void {
     for (let rec of observerRecords) {
@@ -79,9 +88,19 @@ describe("createListShift", () => {
     beforeEach(() => {
         observerRecords = []
         rootTop = 0
-        root = {
+        scrollHandlers = []
+        fakeRoot = {
+            scrollTop: 0,
             getBoundingClientRect: () => rect(rootTop, 400),
-        } as unknown as HTMLElement
+            addEventListener: (type, handler) => {
+                if (type === "scroll") scrollHandlers.push(handler as EventListener)
+            },
+            removeEventListener: (type, handler) => {
+                if (type !== "scroll") return
+                scrollHandlers = scrollHandlers.filter((h) => h !== handler)
+            },
+        }
+        root = fakeRoot as unknown as HTMLElement
         ResizeObserverMock = vi.fn(function (
             this: {
                 observe: Observed["observe"]
@@ -266,6 +285,43 @@ describe("createListShift", () => {
         a.top = 60
         shift.play()
         expect(a.animate).toHaveBeenCalledWith([{ transform: "translateY(40px)" }, { transform: "translateY(0)" }], {
+            duration: LIST_SHIFT_MS,
+            easing: LIST_SHIFT_EASING,
+        })
+        shift.destroy()
+    })
+
+    it("idle root scroll does not invert rows on the next observer tick", () => {
+        let a = createFakeEl(0)
+        let b = createFakeEl(40)
+        let shift = createListShift({ root })
+        shift.register(a as unknown as HTMLElement, "a")
+        shift.register(b as unknown as HTMLElement, "b")
+        fakeRoot.scrollTop = 80
+        a.top = -80
+        b.top = -40
+        fireResize(a)
+        expect(a.animate).not.toHaveBeenCalled()
+        expect(b.animate).not.toHaveBeenCalled()
+        shift.destroy()
+    })
+
+    it("snapshot holds lastTop across root scroll until play", () => {
+        let a = createFakeEl(0)
+        let b = createFakeEl(40)
+        let shift = createListShift({ root })
+        shift.register(a as unknown as HTMLElement, "a")
+        shift.register(b as unknown as HTMLElement, "b")
+        shift.snapshot()
+        fakeRoot.scrollTop = 80
+        a.top = -80
+        b.top = -40
+        shift.play()
+        expect(a.animate).toHaveBeenCalledWith([{ transform: "translateY(80px)" }, { transform: "translateY(0)" }], {
+            duration: LIST_SHIFT_MS,
+            easing: LIST_SHIFT_EASING,
+        })
+        expect(b.animate).toHaveBeenCalledWith([{ transform: "translateY(80px)" }, { transform: "translateY(0)" }], {
             duration: LIST_SHIFT_MS,
             easing: LIST_SHIFT_EASING,
         })

@@ -35,10 +35,18 @@ export function createListShift(opts: {
     let activeAnims = new Map<Key, Animation>()
     let destroyed = false
     let playing = false
+    let holdLastTop = false
     let playId = 0
     let releaseLock: (() => void) | null = null
 
     let relTop = (el: HTMLElement): number => el.getBoundingClientRect().top - root.getBoundingClientRect().top
+
+    let readScrollTop = (): number => {
+        let top = root.scrollTop
+        return typeof top === "number" && Number.isFinite(top) ? top : 0
+    }
+
+    let lastScrollTop = readScrollTop()
 
     let cancelAnim = (key: Key): void => {
         let anim = activeAnims.get(key)
@@ -58,6 +66,26 @@ export function createListShift(opts: {
             lastTop.set(key, relTop(el))
         }
     }
+
+    // relTop includes -scrollTop; idle scroll rebases lastTop so auto invert is layout-only.
+    let syncIdleScroll = (): void => {
+        if (holdLastTop || playing) return
+        let now = readScrollTop()
+        let dy = now - lastScrollTop
+        lastScrollTop = now
+        if (dy === 0) return
+        for (let [key, top] of lastTop) {
+            lastTop.set(key, top - dy)
+        }
+    }
+
+    let onRootScroll = (): void => {
+        if (destroyed || playing || holdLastTop) return
+        rebaseAll()
+        lastScrollTop = readScrollTop()
+    }
+
+    root.addEventListener("scroll", onRootScroll, { passive: true })
 
     let releaseIfHeld = (): void => {
         releaseLock?.()
@@ -121,26 +149,35 @@ export function createListShift(opts: {
 
     let play = (options?: { durationMs?: number }): void => {
         if (destroyed) return
+        if (!holdLastTop) syncIdleScroll()
         invert(options?.durationMs ?? durationMs)
+        holdLastTop = false
+        lastScrollTop = readScrollTop()
     }
 
     let observer: ResizeObserver | null = null
     if (shouldObserve && typeof ResizeObserver === "function") {
         observer = new ResizeObserver((): void => {
             if (destroyed || playing) return
+            if (!holdLastTop) syncIdleScroll()
             invert(durationMs)
+            lastScrollTop = readScrollTop()
         })
     }
 
     let snapshot = (): void => {
         if (destroyed) return
         rebaseAll()
+        holdLastTop = true
+        lastScrollTop = readScrollTop()
     }
 
     let cancel = (): void => {
         playId += 1
         cancelAll()
         playing = false
+        holdLastTop = false
+        lastScrollTop = readScrollTop()
         releaseIfHeld()
     }
 
@@ -151,6 +188,7 @@ export function createListShift(opts: {
                 destroy: (): void => {},
             }
         }
+        if (!holdLastTop) syncIdleScroll()
         itemEls.set(key, el)
         lastTop.set(key, relTop(el))
         observer?.observe(el)
@@ -184,6 +222,7 @@ export function createListShift(opts: {
             if (destroyed) return
             destroyed = true
             cancel()
+            root.removeEventListener("scroll", onRootScroll)
             observer?.disconnect()
             observer = null
             itemEls.clear()

@@ -92,7 +92,7 @@ size.play(240, 200)
 
 ## Layout grow
 
-FLIP-invert one chrome node’s block size (composer, shelf). Auto `ResizeObserver` unless `observe: false`. Inner clock is `createLayoutSizeTween` (`easeOutCubic`, `LAYOUT_GROW_MS`). `med` / `low`: pass `isEnabled: () => canAnimateFull(level)` so the observer snaps.
+FLIP-invert one chrome node’s block size (composer, shelf). Auto `ResizeObserver` unless `observe: false`. `play(toPx)` inverts from the last snapshot (or the initial size) then tweens. Inner clock is `createLayoutSizeTween` (`easeOutCubic`, `LAYOUT_GROW_MS`). `med` / `low`: pass `isEnabled: () => canAnimateFull(level)` so the observer snaps.
 
 ```ts
 import { canAnimateFull, createLayoutGrow, createHeavyAnimationLock } from "@yorozu/animations"
@@ -113,7 +113,7 @@ Do not attach this to a scrolling column of rows — use list shift.
 
 ## List shift
 
-Variable-height FLIP for transcript rows. Geometry is `getBoundingClientRect` relative to `root`. Insert/delete: `snapshot()` before mutate, `register` / `destroy` the row, then `play()`. Edit/reaction size changes can auto-play via row `ResizeObserver`. Duration 0 / `isEnabled` false: rebase only.
+Variable-height FLIP for transcript rows. Geometry is `getBoundingClientRect` relative to `root`. Idle `root` scroll rebases stored tops without playing; `snapshot()` holds them until `play()` so stick-to-bottom still inverts. Insert/delete: `snapshot()` before mutate, `register` / `destroy` the row, then `play()`. Edit/reaction size changes can auto-play via row `ResizeObserver`. Duration 0 / `isEnabled` false: rebase only.
 
 ```ts
 import { canAnimateFull, createListShift } from "@yorozu/animations"
