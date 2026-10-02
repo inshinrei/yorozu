@@ -404,4 +404,32 @@ describe("attachMediaViewer", () => {
         expect(root.querySelector("[data-yorozu-media-stage]")).toBeNull()
         expect(root.querySelector("[data-yorozu-media-loading]")).toBeNull()
     })
+
+    it("wraps zoomable stage, video, and peek in a contain clip", () => {
+        viewer.open({
+            items: [img("a"), { id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
+            index: 0,
+        })
+        let activeStage = root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement
+        let activeClip = activeStage.closest("[data-yorozu-media-clip]") as HTMLElement
+        let zoom = root.querySelector("[data-side=active] [data-yorozu-media-zoom]") as HTMLElement
+        expect(activeClip).toBeTruthy()
+        expect(activeClip.contains(activeStage)).toBe(true)
+        expect(zoom.contains(activeClip)).toBe(true)
+        let peek = root.querySelector("[data-side=newer] [data-yorozu-media-peek]") as HTMLElement
+        let peekClip = peek.closest("[data-yorozu-media-clip]") as HTMLElement
+        expect(peekClip).toBeTruthy()
+        expect(peekClip.contains(peek)).toBe(true)
+    })
+
+    it("wraps active video in a clip without a zoom wrapper", () => {
+        viewer.open({
+            items: [{ id: "v", kind: "video", src: "v.mp4", poster: "p.jpg" }],
+        })
+        let video = root.querySelector("video") as HTMLVideoElement
+        let clip = video.closest("[data-yorozu-media-clip]") as HTMLElement
+        expect(clip).toBeTruthy()
+        expect(clip.contains(video)).toBe(true)
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
+    })
 })

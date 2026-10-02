@@ -34,6 +34,13 @@ export function createPanes(opts: {
         else strip.append(el)
     }
 
+    function clipHost(parent: HTMLElement): HTMLElement {
+        let clip = document.createElement("div")
+        clip.setAttribute("data-yorozu-media-clip", "")
+        parent.append(clip)
+        return clip
+    }
+
     function paneContentKey(side: string, item: MediaViewerItem | MediaViewerNeighbor): string {
         let poster = "poster" in item && item.poster ? item.poster : ""
         let alt = "alt" in item && item.alt ? item.alt : ""
@@ -62,7 +69,7 @@ export function createPanes(opts: {
                 .then((source: CanvasImageSource | null): void => {
                     if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
                     pane.replaceChildren()
-                    if (source) applyCanvasImageSource(pane, source, { peek: true, alt: "" })
+                    if (source) applyCanvasImageSource(clipHost(pane), source, { peek: true, alt: "" })
                 })
             return
         }
@@ -78,7 +85,7 @@ export function createPanes(opts: {
                     if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
                     pane.replaceChildren()
                 }
-                pane.append(image)
+                clipHost(pane).append(image)
                 image.src = poster
                 return
             }
@@ -97,7 +104,7 @@ export function createPanes(opts: {
                 if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
                 pane.replaceChildren()
             }
-            pane.append(image)
+            clipHost(pane).append(image)
             image.src = item.src
             return
         }
@@ -125,7 +132,9 @@ export function createPanes(opts: {
             if ("poster" in item && item.poster) video.poster = item.poster
             let loading = document.createElement("div")
             loading.setAttribute("data-yorozu-media-loading", "")
-            pane.append(video, loading)
+            let clip = clipHost(pane)
+            clip.append(video)
+            pane.append(loading)
             let clearLoading = (): void => {
                 loading.remove()
                 video.removeEventListener("loadeddata", clearLoading)
@@ -149,6 +158,7 @@ export function createPanes(opts: {
             pane.append(wrap)
             host = wrap
         }
+        host = clipHost(host)
         if (hostDecode) {
             let loading = document.createElement("div")
             loading.setAttribute("data-yorozu-media-loading", "")
