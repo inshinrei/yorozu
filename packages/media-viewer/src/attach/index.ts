@@ -3,13 +3,19 @@
  */
 import { prefersReducedMotion } from "@yorozu/animations"
 import { createMediaDecodePort } from "../decode"
+import { fitContain, stageContentSize } from "../layout"
 import { createMediaShell, type MediaShell } from "../shell"
-import { mediaPagerFieldActive } from "../swipe"
+import {
+    mediaPagerFieldActive,
+    mediaSwipeParallaxScale,
+    mediaSwipeParallaxTransformStyle,
+    mediaSwipeParallaxX,
+} from "../swipe"
 import { createMediaSwipe, type MediaSwipe } from "../swipe-controller"
 import type { MediaViewer, MediaViewerNavFrom, MediaViewerOpenOpts, MediaVisibleIds } from "../types"
 import { createMediaImageZoom, type MediaImageZoom } from "../zoom-controller"
 import { createChrome } from "./chrome"
-import { isZoomable, viewportFallback } from "./css"
+import { isZoomable, readPadding, viewportFallback } from "./css"
 import { createFilmstripDom } from "./filmstrip-dom"
 import { createGhostFlight } from "./ghost-flight"
 import { createOverlay, type AttachOverlayNodes } from "./overlay"
@@ -190,6 +196,71 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         })
     }
 
+    function paneNatural(el: Element | null): { width: number; height: number } | null {
+        if (el instanceof HTMLImageElement) {
+            if (el.naturalWidth > 0 && el.naturalHeight > 0) {
+                return { width: el.naturalWidth, height: el.naturalHeight }
+            }
+            return null
+        }
+        if (el instanceof HTMLCanvasElement) {
+            if (el.width > 0 && el.height > 0) return { width: el.width, height: el.height }
+            return null
+        }
+        if (el instanceof HTMLVideoElement) {
+            if (el.videoWidth > 0 && el.videoHeight > 0) {
+                return { width: el.videoWidth, height: el.videoHeight }
+            }
+            return null
+        }
+        return null
+    }
+
+    function applyPaneParallax(): void {
+        let nodes = overlayNodes()
+        if (!nodes) return
+        let viewport = nodes.viewport
+        let live = mediaPagerFieldActive(swipe.offsetX(), swipe.offsetY(), swipe.dismissing())
+        let reduced = reducedMotion()
+        let vw = viewport.clientWidth || viewportFallback().width
+        let offsetX = swipe.offsetX()
+        let panes = nodes.strip.querySelectorAll("[data-yorozu-media-pane][data-side]")
+        for (let pane of panes) {
+            if (!(pane instanceof HTMLElement)) continue
+            let sideRaw = pane.getAttribute("data-side")
+            if (sideRaw !== "older" && sideRaw !== "active" && sideRaw !== "newer") continue
+            let clip = pane.querySelector("[data-yorozu-media-clip]")
+            if (!(clip instanceof HTMLElement)) continue
+            let inner = clip.querySelector("[data-yorozu-media-stage], [data-yorozu-media-peek]")
+            if (!(inner instanceof HTMLElement)) continue
+            let content = stageContentSize(pane.clientWidth, pane.clientHeight, readPadding(pane))
+            let natural = paneNatural(inner)
+            if (!natural) {
+                if (content.width > 0 && content.height > 0) {
+                    clip.style.width = `${content.width}px`
+                    clip.style.height = `${content.height}px`
+                }
+                inner.style.transform = ""
+                continue
+            }
+            let fit = fitContain(natural, content)
+            if (fit) {
+                clip.style.width = `${fit.width}px`
+                clip.style.height = `${fit.height}px`
+            }
+            let clipW = clip.clientWidth || fit?.width || 0
+            let parallaxX = mediaSwipeParallaxX({
+                offsetX,
+                side: sideRaw,
+                viewportWidth: vw,
+                live,
+                reduced,
+            })
+            let scale = mediaSwipeParallaxScale(parallaxX, clipW)
+            inner.style.transform = mediaSwipeParallaxTransformStyle(parallaxX, scale)
+        }
+    }
+
     function applyOverlayAttrs(): void {
         let nodes = overlayNodes()
         if (!nodes) return
@@ -226,6 +297,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
             strip.setAttribute("data-switch-key", key)
             strip.setAttribute("data-switch", dir)
         }
+        applyPaneParallax()
         let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]") as HTMLElement | null
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
     }

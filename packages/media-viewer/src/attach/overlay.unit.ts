@@ -3,7 +3,13 @@ import { MOTION_NAV_MS, MOTION_SETTLE_MS } from "@yorozu/animations"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { attachMediaViewer } from "./index"
 import { createMediaViewer } from "../session"
-import { MEDIA_SWIPE_WHEEL_COOLDOWN_MS, MEDIA_SWIPE_WHEEL_RELEASE_MS } from "../swipe"
+import {
+    MEDIA_SWIPE_WHEEL_COOLDOWN_MS,
+    MEDIA_SWIPE_WHEEL_RELEASE_MS,
+    mediaSwipeParallaxScale,
+    mediaSwipeParallaxTransformStyle,
+    mediaSwipeParallaxX,
+} from "../swipe"
 import type { MediaViewerChromeApi } from "../types"
 import {
     DecodeFn,
@@ -17,6 +23,11 @@ import {
     teardownAttach,
     type AttachTestMount,
 } from "./test-helpers"
+
+function parseTranslateX(transform: string): number {
+    let match = /translate3d\(([-\d.]+)px/.exec(transform)
+    return match ? Number(match[1]) : 0
+}
 
 describe("attachMediaViewer", () => {
     let viewer: AttachTestMount["viewer"]
@@ -426,6 +437,9 @@ describe("attachMediaViewer", () => {
         viewer.open({ items: [img("a"), img("b")] })
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+        expect(
+            (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
+        ).toBe("")
     })
 
     it("horizontal drag stamps data-pager-field and not data-swipe-dismiss", async () => {
@@ -434,11 +448,30 @@ describe("attachMediaViewer", () => {
         let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         mockViewportBox(viewport, 400, 600)
+        let stage = root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLImageElement
+        Object.defineProperty(stage, "naturalWidth", { configurable: true, value: 800 })
+        Object.defineProperty(stage, "naturalHeight", { configurable: true, value: 600 })
         viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
         viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
         flushLiveRaf()
         expect(viewport.hasAttribute("data-pager-field")).toBe(true)
         expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(false)
+        let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
+        let zoomEl = root.querySelector("[data-yorozu-media-zoom]") as HTMLElement
+        let offsetX = parseTranslateX(strip.style.transform)
+        let vw = viewport.clientWidth || 800
+        let parallaxX = mediaSwipeParallaxX({
+            offsetX,
+            side: "active",
+            viewportWidth: vw,
+            live: true,
+            reduced: false,
+        })
+        let clipW = (stage.closest("[data-yorozu-media-clip]") as HTMLElement | null)?.clientWidth || 0
+        expect(stage.style.transform).toBe(
+            mediaSwipeParallaxTransformStyle(parallaxX, mediaSwipeParallaxScale(parallaxX, clipW)),
+        )
+        expect(zoomEl.style.transform).toBe("translate3d(0px, 0px, 0) scale(1)")
     })
 
     it("vertical down drag sets data-swipe-dismiss and not data-pager-field", async () => {
@@ -452,6 +485,9 @@ describe("attachMediaViewer", () => {
         flushLiveRaf()
         expect(overlay.hasAttribute("data-swipe-dismiss")).toBe(true)
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+        expect(
+            (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
+        ).toBe("")
     })
 
     it("horizontal drag under 50px clears data-pager-field after bounce settle", async () => {
@@ -467,6 +503,9 @@ describe("attachMediaViewer", () => {
         await vi.advanceTimersByTimeAsync(MOTION_SETTLE_MS + 32)
         flushLiveRaf()
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+        expect(
+            (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
+        ).toBe("")
     })
 
     it("commit hop leftover offset keeps data-pager-field until offset returns to 0", async () => {
@@ -483,6 +522,9 @@ describe("attachMediaViewer", () => {
         await vi.advanceTimersByTimeAsync(MOTION_NAV_MS + 32)
         flushLiveRaf()
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+        expect(
+            (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
+        ).toBe("")
     })
 
     it("keyboard switch does not stamp data-pager-field", () => {
@@ -492,6 +534,9 @@ describe("attachMediaViewer", () => {
         let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
         expect(strip.getAttribute("data-switch")).toBe("newer")
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
+        expect(
+            (root.querySelector("[data-side=active] [data-yorozu-media-stage]") as HTMLElement).style.transform,
+        ).toBe("")
     })
 
     it("strip does not inline slide-gap", () => {
