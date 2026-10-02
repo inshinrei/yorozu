@@ -111,6 +111,28 @@ const grow = createLayoutGrow({
 
 Do not attach this to a scrolling column of rows — use list shift.
 
+## List shift
+
+Variable-height FLIP for transcript rows. Geometry is `getBoundingClientRect` relative to `root`. Insert/delete: `snapshot()` before mutate, `register` / `destroy` the row, then `play()`. Edit/reaction size changes can auto-play via row `ResizeObserver`. Duration 0 / `isEnabled` false: rebase only.
+
+```ts
+import { canAnimateFull, createListShift } from "@yorozu/animations"
+
+const shift = createListShift({
+    root: scrollerEl,
+    isEnabled: () => canAnimateFull(level),
+    lock,
+})
+const handle = shift.register(rowEl, rowId)
+// insert:
+shift.snapshot()
+scrollerEl.append(newRow)
+shift.register(newRow, newId)
+shift.play()
+```
+
+Do not use `createListReorder` for variable-height chat rows.
+
 ## Intensity
 
 Three playback levels. The OS `prefers-reduced-motion` query is **seed only** — after the host stores a pick, that value owns playback.
@@ -247,6 +269,7 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 | Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                                                                  |
 | List reorder      | `createListReorder`                     | Index FLIP, fixed height                                                                   |
 | Layout grow       | `createLayoutGrow`                      | Chrome block-size FLIP invert; observer; onDelta                                           |
+| List shift        | `createListShift`                       | Variable-height translateY FLIP                                                            |
 | Dock              | `createDock`                            | Edge open/close + backdrop fade                                                            |
 | Fade              | `createFade`                            | Opacity-only show/hide                                                                     |
 | Popover           | `createPopover`                         | Scale + fade from an origin                                                                |

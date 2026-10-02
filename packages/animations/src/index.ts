@@ -26,6 +26,8 @@ export type { LayoutSizeTween } from "./core/layout-size"
 export { createLayoutSizeTween } from "./core/layout-size"
 export type { LayoutGrow, LayoutGrowAxis } from "./layout-grow/grow"
 export { LAYOUT_GROW_MS, LAYOUT_GROW_EPSILON_PX, createLayoutGrow } from "./layout-grow/grow"
+export type { ListShift } from "./list-shift/shift"
+export { LIST_SHIFT_MS, LIST_SHIFT_EASING, LIST_SHIFT_EPSILON_PX, createListShift } from "./list-shift/shift"
 export {
     MOTION_UI_MS,
     MOTION_SETTLE_MS,
