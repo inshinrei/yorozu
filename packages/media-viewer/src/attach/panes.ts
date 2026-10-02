@@ -207,7 +207,7 @@ export function createPanes(opts: {
         let key = paneKeys.get(pane)
         image.onerror = (): void => {
             if (opts.isDetached() || !pane.isConnected || paneKeys.get(pane) !== key) return
-            host.replaceChildren()
+            pane.replaceChildren()
         }
         host.append(image)
         image.src = src

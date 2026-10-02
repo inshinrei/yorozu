@@ -402,15 +402,20 @@ describe("attachMediaViewer", () => {
         image.dispatchEvent(new Event("error"))
         expect(root.querySelector('[data-side="newer"] img')).toBeNull()
         expect(root.querySelector('[data-side="newer"] [data-yorozu-media-loading]')).toBeNull()
+        expect(root.querySelector('[data-side="newer"] [data-yorozu-media-clip]')).toBeNull()
     })
 
     it("compat img.src active onerror clears the stage", () => {
         viewer.open({ items: [img("a")] })
         let image = root.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
         expect(image).toBeTruthy()
+        expect(root.querySelector("[data-yorozu-media-clip]")).toBeTruthy()
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeTruthy()
         image.dispatchEvent(new Event("error"))
         expect(root.querySelector("[data-yorozu-media-stage]")).toBeNull()
         expect(root.querySelector("[data-yorozu-media-loading]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-clip]")).toBeNull()
+        expect(root.querySelector("[data-yorozu-media-zoom]")).toBeNull()
     })
 
     it("wraps zoomable stage, video, and peek in a contain clip", () => {

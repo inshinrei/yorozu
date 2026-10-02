@@ -113,8 +113,8 @@
     border-radius: var(--yorozu-media-radius);
 }
 
-[data-yorozu-media-clip] > [data-yorozu-media-stage],
-[data-yorozu-media-clip] > [data-yorozu-media-peek] {
+[data-yorozu-media-pane][data-side] [data-yorozu-media-clip] > [data-yorozu-media-stage],
+[data-yorozu-media-pane][data-side] [data-yorozu-media-clip] > [data-yorozu-media-peek] {
     width: 100%;
     height: 100%;
     max-width: none;

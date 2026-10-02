@@ -371,6 +371,23 @@ describe("default media viewer styles", () => {
         expect(paneBlock).toContain("--yorozu-media-pad-bottom")
     })
 
+    it("clip-child cover beats active-stage contain", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        let attrCount = (selectorList: string): number => {
+            let first = selectorList.split(",")[0] ?? ""
+            return (first.match(/\[[^\]]+\]/g) ?? []).length
+        }
+        let coverRule = [...css.matchAll(/([^{}]+)\{[^}]*object-fit:\s*cover[^}]*\}/g)]
+            .map((match) => match[1]!.trim())
+            .find((selector) => selector.includes("[data-yorozu-media-clip]"))
+        expect(coverRule).toBeTruthy()
+        let containRule = [...css.matchAll(/([^{}]+)\{[^}]*object-fit:\s*contain[^}]*\}/g)]
+            .map((match) => match[1]!.trim())
+            .find((selector) => selector.includes('[data-side="active"]'))
+        expect(containRule).toBeTruthy()
+        expect(attrCount(coverRule!)).toBeGreaterThan(attrCount(containRule!))
+    })
+
     it("live pager hook zeros pad-x and clip radius without opaque fill", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain("[data-yorozu-media-clip]")
