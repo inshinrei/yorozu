@@ -90,6 +90,27 @@ size.play(240, 200)
 
 `snap()` applies rest immediately and cancels an in-flight play — call it to interrupt, not on the next line after `play`.
 
+## Layout grow
+
+FLIP-invert one chrome node’s block size (composer, shelf). Auto `ResizeObserver` unless `observe: false`. Inner clock is `createLayoutSizeTween` (`easeOutCubic`, `LAYOUT_GROW_MS`). `med` / `low`: pass `isEnabled: () => canAnimateFull(level)` so the observer snaps.
+
+```ts
+import { canAnimateFull, createLayoutGrow, createHeavyAnimationLock } from "@yorozu/animations"
+
+const lock = createHeavyAnimationLock()
+const grow = createLayoutGrow({
+    el: composerEl,
+    lock,
+    isEnabled: () => canAnimateFull(level),
+    onDelta: (deltaPx) => {
+        if (pinned) scroller.scrollTop += deltaPx
+    },
+})
+// destroy() on teardown
+```
+
+Do not attach this to a scrolling column of rows — use list shift.
+
 ## Intensity
 
 Three playback levels. The OS `prefers-reduced-motion` query is **seed only** — after the host stores a pick, that value owns playback.
@@ -225,6 +246,7 @@ Classifier helpers `buildOrderDiff` and `classifyReorderAnim` are public if the 
 | Shared element    | `createSharedElement`                   | Thumb ↔ stage flight                                                                       |
 | Sliding indicator | `createSlidingIndicator`                | Size snap, position tween                                                                  |
 | List reorder      | `createListReorder`                     | Index FLIP, fixed height                                                                   |
+| Layout grow       | `createLayoutGrow`                      | Chrome block-size FLIP invert; observer; onDelta                                           |
 | Dock              | `createDock`                            | Edge open/close + backdrop fade                                                            |
 | Fade              | `createFade`                            | Opacity-only show/hide                                                                     |
 | Popover           | `createPopover`                         | Scale + fade from an origin                                                                |
@@ -262,6 +284,6 @@ Wire `getMode`, `isReduced`, and `enabled` from the stored intensity so every pr
 - **Shared frame pump:** `onAnimationFrame` is one rAF for JS ticks; `dualRaf` still waits two frames; hosts no-op non-motion subscribers while a blocking lock is held.
 - **Measure / mutate:** `queueMeasure` then `queueMutate` on one frame; `dualRaf` still means wait two frames; `queueMeasureAfterMutate` is the rare second read.
 - **First layout is a baseline:** first indicator measure and first reorder `sync` establish state without animating.
-- **Heavy-motion lock:** the host holds one `createHeavyAnimationLock` instance and `acquire`s around slides / docks / list-reorder / layout-size work. Level `any` pauses observers/decode; `blocking` also defers store fan-out. This is not list-reorder `isSuppressed`, and it does not read an OS reduced-motion media query.
+- **Heavy-motion lock:** the host holds one `createHeavyAnimationLock` instance and `acquire`s around slides / docks / list-reorder / layout-size work. Layout-grow acquires `any` via layout-size. Level `any` pauses observers/decode; `blocking` also defers store fan-out. This is not list-reorder `isSuppressed`, and it does not read an OS reduced-motion media query.
 - **Layout size writer:** scheduled `readPx` / `writePx` under the heavy lock; not a height WAAPI helper; prefer compositor substitutes (`scaleY` / clip) for chrome; do not height-tween a scrolling column.
 - **Digit-flip budget:** `scheduleDigitFlip` caps at 10 per shared animation frame (`onAnimationFrame`); skips (no budget consumed) while an optional heavy lock is held.

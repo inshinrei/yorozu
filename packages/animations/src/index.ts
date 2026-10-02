@@ -24,6 +24,8 @@ export type { HeavyLockLevel, HeavyAnimationLock } from "./core/heavy-lock"
 export { DEFAULT_HEAVY_LOCK_TIMEOUT_MS, createHeavyAnimationLock } from "./core/heavy-lock"
 export type { LayoutSizeTween } from "./core/layout-size"
 export { createLayoutSizeTween } from "./core/layout-size"
+export type { LayoutGrow, LayoutGrowAxis } from "./layout-grow/grow"
+export { LAYOUT_GROW_MS, LAYOUT_GROW_EPSILON_PX, createLayoutGrow } from "./layout-grow/grow"
 export {
     MOTION_UI_MS,
     MOTION_SETTLE_MS,
