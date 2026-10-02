@@ -109,6 +109,7 @@ let level = stored ?? defaultAnimationLevel(prefersReducedMotion())
 resolveViewSlideMode(level, "stack") // none | crossfade | push
 resolveViewSlideMode(level, "layer") // none | crossfade | cover
 canAnimate(level) // false only for low
+canAnimateFull(level) // true only for high — layout grow, list shift, send morph, presence pop
 ```
 
 `pickAnimationLevelFromRatio` / `stepAnimationLevel` / `cycleAnimationLevel` drive a three-stop slider. `prefersReducedMotion()` stays an honest media-query probe.
@@ -244,6 +245,7 @@ Respect user preference and host suppressors:
 
 - **`prefersReducedMotion()`** — reads `(prefers-reduced-motion: reduce)`. Use it only to **seed** `defaultAnimationLevel`. Stored `low` / `med` / `high` owns playback after that.
 - **`canAnimate(level)`** — false only for `low`.
+- **`canAnimateFull(level)`** — true only for `high`. Layout grow, list shift, send morph, and presence pop snap at `med` and `low`.
 - **View slide `mode: "none"`** — skips animation; active key still updates and mount policy still applies.
 - **List reorder `isReduced`** — clears the order baseline (no FLIP).
 - **List reorder `isSuppressed`** — updates the baseline without animating (useful during drag).

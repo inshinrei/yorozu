@@ -20,6 +20,7 @@ describe("package barrel", () => {
         expect(typeof animations.playSharedElement).toBe("function")
         expect(typeof animations.createCancelGroup).toBe("function")
         expect(typeof animations.createLayoutSizeTween).toBe("function")
+        expect(typeof animations.canAnimateFull).toBe("function")
         expect(typeof animations.createOffsetDrag).toBe("function")
         expect(typeof animations.resolveDragAxis).toBe("function")
         expect(typeof animations.createOverscrollBounce).toBe("function")

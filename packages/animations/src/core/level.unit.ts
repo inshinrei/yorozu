@@ -3,6 +3,7 @@ import {
     ANIMATION_LEVELS,
     DEFAULT_ANIMATION_LEVEL,
     canAnimate,
+    canAnimateFull,
     cycleAnimationLevel,
     defaultAnimationLevel,
     isAnimationLevel,
@@ -51,6 +52,12 @@ describe("animation level", () => {
         expect(canAnimate("low")).toBe(false)
         expect(canAnimate("med")).toBe(true)
         expect(canAnimate("high")).toBe(true)
+    })
+
+    it("canAnimateFull is true only for high", () => {
+        expect(canAnimateFull("low")).toBe(false)
+        expect(canAnimateFull("med")).toBe(false)
+        expect(canAnimateFull("high")).toBe(true)
     })
 
     it("pickAnimationLevelFromRatio splits the track into thirds", () => {

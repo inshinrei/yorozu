@@ -28,6 +28,10 @@ export function canAnimate(level: AnimationLevel): boolean {
     return level !== "low"
 }
 
+export function canAnimateFull(level: AnimationLevel): boolean {
+    return level === "high"
+}
+
 export function pickAnimationLevelFromRatio(t: number): AnimationLevel {
     if (t < 1 / 3) return "low"
     if (t < 2 / 3) return "med"

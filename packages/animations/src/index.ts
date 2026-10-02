@@ -14,6 +14,7 @@ export {
     defaultAnimationLevel,
     cycleAnimationLevel,
     canAnimate,
+    canAnimateFull,
     pickAnimationLevelFromRatio,
     stepAnimationLevel,
 } from "./core/level"
