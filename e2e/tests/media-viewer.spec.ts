@@ -528,3 +528,38 @@ test("album swipe under 50px clears data-pager-field after settle", async ({ pag
     await waitMs(MEDIA_VIEWER_SETTLE_MS + 50)
     await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
 })
+
+test("album swipe pans the active bitmap on desktop before index changes", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true, viewport: { width: 1280, height: 800 } })
+    let startIndex = await currentThumb(page).getAttribute("data-index")
+    await swipeViewportHold(page, -80, 0)
+    await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
+    expect(await currentThumb(page).getAttribute("data-index")).toBe(String(startIndex))
+    let transform = await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)
+    expect(transform).toContain("translate3d(")
+    let x = Number(/translate3d\(([-\d.]+)px/.exec(transform)?.[1] ?? "NaN")
+    expect(x).toBeGreaterThan(0)
+    await page.mouse.up()
+    await waitMs(MEDIA_VIEWER_SETTLE_MS + 50)
+    await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
+    expect(await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)).toBe("")
+})
+
+test("album swipe zeros clip radius under 40rem", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true, viewport: { width: 640, height: 800 } })
+    await swipeViewportHold(page, -80, 0)
+    await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
+    let radius = await page
+        .locator("[data-side=active] [data-yorozu-media-clip]")
+        .evaluate((el) => getComputedStyle(el).borderRadius)
+    expect(radius === "0px" || radius === "0").toBe(true)
+    await page.mouse.up()
+})
+
+test("keyboard switch does not pan the active bitmap", async ({ page }) => {
+    await openMediaViewer(page, "img-wide", { motion: true })
+    await page.keyboard.press("ArrowRight")
+    await expect(page.locator("[data-yorozu-media-strip]")).toHaveAttribute("data-switch", "newer")
+    await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
+    expect(await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)).toBe("")
+})
