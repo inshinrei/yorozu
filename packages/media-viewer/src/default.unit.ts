@@ -9,7 +9,6 @@ let pkgRoot = join(here, "..")
 let tokenNames = [
     "--yorozu-media-z",
     "--yorozu-media-scrim",
-    "--yorozu-media-pager-field",
     "--yorozu-media-pad-top",
     "--yorozu-media-pad-bottom",
     "--yorozu-media-pad-x",
@@ -49,11 +48,10 @@ describe("default media viewer styles", () => {
         }
         expect(css).toContain("--yorozu-media-z: 1400")
         expect(css).toContain("--yorozu-media-scrim: rgba(25, 25, 26, 0.5)")
-        expect(css).toContain("--yorozu-media-pager-field: rgba(25, 25, 26, 1)")
         expect(css).toContain("--yorozu-media-pad-top: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-bottom: 3.25rem")
         expect(css).toContain("--yorozu-media-pad-x: 0.75rem")
-        expect(css).toContain("--yorozu-media-slide-gap: 40px")
+        expect(css).toContain("--yorozu-media-slide-gap: 80px")
         expect(css).toContain("--yorozu-media-open-ms: 150ms")
         expect(css).toContain("--yorozu-media-close-ms: 100ms")
         expect(css).toContain("--yorozu-media-chrome-ms: 150ms")
@@ -347,6 +345,7 @@ describe("default media viewer styles", () => {
         expect(css).toContain("width: 100%")
         expect(css).toContain("max-width: 100%")
         expect(css).toContain("--yorozu-media-pad-x: 0")
+        expect(css).toContain("--yorozu-media-slide-gap: 40px")
     })
 
     it("reduced-motion chrome snaps filmstrip thumbs", () => {
@@ -372,12 +371,20 @@ describe("default media viewer styles", () => {
         expect(paneBlock).toContain("--yorozu-media-pad-bottom")
     })
 
-    it("pager field paints opaque viewport background", () => {
+    it("live pager hook zeros pad-x and clip radius without opaque fill", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
-        expect(css).toContain("[data-yorozu-media-viewport][data-pager-field]")
-        expect(css).toContain("background-color: var(--yorozu-media-pager-field)")
-        let viewportBlock = css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(viewportBlock).not.toContain("background-color")
+        expect(css).toContain("[data-yorozu-media-clip]")
+        expect(css).toContain("overflow: hidden")
+        expect(css).toContain("[data-yorozu-media-viewport][data-pager-field] [data-yorozu-media-pane]")
+        expect(css).toContain("padding-left: 0")
+        expect(css).toContain("padding-right: 0")
+        expect(css).toContain("[data-yorozu-media-viewport][data-pager-field] [data-yorozu-media-clip]")
+        expect(css).toContain("border-radius: 0")
+        expect(css).not.toContain("var(--yorozu-media-pager-field)")
+        expect(css).not.toContain("--yorozu-media-pager-field")
+        let viewportField =
+            css.match(/(?:^|\n)\[data-yorozu-media-viewport\]\[data-pager-field\]\s*\{[^}]*\}/)?.[0] ?? ""
+        expect(viewportField).not.toContain("background-color")
     })
 
     it("package.json exports tokens.css and default.css", () => {

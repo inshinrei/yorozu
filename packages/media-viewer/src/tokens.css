@@ -2,11 +2,10 @@
 [data-yorozu-media-viewer] {
     --yorozu-media-z: 1400;
     --yorozu-media-scrim: rgba(25, 25, 26, 0.5);
-    --yorozu-media-pager-field: rgba(25, 25, 26, 1);
     --yorozu-media-pad-top: 3.25rem;
     --yorozu-media-pad-bottom: 3.25rem;
     --yorozu-media-pad-x: 0.75rem;
-    --yorozu-media-slide-gap: 40px;
+    --yorozu-media-slide-gap: 80px;
     --yorozu-media-open-ms: 150ms;
     --yorozu-media-close-ms: 100ms;
     --yorozu-media-chrome-ms: 150ms;

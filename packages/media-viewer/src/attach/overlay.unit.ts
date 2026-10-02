@@ -493,4 +493,10 @@ describe("attachMediaViewer", () => {
         expect(strip.getAttribute("data-switch")).toBe("newer")
         expect(viewport.hasAttribute("data-pager-field")).toBe(false)
     })
+
+    it("strip does not inline slide-gap", () => {
+        viewer.open({ items: [img("a"), img("b")] })
+        let strip = root.querySelector("[data-yorozu-media-strip]") as HTMLElement
+        expect(strip.style.getPropertyValue("--yorozu-media-slide-gap")).toBe("")
+    })
 })

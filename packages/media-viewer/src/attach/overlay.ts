@@ -74,7 +74,6 @@ export function createOverlay(opts: {
         viewport.setAttribute("data-yorozu-media-viewport", "")
         let strip = document.createElement("div")
         strip.setAttribute("data-yorozu-media-strip", "")
-        strip.style.setProperty("--yorozu-media-slide-gap", "40px")
         viewport.append(strip)
 
         let backdrop = document.createElement("div")
