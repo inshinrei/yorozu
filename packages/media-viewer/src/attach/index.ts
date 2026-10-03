@@ -42,6 +42,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
 
     let openSeq = 0
     let paintedOpenSeq = -1
+    let chromeHidden = false
     let innerOpen = viewer.open
     viewer.open = (openOpts: MediaViewerOpenOpts): void => {
         openSeq += 1
@@ -300,6 +301,45 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         applyPaneParallax()
         let zoomEl = overlay.querySelector("[data-yorozu-media-zoom]") as HTMLElement | null
         if (zoomEl) zoomEl.style.transform = zoom.transformStyle()
+        applyChromeHidden(nodes)
+    }
+
+    function applyChromeHidden(nodes: AttachOverlayNodes): void {
+        let hosts: HTMLElement[] = [nodes.header, nodes.footer, nodes.chromeEl]
+        let clip = nodes.overlay.querySelector("[data-yorozu-media-filmstrip-clip]")
+        if (clip instanceof HTMLElement) hosts.push(clip)
+        if (chromeHidden) {
+            nodes.overlay.setAttribute("data-chrome", "hidden")
+            for (let host of hosts) host.setAttribute("aria-hidden", "true")
+            return
+        }
+        nodes.overlay.removeAttribute("data-chrome")
+        for (let host of hosts) host.removeAttribute("aria-hidden")
+    }
+
+    function toggleChromeHidden(): void {
+        if (shell?.openPhase() !== "open") return
+        if (swipe.dismissing()) return
+        chromeHidden = !chromeHidden
+        let nodes = overlayNodes()
+        if (nodes) applyChromeHidden(nodes)
+    }
+
+    function onOverlayClick(e: MouseEvent): void {
+        let t = e.target
+        if (!(t instanceof Element)) return
+        if (!t.closest("[data-yorozu-media-viewport]")) return
+        if (
+            t.closest(
+                "[data-yorozu-media-header], [data-yorozu-media-footer], [data-yorozu-media-chrome], [data-yorozu-media-filmstrip], [data-yorozu-media-filmstrip-clip]",
+            )
+        ) {
+            return
+        }
+        if (!zoomInput.takeChromeTap()) return
+        if (shell?.openPhase() !== "open") return
+        if (swipe.dismissing()) return
+        toggleChromeHidden()
     }
 
     function ensureShell(): void {
@@ -392,6 +432,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         nodes.viewport.addEventListener("pointerup", zoomInput.onPointerUp, { signal })
         nodes.viewport.addEventListener("pointercancel", zoomInput.onPointerCancel, { signal })
         nodes.viewport.addEventListener("wheel", zoomInput.onWheel, { signal, passive: false })
+        nodes.overlay.addEventListener("click", onOverlayClick, { signal })
     }
 
     function tearDownOverlay(unmountOpts?: { linger?: boolean }): void {
@@ -416,6 +457,7 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         }
         lastContentId = null
         startedOpen = false
+        chromeHidden = false
         // zoom.reset may have scheduled a frame while overlay was still set.
         cancelRaf()
         overlayHandle.unmount({ linger })

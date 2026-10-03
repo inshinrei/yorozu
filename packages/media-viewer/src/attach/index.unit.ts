@@ -7,6 +7,7 @@ import {
     DecodeFn,
     img,
     imgAspect,
+    mockViewportBox,
     mountAttach,
     origin,
     pointer,
@@ -14,6 +15,13 @@ import {
     RequestFn,
     type AttachTestMount,
 } from "./test-helpers"
+
+function tapViewport(root: HTMLElement): void {
+    let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+    viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+    viewport.dispatchEvent(pointer("pointerup", { clientX: 200, clientY: 200 }))
+    viewport.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 200, clientY: 200 }))
+}
 
 describe("attachMediaViewer", () => {
     let viewer: AttachTestMount["viewer"]
@@ -263,5 +271,97 @@ describe("attachMediaViewer", () => {
         viewport.dispatchEvent(pointer("pointerup", { clientX: 200, clientY: 200 }))
         expect(seen.at(-1)).toEqual({ stage: "a", peeks: ["b"], thumbs: [] })
         expect(seen.filter((s) => s.stage === "a" && s.peeks[0] === "b")).toHaveLength(n)
+    })
+
+    it("viewport click hides chrome and a second click shows it", () => {
+        viewer.open({
+            items: [img("a"), img("b")],
+            chrome: {
+                header: (el) => {
+                    let btn = document.createElement("button")
+                    btn.id = "hdr"
+                    el.append(btn)
+                },
+            },
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.getAttribute("data-phase")).toBe("open")
+        tapViewport(root)
+        expect(overlay.getAttribute("data-chrome")).toBe("hidden")
+        expect(root.querySelector("[data-yorozu-media-header]")?.getAttribute("aria-hidden")).toBe("true")
+        expect(root.querySelector("[data-yorozu-media-filmstrip-clip]")?.getAttribute("aria-hidden")).toBe("true")
+        tapViewport(root)
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+        expect(root.querySelector("[data-yorozu-media-header]")?.hasAttribute("aria-hidden")).toBe(false)
+    })
+
+    it("header button click does not toggle chrome", () => {
+        viewer.open({
+            items: [img("a")],
+            chrome: {
+                header: (el) => {
+                    let btn = document.createElement("button")
+                    btn.id = "hdr"
+                    el.append(btn)
+                },
+            },
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        root.querySelector("#hdr")!.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+    })
+
+    it("filmstrip thumb click does not toggle chrome", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let thumb = root.querySelector('[data-yorozu-media-thumb][data-index="1"]') as HTMLElement
+        thumb.click()
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+        expect(viewer.snapshot().index).toBe(1)
+    })
+
+    it("pointer move past 10px then click does not toggle chrome", () => {
+        viewer.open({ items: [img("a")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 220, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 220, clientY: 200 }))
+        viewport.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 220, clientY: 200 }))
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+    })
+
+    it("horizontal swipe does not hide chrome", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 400, 400)
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 300, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 220, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointerup", { clientX: 220, clientY: 200 }))
+        viewport.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 220, clientY: 200 }))
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+        expect(viewer.snapshot().index).toBe(2)
+    })
+
+    it("reopen starts with chrome shown", () => {
+        viewer.open({ items: [img("a")], ghost: false })
+        tapViewport(root)
+        expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-chrome")).toBe("hidden")
+        viewer.close()
+        viewer.open({ items: [img("b")], ghost: false })
+        expect(root.querySelector("[data-yorozu-media-viewer]")?.hasAttribute("data-chrome")).toBe(false)
+    })
+
+    it("does not toggle chrome while opening", () => {
+        viewer.open({
+            items: [img("a")],
+            origin,
+            chrome: { header: (el) => el.append(document.createElement("button")) },
+        })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.getAttribute("data-phase")).toBe("opening")
+        tapViewport(root)
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
     })
 })

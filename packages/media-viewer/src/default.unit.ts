@@ -239,6 +239,19 @@ describe("default media viewer styles", () => {
         expect(css).not.toMatch(/\[data-yorozu-media-viewer\]\[data-phase="closing"\]\s*\{[^}]*pointer-events:\s*none/)
     })
 
+    it("hidden chrome fades opacity on the four hosts", () => {
+        let css = readFileSync(join(here, "default.css"), "utf8")
+        expect(css).toContain('[data-chrome="hidden"]')
+        expect(css).toContain("opacity: 0")
+        let hostTransition =
+            css.match(
+                /\[data-yorozu-media-header\],\s*\[data-yorozu-media-footer\],\s*\[data-yorozu-media-chrome\],\s*\[data-yorozu-media-filmstrip-clip\]\s*\{[^}]*\}/,
+            )?.[0] ?? ""
+        expect(hostTransition).toContain("opacity")
+        expect(hostTransition).toContain("--yorozu-media-chrome-ms")
+        expect(css).toContain('[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-filmstrip]')
+    })
+
     it("footer sits above the filmstrip when the strip is present and stays at bottom when not", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let footerBlock = css.match(/(?:^|\n)\[data-yorozu-media-footer\]\s*\{[^}]*\}/)?.[0] ?? ""

@@ -151,7 +151,10 @@
 [data-yorozu-media-filmstrip-clip] {
     pointer-events: none;
     z-index: 1;
-    transition: clip-path var(--yorozu-media-chrome-ms) var(--yorozu-media-chrome-hide-ease);
+    opacity: 1;
+    transition:
+        clip-path var(--yorozu-media-chrome-ms) var(--yorozu-media-chrome-hide-ease),
+        opacity var(--yorozu-media-chrome-ms);
 }
 
 [data-yorozu-media-header],
@@ -227,6 +230,26 @@ html.yorozu-media-ghost-handoff [data-yorozu-media-viewport] {
 [data-yorozu-media-viewer][data-phase="closing"] [data-yorozu-media-filmstrip-clip] {
     transition-duration: var(--yorozu-media-chrome-close-ms);
     transition-timing-function: var(--yorozu-media-chrome-hide-ease);
+}
+
+[data-yorozu-media-viewer][data-phase="open"][data-chrome="hidden"] [data-yorozu-media-header],
+[data-yorozu-media-viewer][data-phase="open"][data-chrome="hidden"] [data-yorozu-media-footer],
+[data-yorozu-media-viewer][data-phase="open"][data-chrome="hidden"] [data-yorozu-media-chrome],
+[data-yorozu-media-viewer][data-phase="open"][data-chrome="hidden"] [data-yorozu-media-filmstrip-clip],
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-header],
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-footer],
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-chrome],
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-filmstrip-clip] {
+    opacity: 0;
+    pointer-events: none;
+    transition-timing-function: var(--yorozu-media-chrome-hide-ease);
+}
+
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-header] > *,
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-footer] > *,
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-chrome] > *,
+[data-yorozu-media-viewer][data-chrome="hidden"] [data-yorozu-media-filmstrip] {
+    pointer-events: none;
 }
 
 [data-yorozu-media-filmstrip-clip] {

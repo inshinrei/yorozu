@@ -14,6 +14,7 @@ export type AttachZoomInput = {
     onWheel: (e: WheelEvent) => void
     clearWheelZoomRelease: () => void
     reset: () => void
+    takeChromeTap: () => boolean
 }
 
 export function createZoomInput(opts: {
@@ -29,6 +30,7 @@ export function createZoomInput(opts: {
     let tapX = 0
     let tapY = 0
     let tapMoved = false
+    let chromeTapEligible = false
     let zoomDragging = false
     let dragOriginX = 0
     let dragOriginY = 0
@@ -134,6 +136,7 @@ export function createZoomInput(opts: {
         if (!isZoomable(opts.viewer.snapshot().current)) return
         pinching = true
         tapMoved = true
+        chromeTapEligible = false
         if (zoomDragging) {
             zoomDragging = false
             opts.zoom.endDrag({ withInertia: false })
@@ -164,6 +167,7 @@ export function createZoomInput(opts: {
         }
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
         if (isZoomable(opts.viewer.snapshot().current) && pointers.size >= 2) {
+            chromeTapEligible = false
             if (!pinching) startPinch()
             opts.scheduleRender()
             return
@@ -172,6 +176,7 @@ export function createZoomInput(opts: {
         tapX = e.clientX
         tapY = e.clientY
         tapMoved = false
+        chromeTapEligible = true
         dragOriginX = e.clientX
         dragOriginY = e.clientY
         if (opts.swipe.onPointerDown(e)) {
@@ -185,6 +190,7 @@ export function createZoomInput(opts: {
     function onViewportPointerMove(e: PointerEvent): void {
         if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
         if (pinching && pointers.size >= 2) {
+            chromeTapEligible = false
             e.preventDefault()
             let dist = pinchDistance()
             if (pinchDist > 0 && dist > 0) {
@@ -199,6 +205,7 @@ export function createZoomInput(opts: {
         if (tapPointerId === e.pointerId) {
             if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > TAP_MOVE_PX) {
                 tapMoved = true
+                chromeTapEligible = false
                 if (!zoomDragging && !pinching && isZoomable(opts.viewer.snapshot().current) && opts.zoom.isZoomed()) {
                     opts.zoom.beginDrag()
                     zoomDragging = true
@@ -214,6 +221,7 @@ export function createZoomInput(opts: {
             }
         }
         if (zoomDragging) {
+            chromeTapEligible = false
             e.preventDefault()
             opts.zoom.moveDrag(e.clientX - dragOriginX, e.clientY - dragOriginY, dragStartX, dragStartY)
             opts.scheduleRender()
@@ -226,19 +234,25 @@ export function createZoomInput(opts: {
     function onViewportPointerUp(e: PointerEvent): void {
         pointers.delete(e.pointerId)
         if (pinching) {
+            chromeTapEligible = false
             if (pointers.size < 2) endPinch()
             if (tapPointerId === e.pointerId) tapPointerId = null
             opts.scheduleRender()
             return
         }
         if (zoomDragging) {
+            chromeTapEligible = false
             zoomDragging = false
             opts.zoom.endDrag()
             if (tapPointerId === e.pointerId) tapPointerId = null
             opts.scheduleRender()
             return
         }
+        let swipeMoved = opts.swipe.offsetX() !== 0 || opts.swipe.offsetY() !== 0
         opts.swipe.onPointerUp(e)
+        if (swipeMoved || opts.swipe.offsetX() !== 0 || opts.swipe.offsetY() !== 0) {
+            chromeTapEligible = false
+        }
         if (tapPointerId === e.pointerId) {
             tapPointerId = null
         }
@@ -246,6 +260,7 @@ export function createZoomInput(opts: {
     }
 
     function onViewportPointerCancel(e: PointerEvent): void {
+        chromeTapEligible = false
         pointers.delete(e.pointerId)
         if (pinching) {
             if (pointers.size < 2) endPinch()
@@ -287,10 +302,18 @@ export function createZoomInput(opts: {
         opts.scheduleRender()
     }
 
+    function takeChromeTap(): boolean {
+        if (!chromeTapEligible) return false
+        chromeTapEligible = false
+        return true
+    }
+
     function reset(): void {
         clearWheelZoomRelease()
         zoomDragging = false
         tapPointerId = null
+        tapMoved = false
+        chromeTapEligible = false
         pointers.clear()
         pinching = false
         pinchOrigin = null
@@ -307,5 +330,6 @@ export function createZoomInput(opts: {
         onWheel: onViewportWheel,
         clearWheelZoomRelease,
         reset,
+        takeChromeTap,
     }
 }
