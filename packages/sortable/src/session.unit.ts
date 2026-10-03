@@ -116,6 +116,7 @@ afterEach(() => {
     vi.useRealTimers()
     rafRestore?.()
     rafRestore = null
+    document.body.replaceChildren()
 })
 
 function setup(opts?: {
@@ -158,6 +159,36 @@ function registerKeys(
     axis: SortableAxis = "y",
 ) {
     return keys.map((key, i) => session.registerItem(fakeEl(i * size, size, axis), key))
+}
+
+function mountFocusable(
+    session: ReturnType<typeof createSortableSession<string>>,
+    keys: string[],
+    size = 40,
+    axis: SortableAxis = "y",
+): Map<string, HTMLElement> {
+    let nodes = new Map<string, HTMLElement>()
+    for (let i = 0; i < keys.length; i++) {
+        let key = keys[i]!
+        let el = fakeEl(i * size, size, axis)
+        el.tabIndex = 0
+        document.body.append(el)
+        session.registerItem(el, key)
+        nodes.set(key, el)
+    }
+    return nodes
+}
+
+function press(el: HTMLElement, key: string, init?: KeyboardEventInit): KeyboardEvent {
+    el.focus()
+    let ev = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+    })
+    el.dispatchEvent(ev)
+    return ev
 }
 
 describe("createSortableSession", () => {
@@ -416,6 +447,176 @@ describe("createSortableSession", () => {
         upAt(0, 70)
         expect(session.isActive).toBe(false)
         expect(session.draggingKey).toBeNull()
+    })
+
+    it("Space on a focused registered item lifts without onReorder; Enter does the same", () => {
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"] })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        expect(session.isActive).toBe(true)
+        expect(session.draggingKey).toBe("a")
+        expect(onReorder).not.toHaveBeenCalled()
+        session.cancel()
+
+        let { session: enterSession, onReorder: enterReorder } = setup({ items: ["a", "b", "c", "d"] })
+        let enterNodes = mountFocusable(enterSession, ["a", "b", "c", "d"])
+        press(enterNodes.get("a")!, "Enter")
+        expect(enterSession.isActive).toBe(true)
+        expect(enterSession.draggingKey).toBe("a")
+        expect(enterReorder).not.toHaveBeenCalled()
+    })
+
+    it("Space, ArrowDown, Space reorders a after b", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"], onDragEnd })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        press(nodes.get("a")!, "ArrowDown")
+        press(nodes.get("a")!, " ")
+        expect(onReorder).toHaveBeenCalledTimes(1)
+        expect(onReorder.mock.calls[0]![0]).toEqual(["b", "a", "c", "d"])
+        expect(onDragEnd).toHaveBeenCalledWith("pointerup")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("Space, three ArrowDown, Space moves a to the end", () => {
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"] })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        press(nodes.get("a")!, "ArrowDown")
+        press(nodes.get("a")!, "ArrowDown")
+        press(nodes.get("a")!, "ArrowDown")
+        press(nodes.get("a")!, " ")
+        expect(onReorder.mock.calls[0]![0]).toEqual(["b", "c", "d", "a"])
+    })
+
+    it("Escape cancels a keyboard grab without onReorder", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"], onDragEnd })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        press(nodes.get("a")!, "Escape")
+        expect(onReorder).not.toHaveBeenCalled()
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("focusout outside the grabbed node cancels; focusout onto a child does not", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"], onDragEnd })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        let a = nodes.get("a")!
+        let child = document.createElement("span")
+        child.tabIndex = 0
+        a.append(child)
+        press(a, " ")
+        expect(session.isActive).toBe(true)
+        a.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: child }))
+        expect(session.isActive).toBe(true)
+        let outside = document.createElement("div")
+        outside.tabIndex = 0
+        document.body.append(outside)
+        a.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: outside }))
+        expect(onReorder).not.toHaveBeenCalled()
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("pointer preview ignores arrows; Escape cancels", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"], onDragEnd })
+        mountFocusable(session, ["a", "b", "c", "d"])
+        session.activate("a", 0, 20)
+        let insert = session.insertIndex
+        expect(session.isActive).toBe(true)
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }))
+        expect(session.insertIndex).toBe(insert)
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+        expect(onReorder).not.toHaveBeenCalled()
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("HOLD pending Escape never becomes active and does not onDragEnd", () => {
+        vi.useFakeTimers()
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({
+            items: ["a", "b", "c", "d"],
+            activation: HOLD_ACTIVATION,
+            onDragEnd,
+        })
+        mountFocusable(session, ["a", "b", "c", "d"])
+        session.pointerDown("a", pointer("pointerdown", 0, 20))
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+        expect(session.isActive).toBe(false)
+        expect(onReorder).not.toHaveBeenCalled()
+        expect(onDragEnd).not.toHaveBeenCalled()
+    })
+
+    it("Space on an input child does not grab; after grab, Space on an input child does not drop; Escape still cancels", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"], onDragEnd })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        let a = nodes.get("a")!
+        let input = document.createElement("input")
+        a.append(input)
+        press(input, " ")
+        expect(session.isActive).toBe(false)
+        press(a, " ")
+        expect(session.isActive).toBe(true)
+        press(input, " ")
+        expect(session.isActive).toBe(true)
+        expect(onReorder).not.toHaveBeenCalled()
+        press(input, "Escape")
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("canDragKey false refuses Space grab", () => {
+        let { session } = setup({ items: ["a", "b", "c", "d"], canDragKey: () => false })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("keyboard getOffset on the active key is the start delta toward the destination", () => {
+        let { session } = setup({ items: ["a", "b", "c", "d"], getItemSize: () => 40 })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        press(nodes.get("a")!, "ArrowDown")
+        expect(session.getOffset("a")).toBe(40)
+        expect(session.getOffset("b")).toBe(-40)
+    })
+
+    it("ctrlKey Space does not grab", () => {
+        let { session } = setup({ items: ["a", "b", "c", "d"] })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ", { ctrlKey: true })
+        expect(session.isActive).toBe(false)
+    })
+
+    it("keydown repeat ArrowDown steps again", () => {
+        let { session, onReorder } = setup({ items: ["a", "b", "c", "d"] })
+        let nodes = mountFocusable(session, ["a", "b", "c", "d"])
+        press(nodes.get("a")!, " ")
+        press(nodes.get("a")!, "ArrowDown", { repeat: true })
+        press(nodes.get("a")!, "ArrowDown", { repeat: true })
+        press(nodes.get("a")!, " ")
+        expect(onReorder.mock.calls[0]![0]).toEqual(["b", "c", "a", "d"])
+    })
+
+    it("destroying the last registered item during a keyboard grab cancels", () => {
+        let onDragEnd = vi.fn()
+        let { session } = setup({ items: ["a"], onDragEnd })
+        let el = fakeEl(0, 40, "y")
+        el.tabIndex = 0
+        document.body.append(el)
+        let handle = session.registerItem(el, "a")
+        press(el, " ")
+        expect(session.isActive).toBe(true)
+        handle.destroy()
+        expect(session.isActive).toBe(false)
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
     })
 })
 

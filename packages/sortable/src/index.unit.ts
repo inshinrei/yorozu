@@ -31,4 +31,11 @@ describe("package barrel", () => {
         expect("flowShiftDestIndex" in sortable).toBe(false)
         expect("flowRectDelta" in sortable).toBe(false)
     })
+
+    it("does not export keyboard helper", () => {
+        expect("attachSortableKeyboard" in sortable).toBe(false)
+        expect("isTypingField" in sortable).toBe(false)
+        expect("destinationToInsertIndex" in sortable).toBe(false)
+        expect("stepDestination" in sortable).toBe(false)
+    })
 })

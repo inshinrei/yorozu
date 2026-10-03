@@ -14,6 +14,7 @@ import {
     createSortableAutoScroll,
     pointerOnAxis,
 } from "./auto-scroll"
+import { attachSortableKeyboard, destinationToInsertIndex } from "./keyboard"
 
 export type { SortableAxis }
 export { HOLD_ACTIVATION, POINTER_ACTIVATION, SORTABLE_FEEL, type SortableActivation }
@@ -98,6 +99,7 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
     let captureEl: Element | null = null
     let delayTimer: ReturnType<typeof setTimeout> | null = null
     let documentCleanup: (() => void) | null = null
+    let keyboardGrab = false
 
     let autoScroll = createSortableAutoScroll({
         axis,
@@ -198,7 +200,16 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         let a = baseKeys.indexOf(draggingKey)
         let i = baseKeys.indexOf(key)
         if (a < 0 || i < 0) return 0
-        if (i === a) return pointerDelta() + autoScroll.scrollDelta
+        if (i === a) {
+            if (keyboardGrab) {
+                let dest = toTargetIndex(a, insertIndex)
+                let from = snapshots[a]
+                let to = snapshots[dest]
+                if (!from || !to) return 0
+                return to.start - from.start
+            }
+            return pointerDelta() + autoScroll.scrollDelta
+        }
         let o = toTargetIndex(a, insertIndex)
         let shift = getShift()
         if (i > a && i <= o) return -shift
@@ -215,6 +226,7 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         autoScroll.stop()
         autoScroll.begin(null)
         draggingKey = null
+        keyboardGrab = false
         insertIndex = null
         baseItems = []
         baseKeys = []
@@ -412,8 +424,50 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
         }
     }
 
+    function grabFromKeyboard(key: string | number): void {
+        if (draggingKey != null) return
+        let el = itemEls.get(key)
+        if (!el) return
+        let r = el.getBoundingClientRect()
+        startX = r.left + r.width / 2
+        startY = r.top + r.height / 2
+        lastX = startX
+        lastY = startY
+        currentX = startX
+        currentY = startY
+        becomeActive(key)
+        if (draggingKey == null) return
+        keyboardGrab = true
+        autoScroll.stop()
+        autoScroll.begin(null)
+        let srcIdx = baseKeys.indexOf(key)
+        if (srcIdx >= 0) insertIndex = srcIdx
+        notify()
+    }
+
+    function moveToDestination(dest: number): void {
+        if (!keyboardGrab || draggingKey == null) return
+        let srcIdx = baseKeys.indexOf(draggingKey)
+        if (srcIdx < 0) return
+        insertIndex = destinationToInsertIndex(srcIdx, dest)
+        notify()
+    }
+
+    function dropKeyboard(): void {
+        if (!keyboardGrab || draggingKey == null || insertIndex == null) return
+        endDrag(insertIndex)
+    }
+
+    function srcAndInsert(): { srcIdx: number; insertIndex: number; length: number } | null {
+        if (draggingKey == null || insertIndex == null || baseKeys.length === 0) return null
+        let srcIdx = baseKeys.indexOf(draggingKey)
+        if (srcIdx < 0) return null
+        return { srcIdx, insertIndex, length: baseKeys.length }
+    }
+
     function registerItem(node: HTMLElement, key: string | number): SortableItemHandle {
         itemEls.set(key, node)
+        keyboard.onRegister()
         return {
             update(nextKey: string | number) {
                 if (nextKey === key) return
@@ -423,9 +477,23 @@ export function createSortableSession<T>(options: SortableSessionOptions<T>): So
             },
             destroy() {
                 if (itemEls.get(key) === node) itemEls.delete(key)
+                keyboard.onUnregister()
             },
         }
     }
+
+    let keyboard = attachSortableKeyboard({
+        itemEls,
+        getPending: () => pendingKey != null,
+        getDraggingKey: () => draggingKey,
+        getKeyboardGrab: () => keyboardGrab,
+        canDragKey: (key) => (options.canDragKey ? options.canDragKey(key) : true),
+        grab: grabFromKeyboard,
+        moveTo: moveToDestination,
+        drop: dropKeyboard,
+        cancel,
+        srcAndInsert,
+    })
 
     return {
         get draggingKey(): string | number | null {
