@@ -1,6 +1,6 @@
 # @yorozu/media-viewer
 
-Framework-agnostic media gallery overlay: session, gestures, zoom, ghost flight, and chrome slots. You own chrome DOM; this package paints the stage and drives pointers.
+Framework-agnostic media gallery overlay: session, gestures, zoom, ghost flight, and chrome slots. You own chrome DOM; this package paints the stage and drives pointers. A click on the stage fades header, footer, overlay chrome, and filmstrip in 150ms; a second click shows them.
 
 ## Install
 
@@ -60,7 +60,7 @@ Map `stage` to `pri: "visible"` and peeks/thumbs to `"preload"`. Abort ids that 
 
 `filmstrip: false` turns the package strip off. `true` or omit paints today's full in-flow strip. `{ virtualize: true }` windows thumbs with `@yorozu/virtual-list` using absolute `left` (not a `translateX` window).
 
-Current and neighbors share `--yorozu-media-filmstrip-thumb-h`. Current width follows the item aspect at that height, capped by `--yorozu-media-filmstrip-current-w` (`10rem`) and floored at neighbor width. Extra `--yorozu-media-filmstrip-current-gap` (`8px`) sits beside current; neighbors use `2px`. Album swipe morphs the current thumb and the incoming neighbor with the pager; the strip follows that pair. Overflowing albums fade `2rem` at each clip edge (`--yorozu-media-filmstrip-clip-fade`). Fitting albums keep first/last thumb half-fade. `@media (max-width: 40rem)` makes the clip 100% wide and sets `--yorozu-media-pad-x: 0`; stage-gap is kept. Selection motion is 0.2s (nav) / 0.4s (tap) with hero ease.
+Current and neighbors share `--yorozu-media-filmstrip-thumb-h`. Current width follows the item aspect at that height, capped by `--yorozu-media-filmstrip-current-w` (`10rem`) and floored at neighbor width. Extra `--yorozu-media-filmstrip-current-gap` (`8px`) sits beside current; neighbors use `2px`. Album swipe morphs the current thumb and the incoming neighbor with the pager; the strip follows that pair. Overflowing albums inset the strip so first/last rest on the clip center; that-side `2rem` clip fade is off at that end (`--yorozu-media-filmstrip-clip-fade`). Fitting albums keep first/last thumb half-fade. `@media (max-width: 40rem)` makes the clip 100% wide and sets `--yorozu-media-pad-x: 0`; stage-gap is kept. Selection motion is 0.2s (nav) / 0.4s (tap) with hero ease.
 
 Virtualize mixed default uses those pitches: the current cell from aspect at `thumb-h` (capped by `--yorozu-media-filmstrip-current-w`), neighbors `--yorozu-media-filmstrip-thumb-w`, plus the current/neighbor gaps (CSS `gap` does not apply to absolute thumbs). Pass a number for `itemSizePx` for a uniform pitch, or `{ neighbor, current }` for explicit pitches. `itemSizePx` stays an explicit-pitch override.
 

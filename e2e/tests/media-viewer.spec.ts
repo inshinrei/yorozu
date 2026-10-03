@@ -142,23 +142,13 @@ test("V9 current thumb stays centered in the filmstrip clip", async ({ page }) =
 
     await page.locator('[data-yorozu-media-thumb][data-index="0"]').click()
     await expectIndex(page, 0)
-    await expect
-        .poll(async () => {
-            let delta = await thumbCenterDelta(page)
-            return delta != null && delta <= 2
-        })
-        .toBe(true)
+    await expect.poll(async () => Math.abs((await thumbCenterDelta(page)) ?? 999)).toBeLessThanOrEqual(12)
 
     let last = page.locator("[data-yorozu-media-thumb]").last()
     let lastIndex = (await page.locator("[data-yorozu-media-thumb]").count()) - 1
     await last.click()
     await expectIndex(page, lastIndex)
-    await expect
-        .poll(async () => {
-            let delta = await thumbCenterDelta(page)
-            return delta != null && delta >= -2
-        })
-        .toBe(true)
+    await expect.poll(async () => Math.abs((await thumbCenterDelta(page)) ?? 999)).toBeLessThanOrEqual(12)
 })
 
 test("V10 horizontal swipe >50px on the viewport changes item", async ({ page }) => {
@@ -408,6 +398,8 @@ test("long filmstrip overflows with clip-edge fade", async ({ page }) => {
     let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
     await expect(nav).toHaveAttribute("data-overflow", "true")
     await expect(clip).toHaveAttribute("data-overflow", "true")
+    await expect(clip).toHaveAttribute("data-fade-start", "false")
+    await expect(clip).toHaveAttribute("data-fade-end", "true")
     await expect(page.locator("[data-yorozu-media-thumb][data-edge]")).toHaveCount(0)
     let mask = await clip.evaluate((el) => {
         let cs = getComputedStyle(el)
@@ -415,6 +407,29 @@ test("long filmstrip overflows with clip-edge fade", async ({ page }) => {
     })
     expect(mask).not.toBe("none")
     expect(mask.toLowerCase()).toContain("linear-gradient")
+
+    await page.locator('[data-yorozu-media-thumb][data-index="10"]').click()
+    await expectIndex(page, 10)
+    await expect(clip).toHaveAttribute("data-fade-start", "true")
+    await expect(clip).toHaveAttribute("data-fade-end", "true")
+})
+
+test("stage click fades chrome and a second click shows it", async ({ page }) => {
+    await openFromThumb(page, "img-0")
+    await activeStage(page).click()
+    await expect(viewer(page)).toHaveAttribute("data-chrome", "hidden")
+    let headerOpacity = await page.locator("[data-yorozu-media-header]").evaluate((el) => getComputedStyle(el).opacity)
+    let clipOpacity = await page
+        .locator("[data-yorozu-media-filmstrip-clip]")
+        .evaluate((el) => getComputedStyle(el).opacity)
+    expect(Number(headerOpacity)).toBe(0)
+    expect(Number(clipOpacity)).toBe(0)
+    await activeStage(page).click()
+    await expect(viewer(page)).not.toHaveAttribute("data-chrome", "hidden")
+    headerOpacity = await page.locator("[data-yorozu-media-header]").evaluate((el) => getComputedStyle(el).opacity)
+    expect(Number(headerOpacity)).toBe(1)
+    await page.locator("#chrome-close").click()
+    await waitGone(viewer(page))
 })
 
 test("640px overlay uses a full-width strip and zero stage pad-x", async ({ page }) => {
