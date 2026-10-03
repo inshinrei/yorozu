@@ -33,23 +33,8 @@ export function filmstripOverflows(totalSize: number, viewportWidth: number): bo
     return totalSize > viewportWidth
 }
 
-export const FILMSTRIP_EDGE_FADE_EPS_PX: number = 0.5
-
 export function filmstripEndInsetPx(itemWidth: number, viewportWidth: number): number {
     return Math.max(0, viewportWidth / 2 - itemWidth / 2)
-}
-
-export function filmstripEdgeFade(opts: { scrollLeft: number; maxLeft: number; overflows: boolean }): {
-    start: boolean
-    end: boolean
-} {
-    if (!opts.overflows) {
-        return { start: false, end: false }
-    }
-    return {
-        start: opts.scrollLeft > FILMSTRIP_EDGE_FADE_EPS_PX,
-        end: opts.scrollLeft < opts.maxLeft - FILMSTRIP_EDGE_FADE_EPS_PX,
-    }
 }
 
 function lerp(from: number, to: number, t: number): number {

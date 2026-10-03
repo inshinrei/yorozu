@@ -7,13 +7,11 @@ import {
     MEDIA_SWIPE_SLIDE_GAP_PX,
 } from "./swipe"
 import {
-    FILMSTRIP_EDGE_FADE_EPS_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_PX,
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
-    filmstripEdgeFade,
     filmstripEndInsetPx,
     filmstripGapAfter,
     filmstripGapAfterAtProgress,
@@ -425,45 +423,5 @@ describe("filmstripCentersScrollLeft pads", () => {
         })
         expect(left).toBe(20)
         expect(left).toBeGreaterThan(0)
-    })
-})
-
-describe("filmstripEdgeFade", () => {
-    it("is both false when the strip does not overflow", () => {
-        expect(filmstripEdgeFade({ scrollLeft: 10, maxLeft: 100, overflows: false })).toEqual({
-            start: false,
-            end: false,
-        })
-    })
-
-    it("turns start off at 0 and end off at maxLeft", () => {
-        expect(filmstripEdgeFade({ scrollLeft: 0, maxLeft: 360, overflows: true })).toEqual({
-            start: false,
-            end: true,
-        })
-        expect(filmstripEdgeFade({ scrollLeft: 360, maxLeft: 360, overflows: true })).toEqual({
-            start: true,
-            end: false,
-        })
-        expect(filmstripEdgeFade({ scrollLeft: 180, maxLeft: 360, overflows: true })).toEqual({
-            start: true,
-            end: true,
-        })
-    })
-
-    it("treats within EPS of an end as that end", () => {
-        expect(FILMSTRIP_EDGE_FADE_EPS_PX).toBe(0.5)
-        expect(filmstripEdgeFade({ scrollLeft: 0.5, maxLeft: 360, overflows: true })).toEqual({
-            start: false,
-            end: true,
-        })
-        expect(filmstripEdgeFade({ scrollLeft: 0.51, maxLeft: 360, overflows: true })).toEqual({
-            start: true,
-            end: true,
-        })
-        expect(filmstripEdgeFade({ scrollLeft: 359.5, maxLeft: 360, overflows: true })).toEqual({
-            start: true,
-            end: false,
-        })
     })
 })

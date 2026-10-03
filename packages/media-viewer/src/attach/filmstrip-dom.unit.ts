@@ -735,26 +735,31 @@ describe("attachMediaViewer", () => {
         Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
         viewer.setItems(items, 0)
         let track = nav.querySelector('[role="list"]') as HTMLElement
-        let startPad = Number.parseFloat(track.style.marginInlineStart)
-        expect(startPad).toBeGreaterThan(0)
-        expect(Number.parseFloat(track.style.marginInlineEnd)).toBeGreaterThan(0)
+        let neighborWidth = 44
+        expect(Number.parseFloat(track.style.marginInlineStart)).toBe(filmstripEndInsetPx(neighborWidth, 200))
+        expect(Number.parseFloat(track.style.marginInlineEnd)).toBe(filmstripEndInsetPx(neighborWidth, 200))
         expect(nav.scrollLeft).toBe(0)
         let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
         expect(clip.getAttribute("data-overflow")).toBe("true")
-        expect(clip.getAttribute("data-fade-start")).toBe("false")
-        expect(clip.getAttribute("data-fade-end")).toBe("true")
+        expect(clip.hasAttribute("data-fade-start")).toBe(false)
+        expect(clip.hasAttribute("data-fade-end")).toBe(false)
     })
 
-    it("overflowing last index turns end fade off", () => {
+    it("overflowing clip fade attrs stay off when moving from first to second", () => {
         let items = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
         viewer.open({ items, index: 0 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
         Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
         viewer.setItems(items, 0)
-        viewer.goTo(19)
         let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
-        expect(clip.getAttribute("data-fade-start")).toBe("true")
-        expect(clip.getAttribute("data-fade-end")).toBe("false")
+        expect(clip.hasAttribute("data-fade-start")).toBe(false)
+        expect(clip.hasAttribute("data-fade-end")).toBe(false)
+        viewer.goTo(1)
+        expect(clip.hasAttribute("data-fade-start")).toBe(false)
+        expect(clip.hasAttribute("data-fade-end")).toBe(false)
+        viewer.goTo(19)
+        expect(clip.hasAttribute("data-fade-start")).toBe(false)
+        expect(clip.hasAttribute("data-fade-end")).toBe(false)
     })
 
     it("fitting strip keeps edge thumbs and no list end insets", () => {
@@ -770,8 +775,8 @@ describe("attachMediaViewer", () => {
         expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
         expect(thumbs[1]?.getAttribute("data-edge")).toBe("end")
         let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
-        expect(clip.getAttribute("data-fade-start")).toBe("false")
-        expect(clip.getAttribute("data-fade-end")).toBe("false")
+        expect(clip.hasAttribute("data-fade-start")).toBe(false)
+        expect(clip.hasAttribute("data-fade-end")).toBe(false)
     })
 
     it("virtual default paints content width and current-gap gutter", () => {

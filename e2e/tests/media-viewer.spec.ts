@@ -398,20 +398,25 @@ test("long filmstrip overflows with clip-edge fade", async ({ page }) => {
     let clip = page.locator("[data-yorozu-media-filmstrip-clip]")
     await expect(nav).toHaveAttribute("data-overflow", "true")
     await expect(clip).toHaveAttribute("data-overflow", "true")
-    await expect(clip).toHaveAttribute("data-fade-start", "false")
-    await expect(clip).toHaveAttribute("data-fade-end", "true")
+    await expect(clip).not.toHaveAttribute("data-fade-start")
+    await expect(clip).not.toHaveAttribute("data-fade-end")
     await expect(page.locator("[data-yorozu-media-thumb][data-edge]")).toHaveCount(0)
-    let mask = await clip.evaluate((el) => {
+    let maskAtFirst = await clip.evaluate((el) => {
         let cs = getComputedStyle(el)
         return cs.maskImage || cs.webkitMaskImage
     })
-    expect(mask).not.toBe("none")
-    expect(mask.toLowerCase()).toContain("linear-gradient")
+    expect(maskAtFirst).not.toBe("none")
+    expect(maskAtFirst.toLowerCase()).toContain("linear-gradient")
 
     await page.locator('[data-yorozu-media-thumb][data-index="10"]').click()
     await expectIndex(page, 10)
-    await expect(clip).toHaveAttribute("data-fade-start", "true")
-    await expect(clip).toHaveAttribute("data-fade-end", "true")
+    await expect(clip).not.toHaveAttribute("data-fade-start")
+    await expect(clip).not.toHaveAttribute("data-fade-end")
+    let maskAtMid = await clip.evaluate((el) => {
+        let cs = getComputedStyle(el)
+        return cs.maskImage || cs.webkitMaskImage
+    })
+    expect(maskAtMid).toBe(maskAtFirst)
 })
 
 test("stage click fades chrome and a second click shows it", async ({ page }) => {

@@ -364,4 +364,24 @@ describe("attachMediaViewer", () => {
         tapViewport(root)
         expect(overlay.hasAttribute("data-chrome")).toBe(false)
     })
+
+    it("hidden chrome stays hidden across goTo", () => {
+        viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
+        tapViewport(root)
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        expect(overlay.getAttribute("data-chrome")).toBe("hidden")
+        viewer.goTo(1)
+        expect(overlay.getAttribute("data-chrome")).toBe("hidden")
+        expect(viewer.snapshot().index).toBe(1)
+    })
+
+    it("pointercancel does not toggle chrome on the following click", () => {
+        viewer.open({ items: [img("a")] })
+        let overlay = root.querySelector("[data-yorozu-media-viewer]") as HTMLElement
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointercancel", { clientX: 200, clientY: 200 }))
+        viewport.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 200, clientY: 200 }))
+        expect(overlay.hasAttribute("data-chrome")).toBe(false)
+    })
 })

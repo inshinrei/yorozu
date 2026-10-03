@@ -312,34 +312,18 @@ describe("default media viewer styles", () => {
         expect(css).toContain("linear-gradient(to left, transparent, #000 50%)")
     })
 
-    it("overflowing clip fades at both edges without :has()", () => {
+    it("overflowing clip fades at both edges without :has() or selected-end attrs", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         expect(css).toContain('[data-yorozu-media-filmstrip-clip][data-overflow="true"]')
         expect(css).toContain("--yorozu-media-filmstrip-clip-fade")
         expect(css).toContain("-webkit-mask-image")
+        expect(css).not.toContain("data-fade-start")
+        expect(css).not.toContain("data-fade-end")
         let clipOverflow =
-            css.match(
-                /\[data-yorozu-media-filmstrip-clip\]\[data-overflow="true"\]\[data-fade-start="true"\]\[data-fade-end="true"\]\s*\{[^}]*\}/,
-            )?.[0] ?? ""
-        expect(clipOverflow).toContain("mask-image")
-        expect(clipOverflow).not.toContain(":has(")
-    })
-
-    it("overflowing clip fade is per-edge from data-fade-start/end", () => {
-        let css = readFileSync(join(here, "default.css"), "utf8")
-        expect(css).toContain('[data-fade-start="true"]')
-        expect(css).toContain('[data-fade-end="true"]')
-        expect(css).toContain('[data-fade-start="false"]')
-        expect(css).toContain('[data-fade-end="false"]')
-        expect(css).not.toMatch(/\[data-yorozu-media-filmstrip-clip\][^{]*:has\(/)
-        let both =
-            css.match(
-                /\[data-yorozu-media-filmstrip-clip\]\[data-overflow="true"\]\[data-fade-start="true"\]\[data-fade-end="true"\]\s*\{[^}]*\}/,
-            )?.[0] ?? ""
-        expect(both).toContain("mask-image")
-        let overflowOnly =
             css.match(/(?:^|\n)\[data-yorozu-media-filmstrip-clip\]\[data-overflow="true"\]\s*\{[^}]*\}/)?.[0] ?? ""
-        expect(overflowOnly).toBe("")
+        expect(clipOverflow).toContain("mask-image")
+        expect(clipOverflow).toContain("--yorozu-media-filmstrip-clip-fade")
+        expect(clipOverflow).not.toContain(":has(")
     })
 
     it("fitting overflow-false keeps thumb data-edge fades and does not mask the clip", () => {
