@@ -4,6 +4,8 @@ import { applyCanvasImageSource, type MediaDecodePort } from "../decode"
 import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
+    filmstripEdgeFade,
+    filmstripEndInsetPx,
     filmstripGapAfterAtProgress,
     filmstripInterpolatedWidthPx,
     filmstripOverflows,
@@ -389,6 +391,83 @@ export function createFilmstripDom(opts: {
         return total
     }
 
+    function filmstripContentTotalSize(
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): number {
+        if (opts.viewer.filmstripVirtualize() && filmstripList != null) return filmstripList.totalSize()
+        return filmstripInFlowTotalSize(snap, morph, metrics)
+    }
+
+    function filmstripScrollGeometry(
+        snap: MediaViewerSnapshot,
+        morph: { progress: number; neighborIndex: number | null },
+        metrics: FilmstripMetrics,
+    ): {
+        viewportWidth: number
+        totalSize: number
+        overflows: boolean
+        startPad: number
+        endPad: number
+    } {
+        let viewportWidth = filmstripEl?.clientWidth ?? 0
+        let contentSize = filmstripContentTotalSize(snap, morph, metrics)
+        let overflows = filmstripOverflows(contentSize, viewportWidth)
+        let lastIndex = snap.items.length - 1
+        let trailing = 0
+        if (lastIndex >= 0) {
+            trailing = Math.max(
+                0,
+                filmstripPitchAt(lastIndex, snap, morph, metrics) - filmstripWidthAt(lastIndex, snap, morph, metrics),
+            )
+        }
+        // Last pitch includes gap after the last thumb; clamp/fade use the last thumb's trailing edge.
+        let totalSize = Math.max(0, contentSize - trailing)
+        if (!overflows || snap.items.length === 0) {
+            return { viewportWidth, totalSize, overflows, startPad: 0, endPad: 0 }
+        }
+        let startPad = filmstripEndInsetPx(filmstripWidthAt(0, snap, morph, metrics), viewportWidth)
+        let endPad = filmstripEndInsetPx(filmstripWidthAt(lastIndex, snap, morph, metrics), viewportWidth)
+        return { viewportWidth, totalSize, overflows, startPad, endPad }
+    }
+
+    function applyFilmstripEndPads(startPad: number, endPad: number, overflows: boolean): void {
+        if (!filmstripEl) return
+        let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+        if (!track) return
+        if (overflows) {
+            track.style.marginInlineStart = `${startPad}px`
+            track.style.marginInlineEnd = `${endPad}px`
+            return
+        }
+        track.style.marginInlineStart = ""
+        track.style.marginInlineEnd = ""
+    }
+
+    function stampFilmstripClipFade(scrollLeft: number, maxLeft: number, overflows: boolean): void {
+        if (!filmstripEl) return
+        let fade = filmstripEdgeFade({ scrollLeft, maxLeft, overflows })
+        let clip = filmstripEl.parentElement
+        if (!clip?.hasAttribute("data-yorozu-media-filmstrip-clip")) return
+        clip.setAttribute("data-fade-start", fade.start ? "true" : "false")
+        clip.setAttribute("data-fade-end", fade.end ? "true" : "false")
+    }
+
+    function stampFilmstripClipFadeFromGeo(
+        scrollLeft: number,
+        geo: {
+            viewportWidth: number
+            totalSize: number
+            overflows: boolean
+            startPad: number
+            endPad: number
+        },
+    ): void {
+        let maxLeft = Math.max(0, geo.startPad + geo.totalSize + geo.endPad - geo.viewportWidth)
+        stampFilmstripClipFade(scrollLeft, maxLeft, geo.overflows)
+    }
+
     function filmstripVirtualPitch(index: number): number {
         let snap = opts.viewer.snapshot()
         let metrics = filmstripPaintMetrics()
@@ -452,48 +531,48 @@ export function createFilmstripDom(opts: {
         let landRestScroll = filmstripLiveScroll && !morph.live
         filmstripLiveScroll = morph.live
         if (!morph.live && !landRestScroll) return
-        let viewportWidth = filmstripEl.clientWidth
-        let totalSize =
-            opts.viewer.filmstripVirtualize() && filmstripList != null
-                ? filmstripList.totalSize()
-                : filmstripInFlowTotalSize(snap, morph, metrics)
-        let fromCenter = filmstripCenterAt(snap.index, snap, morph, metrics)
+        let geo = filmstripScrollGeometry(snap, morph, metrics)
+        let fromCenter = geo.startPad + filmstripCenterAt(snap.index, snap, morph, metrics)
         let toCenter =
-            morph.neighborIndex == null ? fromCenter : filmstripCenterAt(morph.neighborIndex, snap, morph, metrics)
+            morph.neighborIndex == null
+                ? fromCenter
+                : geo.startPad + filmstripCenterAt(morph.neighborIndex, snap, morph, metrics)
         let left = filmstripCentersScrollLeft({
             fromCenter,
             toCenter,
             progress: morph.progress,
-            viewportWidth,
-            totalSize,
+            viewportWidth: geo.viewportWidth,
+            totalSize: geo.totalSize,
+            startPad: geo.startPad,
+            endPad: geo.endPad,
         })
         filmstripEl.scrollLeft = left
         if (opts.viewer.filmstripVirtualize()) syncFilmstripScroll(left)
+        stampFilmstripClipFadeFromGeo(left, geo)
     }
 
     function stampFilmstripOverflow(): void {
         if (!filmstripEl) return
         let snap = opts.viewer.snapshot()
-        let viewportWidth = filmstripEl.clientWidth
-        let totalSize =
-            opts.viewer.filmstripVirtualize() && filmstripList != null
-                ? filmstripList.totalSize()
-                : filmstripEl.scrollWidth
-        let overflows = filmstripOverflows(totalSize, viewportWidth)
-        filmstripEl.setAttribute("data-overflow", overflows ? "true" : "false")
+        let metrics = filmstripPaintMetrics()
+        let morph = filmstripMorph(snap)
+        let geo = filmstripScrollGeometry(snap, morph, metrics)
+        applyFilmstripEndPads(geo.startPad, geo.endPad, geo.overflows)
+        filmstripEl.setAttribute("data-overflow", geo.overflows ? "true" : "false")
         let clip = filmstripEl.parentElement
         if (clip?.hasAttribute("data-yorozu-media-filmstrip-clip")) {
-            clip.setAttribute("data-overflow", overflows ? "true" : "false")
+            clip.setAttribute("data-overflow", geo.overflows ? "true" : "false")
         }
         let lastIndex = snap.items.length - 1
         for (let el of filmstripEl.querySelectorAll("[data-yorozu-media-thumb]")) {
             if (!(el instanceof HTMLElement)) continue
             el.removeAttribute("data-edge")
-            if (overflows) continue
+            if (geo.overflows) continue
             let index = Number(el.getAttribute("data-index"))
             if (index === 0) el.setAttribute("data-edge", "start")
             else if (index === lastIndex) el.setAttribute("data-edge", "end")
         }
+        stampFilmstripClipFadeFromGeo(filmstripEl.scrollLeft, geo)
     }
 
     function observeFilmstripNav(nav: HTMLElement): void {
@@ -616,6 +695,7 @@ export function createFilmstripDom(opts: {
     function onFilmstripScroll(): void {
         if (!filmstripEl) return
         syncFilmstripScroll(filmstripEl.scrollLeft)
+        stampFilmstripOverflow()
     }
 
     function rebuildThumbs(track: HTMLElement, snap: MediaViewerSnapshot): void {
@@ -704,48 +784,31 @@ export function createFilmstripDom(opts: {
 
     function centerCurrentThumb(behavior: ScrollBehavior): void {
         if (!filmstripEl) return
-        if (opts.viewer.filmstripVirtualize()) {
-            let snap = opts.viewer.snapshot()
-            let index = snap.index
-            let currentExtent = opts.viewer.filmstripItemSizePx()
-            if (!opts.viewer.filmstripExplicitItemSize()) {
-                currentExtent = filmstripContentWidthPx(
-                    snap.items[index],
-                    filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]"),
-                )
-            }
-            let viewportWidth = filmstripEl.clientWidth
-            let sizes = opts.viewer.filmstripItemSizes()
-            let count = snap.items.length
-            let rowTop = filmstripList != null ? filmstripList.rowTop(index) : index * sizes.neighbor
-            let left = rowTop + currentExtent / 2 - viewportWidth / 2
-            let totalSize = 0
-            if (filmstripList != null) totalSize = filmstripList.totalSize()
-            else if (count > 0) totalSize = (count - 1) * sizes.neighbor + sizes.current
-            let maxLeft = Math.max(0, totalSize - viewportWidth)
-            if (left < 0) left = 0
-            if (left > maxLeft) left = maxLeft
-            if (typeof filmstripEl.scrollTo === "function") {
-                filmstripEl.scrollTo({ left, behavior })
-            } else {
-                filmstripEl.scrollLeft = left
-            }
-            // Smooth: live scrollLeft is still the old offset; let the scroll event drive the engine.
-            if (behavior === "smooth") return
-            syncFilmstripScroll(left)
-            return
-        }
-        let current = filmstripEl.querySelector("[data-yorozu-media-thumb][data-current]")
-        if (!(current instanceof HTMLElement)) return
-        let stripBox = filmstripEl.getBoundingClientRect()
-        let thumbBox = current.getBoundingClientRect()
-        if (!(stripBox.width > 0) || !(thumbBox.width > 0)) return
-        let left = filmstripEl.scrollLeft + (thumbBox.left + thumbBox.width / 2) - (stripBox.left + stripBox.width / 2)
+        let snap = opts.viewer.snapshot()
+        let metrics = filmstripPaintMetrics()
+        let morph = filmstripMorph(snap)
+        let geo = filmstripScrollGeometry(snap, morph, metrics)
+        applyFilmstripEndPads(geo.startPad, geo.endPad, geo.overflows)
+        let fromCenter = geo.startPad + filmstripCenterAt(snap.index, snap, morph, metrics)
+        let left = filmstripCentersScrollLeft({
+            fromCenter,
+            toCenter: fromCenter,
+            progress: 1,
+            viewportWidth: geo.viewportWidth,
+            totalSize: geo.totalSize,
+            startPad: geo.startPad,
+            endPad: geo.endPad,
+        })
         if (typeof filmstripEl.scrollTo === "function") {
             filmstripEl.scrollTo({ left, behavior })
-            return
+        } else {
+            filmstripEl.scrollLeft = left
         }
-        filmstripEl.scrollLeft = left
+        stampFilmstripClipFadeFromGeo(left, geo)
+        if (!opts.viewer.filmstripVirtualize()) return
+        // Smooth: live scrollLeft is still the old offset; let the scroll event drive the engine.
+        if (behavior === "smooth") return
+        syncFilmstripScroll(left)
     }
 
     function onFilmstripClick(e: Event): void {

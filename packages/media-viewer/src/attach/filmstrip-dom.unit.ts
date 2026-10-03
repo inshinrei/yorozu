@@ -5,6 +5,7 @@ import { createMediaViewer } from "../session"
 import {
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
+    filmstripEndInsetPx,
     filmstripGapAfter,
     filmstripThumbPitchPx,
 } from "../filmstrip"
@@ -247,38 +248,36 @@ describe("attachMediaViewer", () => {
         HTMLElement.prototype.scrollTo = scrollTo
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 0 })
         let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
-        let target = nav.querySelector('[data-yorozu-media-thumb][data-index="2"]') as HTMLElement
-        expect(target).toBeTruthy()
-        Object.defineProperty(nav, "scrollLeft", { configurable: true, value: 40, writable: true })
-        let stripBox = {
-            left: 100,
-            width: 200,
-            top: 0,
-            height: 40,
-            right: 300,
-            bottom: 40,
-            x: 100,
-            y: 0,
-            toJSON: () => ({}),
-        }
-        let thumbBox = {
-            left: 280,
-            width: 60,
-            top: 0,
-            height: 40,
-            right: 340,
-            bottom: 40,
-            x: 280,
-            y: 0,
-            toJSON: () => ({}),
-        }
-        nav.getBoundingClientRect = () => stripBox as DOMRect
-        target.getBoundingClientRect = () => thumbBox as DOMRect
+        Object.defineProperty(nav, "clientWidth", { value: 80, configurable: true })
+        viewer.setItems([img("a"), img("b"), img("c")], 0)
         scrollTo.mockClear()
         viewer.goTo(2)
-        let thumbMid = thumbBox.left + thumbBox.width / 2
-        let stripMid = stripBox.left + stripBox.width / 2
-        let expectedLeft = 40 + thumbMid - stripMid
+        let neighborWidth = 44
+        let currentWidth = 44
+        let restIndex = 2
+        let restWidths = [neighborWidth, neighborWidth, currentWidth]
+        let restTotal = 0
+        let restCenter = 0
+        for (let i = 0; i < restWidths.length; i++) {
+            let width = restWidths[i]!
+            let pitch = filmstripThumbPitchPx(width, filmstripGapAfter(i, restIndex, 2, 8))
+            if (i < restIndex) restCenter += pitch
+            restTotal += pitch
+        }
+        restCenter += currentWidth / 2
+        let startPad = filmstripEndInsetPx(restWidths[0]!, 80)
+        let endPad = filmstripEndInsetPx(restWidths[restWidths.length - 1]!, 80)
+        restCenter += startPad
+        let lastPitch = filmstripThumbPitchPx(currentWidth, filmstripGapAfter(restIndex, restIndex, 2, 8))
+        let expectedLeft = filmstripCentersScrollLeft({
+            fromCenter: restCenter,
+            toCenter: restCenter,
+            progress: 1,
+            viewportWidth: 80,
+            totalSize: restTotal - Math.max(0, lastPitch - currentWidth),
+            startPad,
+            endPad,
+        })
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: expectedLeft, behavior: "smooth" }))
     })
 
@@ -328,7 +327,7 @@ describe("attachMediaViewer", () => {
         let scrollTo = vi.fn()
         nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
         viewer.goTo(20)
-        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 20 * 40 + 20 - 100 }))
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 80 + 20 * 40 + 20 - 100 }))
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
     })
 
@@ -351,15 +350,23 @@ describe("attachMediaViewer", () => {
         for (let i = 0; i < 20; i++) {
             rowTop += filmstripThumbPitchPx(44, filmstripGapAfter(i, 20, 2, 8))
         }
-        let left = rowTop + w / 2 - 100
+        let startPad = filmstripEndInsetPx(44, 200)
+        let endPad = filmstripEndInsetPx(44, 200)
+        let fromCenter = startPad + rowTop + w / 2
         let totalSize = rowTop
         for (let i = 20; i < 40; i++) {
             let width = i === 20 ? w : 44
             totalSize += filmstripThumbPitchPx(width, filmstripGapAfter(i, 20, 2, 8))
         }
-        let maxLeft = Math.max(0, totalSize - 200)
-        if (left < 0) left = 0
-        if (left > maxLeft) left = maxLeft
+        let left = filmstripCentersScrollLeft({
+            fromCenter,
+            toCenter: fromCenter,
+            progress: 1,
+            viewportWidth: 200,
+            totalSize,
+            startPad,
+            endPad,
+        })
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left }))
         expect(nav.querySelector("[data-current]")?.getAttribute("data-index")).toBe("20")
     })
@@ -376,7 +383,7 @@ describe("attachMediaViewer", () => {
         let scrollTo = vi.fn()
         nav.scrollTo = scrollTo as unknown as typeof nav.scrollTo
         viewer.goTo(39)
-        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 1400 }))
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 1560 }))
     })
 
     it("virtualized filmstrip does not recenter when neighbors change", () => {
@@ -721,6 +728,52 @@ describe("attachMediaViewer", () => {
         expect(nav.querySelector("[data-edge]")).toBeNull()
     })
 
+    it("overflowing strip insets the list and centers first at scrollLeft 0", () => {
+        let items = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        viewer.setItems(items, 0)
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        let startPad = Number.parseFloat(track.style.marginInlineStart)
+        expect(startPad).toBeGreaterThan(0)
+        expect(Number.parseFloat(track.style.marginInlineEnd)).toBeGreaterThan(0)
+        expect(nav.scrollLeft).toBe(0)
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
+        expect(clip.getAttribute("data-overflow")).toBe("true")
+        expect(clip.getAttribute("data-fade-start")).toBe("false")
+        expect(clip.getAttribute("data-fade-end")).toBe("true")
+    })
+
+    it("overflowing last index turns end fade off", () => {
+        let items = Array.from({ length: 20 }, (_, i) => img(`id-${i}`))
+        viewer.open({ items, index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 200, configurable: true })
+        viewer.setItems(items, 0)
+        viewer.goTo(19)
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
+        expect(clip.getAttribute("data-fade-start")).toBe("true")
+        expect(clip.getAttribute("data-fade-end")).toBe("false")
+    })
+
+    it("fitting strip keeps edge thumbs and no list end insets", () => {
+        viewer.open({ items: [img("a"), img("b")], index: 0 })
+        let nav = root.querySelector("[data-yorozu-media-filmstrip]") as HTMLElement
+        Object.defineProperty(nav, "clientWidth", { value: 800, configurable: true })
+        viewer.setItems([img("a"), img("b")], 0)
+        let track = nav.querySelector('[role="list"]') as HTMLElement
+        expect(track.style.marginInlineStart).toBe("")
+        expect(track.style.marginInlineEnd).toBe("")
+        expect(nav.getAttribute("data-overflow")).toBe("false")
+        let thumbs = [...nav.querySelectorAll("[data-yorozu-media-thumb]")]
+        expect(thumbs[0]?.getAttribute("data-edge")).toBe("start")
+        expect(thumbs[1]?.getAttribute("data-edge")).toBe("end")
+        let clip = root.querySelector("[data-yorozu-media-filmstrip-clip]") as HTMLElement
+        expect(clip.getAttribute("data-fade-start")).toBe("false")
+        expect(clip.getAttribute("data-fade-end")).toBe("false")
+    })
+
     it("virtual default paints content width and current-gap gutter", () => {
         let items = [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 9, 16)]
         viewer.open({ items, index: 0, filmstrip: { virtualize: true } })
@@ -817,7 +870,23 @@ describe("attachMediaViewer", () => {
         for (let i = 0; i < 4; i++) {
             rowTop += filmstripThumbPitchPx(44, filmstripGapAfter(i, 4, 2, 8))
         }
-        let left = rowTop + w / 2 - 100
+        let startPad = filmstripEndInsetPx(44, 200)
+        let endPad = filmstripEndInsetPx(44, 200)
+        let fromCenter = startPad + rowTop + w / 2
+        let totalSize = rowTop
+        for (let i = 4; i < 10; i++) {
+            let width = i === 4 ? w : 44
+            totalSize += filmstripThumbPitchPx(width, filmstripGapAfter(i, 4, 2, 8))
+        }
+        let left = filmstripCentersScrollLeft({
+            fromCenter,
+            toCenter: fromCenter,
+            progress: 1,
+            viewportWidth: 200,
+            totalSize,
+            startPad,
+            endPad,
+        })
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left }))
     })
 
@@ -1066,12 +1135,17 @@ describe("attachMediaViewer", () => {
             restTotal += pitch
         }
         restCenter += currentWidth / 2
+        let startPad = filmstripEndInsetPx(restWidths[0]!, stripViewport)
+        let endPad = filmstripEndInsetPx(restWidths[restWidths.length - 1]!, stripViewport)
+        restCenter += startPad
         let restLeft = filmstripCentersScrollLeft({
             fromCenter: restCenter,
             toCenter: restCenter,
             progress: 0,
             viewportWidth: stripViewport,
             totalSize: restTotal,
+            startPad,
+            endPad,
         })
         expect(leftoverLeft).not.toBe(restLeft)
         flushLiveRaf()
@@ -1126,12 +1200,17 @@ describe("attachMediaViewer", () => {
             restTotal += pitch
         }
         restCenter += currentWidth / 2
+        let startPad = filmstripEndInsetPx(restWidths[0]!, stripViewport)
+        let endPad = filmstripEndInsetPx(restWidths[restWidths.length - 1]!, stripViewport)
+        restCenter += startPad
         let restLeft = filmstripCentersScrollLeft({
             fromCenter: restCenter,
             toCenter: restCenter,
             progress: 0,
             viewportWidth: stripViewport,
             totalSize: restTotal,
+            startPad,
+            endPad,
         })
         expect(liveLeft).not.toBe(restLeft)
         await Promise.resolve()
