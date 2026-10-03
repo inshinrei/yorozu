@@ -49,6 +49,7 @@ const mountWithReorder = (
         for (let key of items) {
             let node = document.createElement("div")
             node.dataset.key = key
+            node.tabIndex = 0
             node.textContent = key
             list.append(node)
             handles.push(host.session.registerItem(node, key))

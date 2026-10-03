@@ -182,3 +182,53 @@ test("HOLD activation: early move does not reorder; still press then drag does",
     await page.mouse.up()
     await expect(page.locator("#order-hold")).not.toHaveText("a,b,c,d,e,f,g,h")
 })
+
+test("keyboard grab ArrowDown drop reorders #list-y", async ({ page }) => {
+    await page.goto("/sortable.html")
+    let list = page.locator("#list-y")
+    await page.locator('#list-y [data-key="a"]').focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("Space")
+    await expect(page.locator("#order-y")).toHaveText("b,c,d,a")
+    expect(transformsCleared(await itemTransforms(list))).toBe(true)
+})
+
+test("keyboard grab Escape restores #list-y", async ({ page }) => {
+    await page.goto("/sortable.html")
+    await page.locator('#list-y [data-key="a"]').focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("Escape")
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+})
+
+test("pointer preview Escape restores without a host listener", async ({ page }) => {
+    await page.goto("/sortable.html")
+    let list = page.locator("#list-y")
+    let { from, to } = await captureCenters(list)
+    await dragTowardWithoutUp(page, from, to, { x: from.x, y: from.y + 12 })
+    await assertPreview(list, "y")
+    await page.keyboard.press("Escape")
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+    expect(await joinDataKeys(list)).toBe("a,b,c,d")
+    expect(transformsCleared(await itemTransforms(list))).toBe(true)
+})
+
+test("keyboard grab drop reorders #list-both", async ({ page }) => {
+    await page.goto("/sortable.html")
+    await page.locator('#list-both [data-key="a"]').focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("Space")
+    await expect(page.locator("#order-both")).not.toHaveText("a,b,c,d")
+})
+
+test("keyboard grab Tab away cancels #list-y", async ({ page }) => {
+    await page.goto("/sortable.html")
+    await page.locator('#list-y [data-key="a"]').focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("Tab")
+    await expect(page.locator("#order-y")).toHaveText("a,b,c,d")
+})
