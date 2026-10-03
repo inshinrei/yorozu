@@ -402,4 +402,108 @@ describe("createVirtualList", () => {
         vi.advanceTimersByTime(DEFAULT_IDLE_TRIM_MS)
         expect(list.viewportIds()).toEqual(after)
     })
+
+    it("scrollToIndex reanchors and returns start-aligned rowTop", () => {
+        let items = ids(100)
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+        })
+        list.sync()
+        let other = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+        })
+        other.sync()
+        other.reanchor(50)
+        expect(list.scrollToIndex(50)).toBe(2000)
+        expect(list.viewportIds()?.includes("c50")).toBe(true)
+        expect(list.fromOffset()).toBe(other.fromOffset())
+        expect(list.viewportIds()).toEqual(other.viewportIds())
+        let mounted = list.viewportIds()
+        expect(list.scrollToIndex(50)).toBe(2000)
+        expect(list.viewportIds()).toBe(mounted)
+        list.destroy()
+        other.destroy()
+    })
+
+    it("scrollToIndex on an empty list returns 0", () => {
+        let list = createVirtualList({
+            getItems: () => [],
+            itemSize: 40,
+        })
+        list.sync()
+        expect(list.scrollToIndex(3)).toBe(0)
+        list.destroy()
+    })
+
+    it("scrollToIndex clamps out of range and truncates floats", () => {
+        let items = ids(100)
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+        })
+        list.sync()
+        expect(list.scrollToIndex(-1)).toBe(0)
+        expect(list.viewportIds()?.[0]).toBe("c0")
+        expect(list.scrollToIndex(9999)).toBe(3960)
+        expect(list.viewportIds()?.includes("c99")).toBe(true)
+        expect(list.scrollToIndex(50.9)).toBe(2000)
+        expect(list.viewportIds()?.includes("c50")).toBe(true)
+        list.destroy()
+    })
+
+    it("scrollToIndex uses prefix rowTop for variable height", () => {
+        let items = ids(8)
+        let heights = [10, 50, 20, 80, 10, 50, 20, 80]
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: (i) => heights[i] ?? 0,
+            listSlice: 3,
+        })
+        list.sync()
+        expect(list.scrollToIndex(2)).toBe(list.rowTop(2))
+        expect(list.scrollToIndex(2)).toBe(60)
+        list.destroy()
+    })
+
+    it("idle trim after scrollToIndex keeps the jumped row mounted", () => {
+        let items = ids(100)
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+        })
+        list.sync()
+        list.onScroll({ scrollTop: 0, viewportHeight: 80 })
+        expect(list.scrollToIndex(50)).toBe(2000)
+        expect(list.viewportIds()?.includes("c50")).toBe(true)
+        vi.advanceTimersByTime(DEFAULT_IDLE_TRIM_MS)
+        expect(list.viewportIds()?.includes("c50")).toBe(true)
+        list.destroy()
+    })
+
+    it("scrollToIndex does not call loadMoreBackwards or onNearEnd", () => {
+        let items = ids(100)
+        let load = vi.fn()
+        let near = vi.fn()
+        let list = createVirtualList({
+            getItems: () => items,
+            itemSize: 40,
+            listSlice: 5,
+            loadMoreBackwards: load,
+            onNearEnd: near,
+        })
+        list.sync()
+        load.mockClear()
+        near.mockClear()
+        list.scrollToIndex(95)
+        expect(load).not.toHaveBeenCalled()
+        expect(near).not.toHaveBeenCalled()
+        expect(list.viewportIds()?.includes("c95")).toBe(true)
+        list.destroy()
+    })
 })

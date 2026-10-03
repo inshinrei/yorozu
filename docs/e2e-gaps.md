@@ -8,4 +8,3 @@ Playwright covers Must and Should scenarios for `@yorozu/confirm-tooltip`, `@yor
 - Confirm: `listenEsc` defaults to false; Escape-on-by-default is not a package behavior.
 - Media: no double-tap zoom, no video zoom.
 - Menu: no close-on-select package default, no typeahead, no ArrowLeft/Right submenu.
-- Virtual list: no `scrollToIndex` engine API.

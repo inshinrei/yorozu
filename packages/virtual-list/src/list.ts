@@ -51,6 +51,7 @@ export type VirtualList<Id extends string | number> = {
     sync: (isDisabled?: boolean) => boolean
     onScroll: (metrics: { scrollTop: number; viewportHeight: number }) => void
     reanchor: (index: number) => void
+    scrollToIndex: (index: number) => number
     resetToTop: () => void
     getMore: (direction: LoadDirection, noScroll?: boolean) => boolean
     trimIdle: (firstVisibleIndex: number) => boolean
@@ -343,6 +344,17 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
         notifyIfChanged(controller.reanchorAtIndex(sourceIds(), index))
     }
 
+    function scrollToIndex(index: number): number {
+        let source = sourceIds()
+        if (source.length === 0) return 0
+        let clamped = Math.max(0, Math.min(Math.trunc(index), source.length - 1))
+        notifyIfChanged(controller.reanchorAtIndex(source, clamped))
+        let top = rowTop(clamped)
+        lastScrollTop = top
+        edgeState.lastScrollTop = undefined
+        return top
+    }
+
     function resetToTop(): void {
         let prevIds = controller.viewportIds
         let prevFrom = controller.fromOffset
@@ -387,6 +399,7 @@ export function createVirtualList<Id extends string | number>(options: VirtualLi
         sync,
         onScroll,
         reanchor,
+        scrollToIndex,
         resetToTop,
         getMore,
         trimIdle,

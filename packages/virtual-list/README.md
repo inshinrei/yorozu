@@ -56,6 +56,12 @@ function paint(): void {
 }
 ```
 
+Jump so a row’s top sits at the viewport top. The engine reanchors the mounted window and returns the `scrollTop` to assign. Native overflow clamps last rows.
+
+```ts
+scroller.scrollTop = list.scrollToIndex(80)
+```
+
 Edge bounce is opt-in via `@yorozu/animations`. `createVirtualList` does not paint rubber. Hosts that omit the session get native clamp / UA rubber only.
 
 ```ts
