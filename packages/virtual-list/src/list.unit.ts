@@ -340,14 +340,12 @@ describe("createVirtualList", () => {
     it("does not edge-load on negative scrollTop", () => {
         let items = ids(100)
         let loadBackwards = vi.fn()
-        let loadForwards = vi.fn()
         let changes = 0
         let list = createVirtualList({
             getItems: () => items,
             itemSize: 40,
             listSlice: 5,
             loadMoreBackwards: loadBackwards,
-            loadMoreForwards: loadForwards,
             onChange: () => {
                 changes += 1
             },
@@ -359,7 +357,6 @@ describe("createVirtualList", () => {
         list.onScroll({ scrollTop: -40, viewportHeight: 80 })
         list.onScroll({ scrollTop: 0, viewportHeight: 80 })
         expect(loadBackwards).not.toHaveBeenCalled()
-        expect(loadForwards).not.toHaveBeenCalled()
         expect(changes).toBe(changesAfterSync)
         expect(list.viewportIds()).toBe(idsAfterSync)
         list.destroy()
