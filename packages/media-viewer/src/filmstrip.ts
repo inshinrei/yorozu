@@ -33,6 +33,25 @@ export function filmstripOverflows(totalSize: number, viewportWidth: number): bo
     return totalSize > viewportWidth
 }
 
+export const FILMSTRIP_EDGE_FADE_EPS_PX: number = 0.5
+
+export function filmstripEndInsetPx(itemWidth: number, viewportWidth: number): number {
+    return Math.max(0, viewportWidth / 2 - itemWidth / 2)
+}
+
+export function filmstripEdgeFade(opts: { scrollLeft: number; maxLeft: number; overflows: boolean }): {
+    start: boolean
+    end: boolean
+} {
+    if (!opts.overflows) {
+        return { start: false, end: false }
+    }
+    return {
+        start: opts.scrollLeft > FILMSTRIP_EDGE_FADE_EPS_PX,
+        end: opts.scrollLeft < opts.maxLeft - FILMSTRIP_EDGE_FADE_EPS_PX,
+    }
+}
+
 function lerp(from: number, to: number, t: number): number {
     return from + (to - from) * t
 }
@@ -107,10 +126,14 @@ export function filmstripCentersScrollLeft(opts: {
     progress: number
     viewportWidth: number
     totalSize: number
+    startPad?: number
+    endPad?: number
 }): number {
+    let startPad = opts.startPad ?? 0
+    let endPad = opts.endPad ?? 0
     let center = lerp(opts.fromCenter, opts.toCenter, opts.progress)
     let left = center - opts.viewportWidth / 2
-    let maxLeft = Math.max(0, opts.totalSize - opts.viewportWidth)
+    let maxLeft = Math.max(0, startPad + opts.totalSize + endPad - opts.viewportWidth)
     if (left < 0) return 0
     if (left > maxLeft) return maxLeft
     return left

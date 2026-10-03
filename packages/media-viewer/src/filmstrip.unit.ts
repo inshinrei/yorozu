@@ -7,11 +7,14 @@ import {
     MEDIA_SWIPE_SLIDE_GAP_PX,
 } from "./swipe"
 import {
+    FILMSTRIP_EDGE_FADE_EPS_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_DESKTOP_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_MOBILE_MAX_PX,
     FILMSTRIP_SWIPE_SLIDE_GAP_PX,
     filmstripCentersScrollLeft,
     filmstripCurrentWidthPx,
+    filmstripEdgeFade,
+    filmstripEndInsetPx,
     filmstripGapAfter,
     filmstripGapAfterAtProgress,
     filmstripInterpolatedWidthPx,
@@ -351,5 +354,116 @@ describe("filmstripCentersScrollLeft", () => {
                 totalSize: 50,
             }),
         ).toBe(0)
+    })
+})
+
+describe("filmstripEndInsetPx", () => {
+    it("is half viewport minus half item, floored at 0", () => {
+        expect(filmstripEndInsetPx(40, 100)).toBe(30)
+        expect(filmstripEndInsetPx(120, 100)).toBe(0)
+        expect(filmstripEndInsetPx(0, 100)).toBe(50)
+    })
+})
+
+describe("filmstripCentersScrollLeft pads", () => {
+    it("first rest is 0 and last rest is maxLeft", () => {
+        let startPad = 30
+        let endPad = 30
+        let viewportWidth = 100
+        let totalSize = 400
+        let firstCenter = startPad + 20
+        expect(
+            filmstripCentersScrollLeft({
+                fromCenter: firstCenter,
+                toCenter: firstCenter,
+                progress: 1,
+                viewportWidth,
+                totalSize,
+                startPad,
+                endPad,
+            }),
+        ).toBe(0)
+        let lastCenter = startPad + totalSize - 20
+        let maxLeft = startPad + totalSize + endPad - viewportWidth
+        expect(
+            filmstripCentersScrollLeft({
+                fromCenter: lastCenter,
+                toCenter: lastCenter,
+                progress: 1,
+                viewportWidth,
+                totalSize,
+                startPad,
+                endPad,
+            }),
+        ).toBe(maxLeft)
+        expect(maxLeft).toBe(360)
+    })
+
+    it("mid content center 200 with pads 30 lands at 180", () => {
+        expect(
+            filmstripCentersScrollLeft({
+                fromCenter: 30 + 200,
+                toCenter: 30 + 200,
+                progress: 1,
+                viewportWidth: 100,
+                totalSize: 400,
+                startPad: 30,
+                endPad: 30,
+            }),
+        ).toBe(180)
+    })
+
+    it("live lerp from first moves scrollLeft above 0", () => {
+        let left = filmstripCentersScrollLeft({
+            fromCenter: 50,
+            toCenter: 90,
+            progress: 0.5,
+            viewportWidth: 100,
+            totalSize: 400,
+            startPad: 30,
+            endPad: 30,
+        })
+        expect(left).toBe(20)
+        expect(left).toBeGreaterThan(0)
+    })
+})
+
+describe("filmstripEdgeFade", () => {
+    it("is both false when the strip does not overflow", () => {
+        expect(filmstripEdgeFade({ scrollLeft: 10, maxLeft: 100, overflows: false })).toEqual({
+            start: false,
+            end: false,
+        })
+    })
+
+    it("turns start off at 0 and end off at maxLeft", () => {
+        expect(filmstripEdgeFade({ scrollLeft: 0, maxLeft: 360, overflows: true })).toEqual({
+            start: false,
+            end: true,
+        })
+        expect(filmstripEdgeFade({ scrollLeft: 360, maxLeft: 360, overflows: true })).toEqual({
+            start: true,
+            end: false,
+        })
+        expect(filmstripEdgeFade({ scrollLeft: 180, maxLeft: 360, overflows: true })).toEqual({
+            start: true,
+            end: true,
+        })
+    })
+
+    it("treats within EPS of an end as that end", () => {
+        expect(FILMSTRIP_EDGE_FADE_EPS_PX).toBe(0.5)
+        expect(filmstripEdgeFade({ scrollLeft: 0.5, maxLeft: 360, overflows: true })).toEqual({
+            start: false,
+            end: true,
+        })
+        expect(filmstripEdgeFade({ scrollLeft: 0.51, maxLeft: 360, overflows: true })).toEqual({
+            start: true,
+            end: true,
+        })
+        expect(filmstripEdgeFade({ scrollLeft: 359.5, maxLeft: 360, overflows: true })).toEqual({
+            start: true,
+            end: false,
+        })
     })
 })
