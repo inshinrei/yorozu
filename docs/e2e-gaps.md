@@ -4,7 +4,6 @@ Playwright covers Must and Should scenarios for `@yorozu/confirm-tooltip`, `@yor
 
 ## Product gaps
 
-- Sortable: no keyboard reorder and no package-level Escape (host would have to listen).
 - Confirm: `listenEsc` defaults to false; Escape-on-by-default is not a package behavior.
 - Media: no double-tap zoom, no video zoom.
 - Menu: no close-on-select package default, no typeahead, no ArrowLeft/Right submenu.

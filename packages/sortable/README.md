@@ -100,6 +100,17 @@ function paint(): void {
 
 Pass `activation` on `createSortableSession` or `createSortableBothAxis` (same tokens). `pointerDown` is the threshold / hold path; `activate(key, clientX, clientY)` arms immediately without waiting for DOM move events. Optional `canDragKey` is checked on `pointerDown`, `activate`, and again when the drag becomes active.
 
+## Keyboard
+
+The session listens on `document` once any item is registered. Hosts set `tabindex` on rows (the package does not).
+
+- Space / Enter on a focused registered item (or a descendant) lifts it.
+- ArrowUp / ArrowLeft move one slot earlier in `getItems()` order; ArrowDown / ArrowRight move one later. Same map on `createSortableSession` and `createSortableBothAxis`.
+- Space / Enter drops (`onReorder` when the destination changed).
+- Escape cancels a pointer or keyboard drag and restores transforms.
+- Focus leaving a keyboard-grabbed item cancels.
+- Typing fields (`input`, `textarea`, `select`, `contenteditable`) skip grab / move / drop. Escape still cancels a live drag.
+
 ## Auto-scroll
 
 While dragging, the session scrolls the nearest overflow parent (or `getViewport()`) when the pointer enters a **60px** edge zone on **both axes** (`AUTO_SCROLL_ZONE_PX`). Step size is quadratic in penetration, capped at **8px per frame** (`AUTO_SCROLL_MAX_PX_PER_FRAME`).
@@ -140,3 +151,4 @@ mode.exit()
 - No grid occupancy (tetris). Wrapping flex flow is `createSortableBothAxis`; 1d lists stay on `createSortableSession`.
 - No multi-item drag
 - No domain order logic (hosts own persistence and constraints)
+- No Home/End keyboard jump and no keyboard auto-scroll

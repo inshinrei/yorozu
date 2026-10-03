@@ -116,6 +116,7 @@ afterEach(() => {
     vi.useRealTimers()
     rafRestore?.()
     rafRestore = null
+    document.body.replaceChildren()
 })
 
 function setup(opts?: {
@@ -151,6 +152,31 @@ function registerWrap(session: ReturnType<typeof createSortableBothAxis<string>>
         session.registerItem(nodes[key], key)
     }
     return nodes
+}
+
+function mountWrapFocusable(
+    session: ReturnType<typeof createSortableBothAxis<string>>,
+): Record<"a" | "b" | "c" | "d", HTMLElement> {
+    let nodes = wrapNodes()
+    for (let key of ["a", "b", "c", "d"] as const) {
+        let el = nodes[key]
+        el.tabIndex = 0
+        document.body.append(el)
+        session.registerItem(el, key)
+    }
+    return nodes
+}
+
+function press(el: HTMLElement, key: string, init?: KeyboardEventInit): KeyboardEvent {
+    el.focus()
+    let ev = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+    })
+    el.dispatchEvent(ev)
+    return ev
 }
 
 describe("createSortableBothAxis", () => {
@@ -304,6 +330,46 @@ describe("createSortableBothAxis", () => {
         let { session } = setup({ feel: { liftScale: 1.2, siblingMs: 100 } })
         expect(session.liftScale).toBe(1.2)
         expect(session.siblingTransition).toBe("100ms cubic-bezier(0.42, 0, 0.58, 1)")
+    })
+
+    it("Space on a focused item lifts without onReorder", () => {
+        let { session, onReorder } = setup()
+        let nodes = mountWrapFocusable(session)
+        press(nodes.a, " ")
+        expect(session.isActive).toBe(true)
+        expect(session.draggingKey).toBe("a")
+        expect(onReorder).not.toHaveBeenCalled()
+    })
+
+    it("Space, ArrowDown, Space reorders a after b", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ onDragEnd })
+        let nodes = mountWrapFocusable(session)
+        press(nodes.a, " ")
+        press(nodes.a, "ArrowDown")
+        press(nodes.a, " ")
+        expect(onReorder).toHaveBeenCalledTimes(1)
+        expect(onReorder.mock.calls[0]![0]).toEqual(["b", "a", "c", "d"])
+        expect(onDragEnd).toHaveBeenCalledWith("pointerup")
+    })
+
+    it("Escape cancels a keyboard grab without onReorder", () => {
+        let onDragEnd = vi.fn()
+        let { session, onReorder } = setup({ onDragEnd })
+        let nodes = mountWrapFocusable(session)
+        press(nodes.a, " ")
+        press(nodes.a, "Escape")
+        expect(onReorder).not.toHaveBeenCalled()
+        expect(onDragEnd).toHaveBeenCalledWith("cancel")
+        expect(session.isActive).toBe(false)
+    })
+
+    it("keyboard getOffset on the active key is flowRectDelta to the destination", () => {
+        let { session } = setup()
+        let nodes = mountWrapFocusable(session)
+        press(nodes.a, " ")
+        press(nodes.a, "ArrowDown")
+        expect(session.getOffset("a")).toEqual({ x: 52, y: 0 })
     })
 })
 
