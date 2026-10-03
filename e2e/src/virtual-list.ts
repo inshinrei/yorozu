@@ -20,6 +20,7 @@ let scroller = requireEl("scroller")
 let sizer = requireEl("sizer")
 let jump80 = requireEl("jump-80")
 let reanchor80 = requireEl("reanchor-80")
+let scrollTo80 = requireEl("scroll-to-80")
 let rowNodes = new Map<string, HTMLElement>()
 
 let list: VirtualList<string> = createVirtualList({
@@ -76,4 +77,8 @@ jump80.addEventListener("click", () => {
 reanchor80.addEventListener("click", () => {
     list.reanchor(JUMP_INDEX)
     scroller.scrollTop = JUMP_INDEX * ITEM_SIZE
+})
+
+scrollTo80.addEventListener("click", () => {
+    scroller.scrollTop = list.scrollToIndex(JUMP_INDEX)
 })

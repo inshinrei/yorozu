@@ -165,3 +165,13 @@ test("PageDown does not rubber-band", async ({ page }) => {
     expect(await sizer.getAttribute("data-yorozu-overscroll")).toBe("none")
     await expect.poll(async () => scroller.evaluate((el) => (el as HTMLElement).scrollTop)).toBeGreaterThan(0)
 })
+
+test("scrollToIndex-80 mounts row-80", async ({ page }) => {
+    await page.goto("/virtual-list.html")
+    await expect(row(page, "row-0")).toBeAttached()
+
+    await page.locator("#scroll-to-80").click()
+    await expect(row(page, "row-80")).toBeAttached()
+    await assertWindow(page, { includes: "row-80" })
+    await expect(page.locator("#sizer")).toHaveCSS("height", SIZER_HEIGHT)
+})
