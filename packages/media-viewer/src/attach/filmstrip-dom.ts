@@ -557,10 +557,11 @@ export function createFilmstripDom(opts: {
         if (typeof ResizeObserver !== "function") return
         filmstripResizeObserver = new ResizeObserver(() => {
             if (opts.isDetached() || !filmstripEl) return
+            let strip = filmstripEl
             withFilmstripMetrics(() => {
                 if (opts.viewer.filmstripVirtualize() && filmstripList != null) {
                     applyFilmstripFitSlice(filmstripList, opts.viewer.snapshot())
-                    let track = filmstripEl.querySelector('[role="list"]') as HTMLElement | null
+                    let track = strip.querySelector('[role="list"]') as HTMLElement | null
                     if (track) rebuildVirtualThumbs(track, opts.viewer.snapshot())
                 }
                 stampFilmstripOverflow()
