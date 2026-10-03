@@ -180,6 +180,26 @@ describe("createLayoutGrow", () => {
         grow.destroy()
     })
 
+    it("onDelta gets negative steps when the block shrinks", async () => {
+        let { fixture, el } = createFixture(80)
+        let deltas: number[] = []
+        let grow = createLayoutGrow({
+            el,
+            onDelta: (deltaPx) => {
+                deltas.push(deltaPx)
+            },
+        })
+        fixture.naturalH = 40
+        fireResize()
+        flushDomSchedule()
+        await vi.advanceTimersByTimeAsync(LAYOUT_GROW_MS + 64)
+        flushDomSchedule()
+        expect(deltas.length).toBeGreaterThan(0)
+        expect(deltas.every((delta) => delta < 0)).toBe(true)
+        expect(deltas.reduce((sum, delta) => sum + delta, 0)).toBeCloseTo(-40)
+        grow.destroy()
+    })
+
     it("axis inline writes width", async () => {
         let { fixture, el } = createFixture(40, 20)
         let grow = createLayoutGrow({ el, axis: "inline" })

@@ -80,9 +80,8 @@ export function createListShift(opts: {
     }
 
     let onRootScroll = (): void => {
-        if (destroyed || playing || holdLastTop) return
-        rebaseAll()
-        lastScrollTop = readScrollTop()
+        if (destroyed) return
+        syncIdleScroll()
     }
 
     root.addEventListener("scroll", onRootScroll, { passive: true })
@@ -103,13 +102,16 @@ export function createListShift(opts: {
     }
 
     let invert = (ms: number): void => {
+        playId += 1
+        let id = playId
+        cancelAll()
         if (!isEnabled() || ms <= 0) {
+            playing = false
+            releaseIfHeld()
             rebaseAll()
             return
         }
 
-        playId += 1
-        let id = playId
         releaseIfHeld()
         releaseLock = lock?.acquire("list-shift", { level: "any", durationMs: ms }) ?? null
         playing = true
@@ -130,7 +132,6 @@ export function createListShift(opts: {
             if (prev === undefined) continue
             let delta = prev - now
             if (Math.abs(delta) <= LIST_SHIFT_EPSILON_PX) continue
-            cancelAnim(key)
             let anim = animateElement(el, [{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
                 duration: ms,
                 easing,
@@ -167,6 +168,10 @@ export function createListShift(opts: {
 
     let snapshot = (): void => {
         if (destroyed) return
+        playId += 1
+        cancelAll()
+        playing = false
+        releaseIfHeld()
         rebaseAll()
         holdLastTop = true
         lastScrollTop = readScrollTop()
@@ -206,7 +211,8 @@ export function createListShift(opts: {
             },
             destroy: (): void => {
                 observer?.unobserve(el)
-                if (itemEls.get(key) === el) itemEls.delete(key)
+                if (itemEls.get(key) !== el) return
+                itemEls.delete(key)
                 lastTop.delete(key)
                 cancelAnim(key)
             },
