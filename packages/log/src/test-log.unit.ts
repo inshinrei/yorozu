@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { configure, getConfig } from "./configure"
+import { Level } from "./levels"
 import { createTestLog } from "./test-log"
 
 afterEach(() => {
@@ -48,8 +49,11 @@ describe("createTestLog", () => {
 
     it("isEnabled is true for every level even with no global handlers", () => {
         configure({})
-        expect(createTestLog().isEnabled("trace")).toBe(true)
-        expect(createTestLog().subsystem).toBe("")
-        expect(createTestLog().category).toBe("")
+        let log = createTestLog()
+        for (let level of Object.values(Level)) {
+            expect(log.isEnabled(level)).toBe(true)
+        }
+        expect(log.subsystem).toBe("")
+        expect(log.category).toBe("")
     })
 })

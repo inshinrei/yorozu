@@ -21,10 +21,16 @@ function capture(): { records: LogRecord[]; handler: LogHandler } {
 
 describe("init without handlers", () => {
     it("does not emit and isEnabled is false for every level", () => {
-        let log = init("s", "c")
-        log.info("x", { n: 1 })
-        for (let level of Object.values(Level)) {
-            expect(log.isEnabled(level)).toBe(false)
+        let now = vi.spyOn(Date, "now")
+        try {
+            let log = init("s", "c")
+            log.info("x", { n: 1 })
+            expect(now).not.toHaveBeenCalled()
+            for (let level of Object.values(Level)) {
+                expect(log.isEnabled(level)).toBe(false)
+            }
+        } finally {
+            now.mockRestore()
         }
     })
 })
@@ -179,6 +185,15 @@ describe(".log", () => {
         init().log("hello")
         expect(records[0].level).toBe("notice")
         expect(records[0].msg).toBe("hello")
+    })
+
+    it("logs the message debug at notice when called with a single LogLevel string", () => {
+        let { records, handler } = capture()
+        configure({ handlers: [handler] })
+        init().log("debug")
+        expect(records).toHaveLength(1)
+        expect(records[0].level).toBe("notice")
+        expect(records[0].msg).toBe("debug")
     })
 
     it("uses the level string form", () => {
