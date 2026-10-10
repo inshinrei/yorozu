@@ -19,7 +19,7 @@ import {
     type ScanHit,
     type TxMode,
 } from "@yorozu/db"
-import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
+import { init, reportError, type Logger } from "@yorozu/log"
 import { requestIdle, type IdleHandle } from "@yorozu/utils"
 import { wrapBetterSqlite3, type SqliteHandle } from "./handle"
 
@@ -58,12 +58,6 @@ type PendingWrite = {
 type Pending = Map<string, Map<string, PendingWrite>>
 
 let IDENT_RE = /^[A-Za-z0-9_-]+$/
-let ISSUE_KEY = "yorozu-db-sqlite"
-
-function reportError(log: Logger, err: unknown): void {
-    if (err instanceof Error) log.error(err)
-    else log.warn("never-happen", { err })
-}
 
 function quoteIdent(name: string): string {
     if (!IDENT_RE.test(name)) throw new Error(`illegal identifier: ${name}`)
@@ -956,7 +950,7 @@ class SqliteDriver implements DbDriver {
         log?: Logger
         autoFlush?: boolean | { pendingPuts?: number; idleMs?: number }
     }) {
-        this.log = makeLog(opts.log ?? makeSilentLog(), ISSUE_KEY)
+        this.log = opts.log ?? init("yorozu-db-sqlite", "driver")
         this._filename = opts.filename
         this._native = opts.native ?? Database
         this._autoFlush = resolveAutoFlush(opts.autoFlush)

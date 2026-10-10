@@ -18,7 +18,7 @@ let driver = createSqliteDriver({
 let db = await driver.open(schema)
 ```
 
-Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db-sqlite")`.
+Logger is optional. Internally: `opts.log ?? init("yorozu-db-sqlite", "driver")`. Silent default is `init` with no handlers (or the host passes `disabled`).
 
 `wrapBetterSqlite3(db)` is the thin handle: `exec`, `prepare` → `{ run, all, get }` with array bind `stmt.run(...params)`, `transaction(fn) => db.transaction(fn)()`, `close`.
 

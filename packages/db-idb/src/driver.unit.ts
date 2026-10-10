@@ -4,7 +4,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { DbSchema } from "@yorozu/db"
-import { makeSilentLog } from "@yorozu/log"
+import { disabled } from "@yorozu/log"
 import { createIdbDriver } from "./driver"
 
 let here = dirname(fileURLToPath(import.meta.url))
@@ -392,7 +392,7 @@ describe("createIdbDriver", () => {
     })
 
     it("optional log is accepted", async () => {
-        let driver = createIdbDriver({ dbName: nextName(), log: makeSilentLog() })
+        let driver = createIdbDriver({ dbName: nextName(), log: disabled })
         let db = await driver.open(schema)
         await db.collection<FileRow>("files").put(fileRow({ key: "a" }))
         expect(await db.collection<FileRow>("files").get("a")).toEqual(fileRow({ key: "a" }))

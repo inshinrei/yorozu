@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { openMemoryDb } from "@yorozu/db"
-import { createTestLog, expectFlowStory } from "@yorozu/log"
+import { createTestLog, type TestLog } from "@yorozu/log"
 import { BytesLruMap } from "./bytes-lru-map"
 import { createResourceCache } from "./cache"
 import { dropDelete, dropStripBlob, type DropReason } from "./drop"
 import { resourceSchema, type ResourceRow } from "./row"
+
+const STORY_MSGS: ReadonlySet<string> = new Set(["start", "skip", "retry", "done", "never-happen"])
+
+function story(log: TestLog): string[] {
+    return log
+        .collect()
+        .map((r) => (r.level === "error" ? "error" : r.msg))
+        .filter((m) => m === "error" || STORY_MSGS.has(m))
+}
 
 function blobOf(n: number): Blob {
     return new Blob([new Uint8Array(n)])
@@ -216,7 +225,7 @@ describe("createResourceCache", () => {
 
     it("resource-evict flow is skip under cap and start/done when trimming", async () => {
         let col = await filesCol()
-        let raw = createTestLog()
+        let raw = createTestLog("yorozu-resource-cache", "evict")
         let cache = createResourceCache({
             collection: col,
             drop: dropDelete,
@@ -225,7 +234,7 @@ describe("createResourceCache", () => {
         })
         await cache.put({ key: "old", storedAt: 1, blob: blobOf(10), meta: {} })
         await cache.put({ key: "new", storedAt: 2, blob: blobOf(10), meta: {} })
-        expectFlowStory(raw.collect(), "resource-evict", ["skip", "start", "done"])
+        expect(story(raw)).toEqual(["skip", "start", "done"])
         expect(await col.get("old")).toBeNull()
     })
 

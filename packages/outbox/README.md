@@ -79,14 +79,14 @@ Cross-tab: this package does not open `BroadcastChannel`. Host should `bc.onmess
 
 Offline: pass `subscribeOnline` (e.g. `window` `online`) or call `wake()` when connectivity returns; otherwise the watchdog is the fuse.
 
-Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-outbox")`. Process flow is `outbox-process` (`start` / `done` / `retry` / `skip` / `error`).
+Logger is optional. Internally: `options.log ?? init("yorozu-outbox", "worker")`. Process messages: `start` / `done` / `retry` / `skip` / `never-happen`; failures via `reportError`.
 
 ## Musts
 
 - Collection `claim` is `keysOnly` + one `get` (FIFO by `createdAt` among due keys); payloads are `structuredClone`d on enqueue / get / claim / listFailed.
 - Claim/lease is a queue. Host injects `OutboxStore` + `Clock` + logger + handlers.
 - Success deletes. Non-retryable or max attempts exhaust. Offline `releaseUncounted` (does not count toward the cap) then skip. Else exponential backoff on `reservedTo`: `min(base * 2^(attempts-1), cap)` minus 0–20% jitter.
-- Unknown type: `warn("never-happen")` then delete.
+- Unknown type: `warning("never-happen")` then delete.
 - `onExhausted` → `markFailed` (retain). Else `rollback?` then delete.
 - Messenger keeps SyncManager, connectivity pause/resume, `withDurableWrite` / durability, and domain handlers. This package does not own those.
 - Tests in this package use `openMemoryOutbox` / `openMemoryDb` only. Do not import `@yorozu/db-idb` or `@yorozu/db-sqlite` here.

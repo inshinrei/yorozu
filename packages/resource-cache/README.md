@@ -56,7 +56,7 @@ let thumbs = createResourceCache({
 })
 ```
 
-Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-resource-cache")`. Bytes trim uses flow `resource-evict` (`start` / `skip` / `done`).
+Logger is optional. Internally: `opts.log ?? init("yorozu-resource-cache", "evict")`. Bytes trim logs `skip` / `start` / `done` as info messages.
 
 Omitted caps turn that policy off. `dropDelete` removes rows. `dropStripBlob()` keeps the row, `bytes === 0`, no blob. A host that wants strip on bytes and delete on TTL/count composes `plan.reason` in its own `DropHandler`.
 

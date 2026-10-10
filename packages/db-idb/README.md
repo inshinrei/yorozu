@@ -20,7 +20,7 @@ let driver = createIdbDriver({
 let db = await driver.open(schema)
 ```
 
-Logger is optional. Internally: `makeLog(opts.log ?? makeSilentLog(), "yorozu-db-idb")`.
+Logger is optional. Internally: `opts.log ?? init("yorozu-db-idb", "driver")`. Silent default is `init` with no handlers (or the host passes `disabled`).
 
 `deferPut`: when it returns `false` for a collection, `put({ flush: "batch" })` still writes immediately. Default: every collection may batch.
 

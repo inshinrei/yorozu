@@ -5,7 +5,7 @@ import { existsSync } from "node:fs"
 import Database from "better-sqlite3"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { compareIndexKey, type DbSchema } from "@yorozu/db"
-import { makeSilentLog } from "@yorozu/log"
+import { disabled } from "@yorozu/log"
 import { createSqliteDriver } from "./driver"
 
 let schema: DbSchema = {
@@ -196,7 +196,7 @@ describe("createSqliteDriver", () => {
     })
 
     it("optional log is accepted", async () => {
-        let driver = createSqliteDriver({ filename: ":memory:", log: makeSilentLog() })
+        let driver = createSqliteDriver({ filename: ":memory:", log: disabled })
         let db = await driver.open(schema)
         await db.collection<FileRow>("files").put(fileRow({ key: "a" }))
         expect(await db.collection<FileRow>("files").get("a")).toEqual(fileRow({ key: "a" }))

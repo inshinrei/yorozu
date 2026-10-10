@@ -1,12 +1,10 @@
 import type { Collection } from "@yorozu/db"
-import { makeLog, makeSilentLog, reportFlowFailure, type Logger } from "@yorozu/log"
+import { init, reportError, type Logger } from "@yorozu/log"
 import { pickOldestOverBytesCapOrdered } from "./bytes-cap"
 import type { BytesLruMap } from "./bytes-lru-map"
 import { attachBytesLedger, listEvictItems } from "./collection"
 import type { DropHandler, DropReason } from "./drop"
 import type { ResourceClass, ResourceRow } from "./row"
-
-const ISSUE_KEY: string = "yorozu-resource-cache"
 
 export type ResourceCacheCaps = {
     maxBytes?: number
@@ -35,7 +33,7 @@ export function createResourceCache<Meta = unknown>(opts: {
     log?: Logger
     preferDrop?: ResourceClass[]
 }): ResourceCache<Meta> {
-    let log = makeLog(opts.log ?? makeSilentLog(), ISSUE_KEY)
+    let log = opts.log ?? init("yorozu-resource-cache", "evict")
     let caps: ResourceCacheCaps = opts.caps ?? {}
     let items = attachBytesLedger(opts.collection)
     let l1 = opts.l1
@@ -81,11 +79,10 @@ export function createResourceCache<Meta = unknown>(opts: {
         if (mode === "full" || mode === "bytes") {
             let maxBytes = caps.maxBytes
             if (maxBytes == null) return
-            let flow = log.flow("resource-evict", { capBytes: maxBytes })
             try {
                 let total = await items.getBytesTotal()
                 if (maxBytes > 0 && total <= maxBytes) {
-                    flow.info("skip", { capBytes: maxBytes, totalBytes: total })
+                    log.info("skip", { capBytes: maxBytes, totalBytes: total })
                     return
                 }
                 let listed = usePreferDrop
@@ -95,7 +92,7 @@ export function createResourceCache<Meta = unknown>(opts: {
                     ? pickOldestOverBytesCapOrdered(listed, total, maxBytes, { preferDrop })
                     : pickOldestOverBytesCapOrdered(listed, total, maxBytes)
                 if (!keys.length) {
-                    flow.info("skip", { capBytes: maxBytes, totalBytes: total })
+                    log.info("skip", { capBytes: maxBytes, totalBytes: total })
                     return
                 }
                 let dropSet = new Set(keys)
@@ -103,11 +100,11 @@ export function createResourceCache<Meta = unknown>(opts: {
                 for (let it of listed) {
                     if (!dropSet.has(it.key)) remainingBytes += it.bytes
                 }
-                flow.info("start", { dropped: keys.length, remainingBytes, capBytes: maxBytes })
+                log.info("start", { dropped: keys.length, remainingBytes, capBytes: maxBytes })
                 await applyDrop(keys, "bytes")
-                flow.info("done", { dropped: keys.length, remainingBytes, capBytes: maxBytes })
+                log.info("done", { dropped: keys.length, remainingBytes, capBytes: maxBytes })
             } catch (err) {
-                reportFlowFailure(flow, err, { capBytes: maxBytes })
+                reportError(log, err, { capBytes: maxBytes })
                 throw err
             }
         }

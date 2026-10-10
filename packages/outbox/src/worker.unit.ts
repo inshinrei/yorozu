@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createTestLog, expectFlowStory } from "@yorozu/log"
+import { createTestLog, type TestLog } from "@yorozu/log"
 import { timers, type IdleScheduler } from "@yorozu/utils"
 import { mutableClock } from "./_contract"
 import { openMemoryOutbox } from "./memory"
 import { OUTBOX_MAX_FAILED_AGE_MS } from "./prune"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
 import { OutboxWorker, type OutboxHandler } from "./worker"
+
+const STORY_MSGS: ReadonlySet<string> = new Set(["start", "skip", "retry", "done", "never-happen"])
+
+function story(log: TestLog): string[] {
+    return log
+        .collect()
+        .map((r) => (r.level === "error" ? "error" : r.msg))
+        .filter((m) => m === "error" || STORY_MSGS.has(m))
+}
 
 function makeEntry(overrides: Partial<OutboxEntry> = {}): OutboxEntry {
     return {
@@ -193,34 +202,34 @@ describe("OutboxWorker", () => {
 
     it("start processes claimed entry and deletes on success", async () => {
         let { store, state, deleteSpy } = makeRepo([makeEntry()])
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(new OutboxWorker(store, handlers, { log, pollIntervalMs: 10 }))
         await startUntilIdle(w)
         expect(deleteSpy).toHaveBeenCalledWith("e1")
         expect(processSpy).toHaveBeenCalledTimes(1)
         expect(state.items).toHaveLength(0)
-        expectFlowStory(log.collect(), "outbox-process", ["start", "done"])
+        expect(story(log)).toEqual(["start", "done"])
     })
 
     it("logs delete failure after successful process and does not backoff or exhaust", async () => {
         let { store, deleteSpy, updateAfterFailureSpy, markFailedSpy } = makeRepo([makeEntry()])
         deleteSpy.mockRejectedValueOnce(new Error("delete failed"))
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(new OutboxWorker(store, handlers, { log, pollIntervalMs: 10, maxAttempts: 5 }))
         await startUntilIdle(w)
         expect(processSpy).toHaveBeenCalledTimes(1)
         expect(updateAfterFailureSpy).not.toHaveBeenCalled()
         expect(markFailedSpy).not.toHaveBeenCalled()
         expect(rollbackSpy).not.toHaveBeenCalled()
-        expect(log.collect().some((r) => r.errorMeta?.issueKey === "yorozu-outbox")).toBe(true)
-        expectFlowStory(log.collect(), "outbox-process", ["start", "done"])
+        expect(log.collect().some((r) => r.subsystem === "yorozu-outbox" && r.level === "error")).toBe(true)
+        expect(story(log)).toEqual(["start", "error", "done"])
     })
 
     it("backs off (not release) on failure below maxAttempts", async () => {
         let clock: Clock = { now: () => Date.now() }
         let { store, releaseSpy, updateAfterFailureSpy } = makeRepo([makeEntry({ attempts: 1 })], clock)
         processSpy.mockRejectedValueOnce(new Error("temp"))
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(
             new OutboxWorker(store, handlers, {
                 pollIntervalMs: 10,
@@ -236,7 +245,7 @@ describe("OutboxWorker", () => {
         expect(releaseSpy).not.toHaveBeenCalled()
         let nextReservedTo = updateAfterFailureSpy.mock.calls[0]![2] as number
         expect(nextReservedTo).toBeGreaterThan(clock.now())
-        expectFlowStory(log.collect(), "outbox-process", ["start", "retry"])
+        expect(story(log)).toEqual(["start", "retry"])
     })
 
     it("writes backoff reservedTo from the injected clock, not Date.now", async () => {
@@ -250,7 +259,7 @@ describe("OutboxWorker", () => {
                 pollIntervalMs: 10,
                 retryBaseMs: 1000,
                 retryCapMs: 30_000,
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 clock,
             }),
         )
@@ -281,7 +290,7 @@ describe("OutboxWorker", () => {
         })
         let w = track(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 5,
                 maxAttempts: 5,
                 retryBaseMs: base,
@@ -310,13 +319,13 @@ describe("OutboxWorker", () => {
     it("calls rollback and deletes when attempts reach max", async () => {
         let { store, state, deleteSpy } = makeRepo([makeEntry({ attempts: 4 })])
         processSpy.mockRejectedValueOnce(new Error("boom"))
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(new OutboxWorker(store, handlers, { log, pollIntervalMs: 10, maxAttempts: 5 }))
         await startUntilIdle(w)
         expect(deleteSpy).toHaveBeenCalledWith("e1")
         expect(rollbackSpy).toHaveBeenCalledTimes(1)
         expect(state.items).toHaveLength(0)
-        expectFlowStory(log.collect(), "outbox-process", ["start", "error"])
+        expect(story(log)).toEqual(["start", "error"])
     })
 
     it("marks failed (does NOT delete) at max when handler defines onExhausted", async () => {
@@ -330,7 +339,7 @@ describe("OutboxWorker", () => {
                 onExhausted,
             },
         }
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(new OutboxWorker(store, exhaustHandlers, { log, pollIntervalMs: 10, maxAttempts: 5 }))
         await startUntilIdle(w)
         expect(markFailedSpy).toHaveBeenCalledWith("e1", expect.any(String))
@@ -338,7 +347,7 @@ describe("OutboxWorker", () => {
         expect(deleteSpy).not.toHaveBeenCalled()
         expect(state.items).toHaveLength(1)
         expect(state.items[0]!.failedAt).toBeGreaterThan(0)
-        expect(log.collect().some((r) => r.errorMeta?.issueKey === "yorozu-outbox")).toBe(true)
+        expect(log.collect().some((r) => r.subsystem === "yorozu-outbox" && r.level === "error")).toBe(true)
     })
 
     it("exhausts immediately on a non-retryable error, regardless of attempts", async () => {
@@ -356,7 +365,7 @@ describe("OutboxWorker", () => {
         }
         let w = track(
             new OutboxWorker(store, exhaustHandlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 10,
                 maxAttempts: 5,
                 isRetryableError: () => false,
@@ -381,7 +390,7 @@ describe("OutboxWorker", () => {
                 onExhausted,
             },
         }
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(
             new OutboxWorker(store, exhaustHandlers, {
                 log,
@@ -397,22 +406,24 @@ describe("OutboxWorker", () => {
         expect(onExhausted).not.toHaveBeenCalled()
         expect(state.items[0]!.attempts).toBe(4)
         expect(state.items[0]!.failedAt).toBeUndefined()
-        expectFlowStory(log.collect(), "outbox-process", ["start", "skip"])
+        expect(story(log)).toEqual(["start", "skip"])
     })
 
     it("deletes immediately for unknown handler type and warns never-happen", async () => {
         let { store, state, deleteSpy } = makeRepo([makeEntry({ type: "unknown/type" })])
-        let log = createTestLog()
+        let log = createTestLog("yorozu-outbox", "worker")
         let w = track(new OutboxWorker(store, handlers, { log, pollIntervalMs: 10 }))
         await startUntilIdle(w)
         expect(deleteSpy).toHaveBeenCalledWith("e1")
         expect(state.items).toHaveLength(0)
-        expectFlowStory(log.collect(), "outbox-process", ["start", "never-happen"])
+        expect(story(log)).toEqual(["start", "never-happen"])
     })
 
     it("stop prevents further processing", async () => {
         let { store } = makeRepo([makeEntry()])
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 5 }))
+        let w = track(
+            new OutboxWorker(store, handlers, { log: createTestLog("yorozu-outbox", "worker"), pollIntervalMs: 5 }),
+        )
         w.start()
         w.stop()
         await flushMicrotasks()
@@ -422,7 +433,9 @@ describe("OutboxWorker", () => {
 
     it("pause stops ticks and processing, resume restarts with eager tick", async () => {
         let { store, state, deleteSpy } = makeRepo([])
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 10 }))
+        let w = track(
+            new OutboxWorker(store, handlers, { log: createTestLog("yorozu-outbox", "worker"), pollIntervalMs: 10 }),
+        )
         await startUntilIdle(w)
         w.pause()
         state.items.push(makeEntry())
@@ -448,7 +461,9 @@ describe("OutboxWorker", () => {
         let id = await store.enqueue({ type: "f", payload: {} })
         await store.markFailed(id)
         clock.nowMs += OUTBOX_MAX_FAILED_AGE_MS + 1
-        let w = track(new OutboxWorker(store, {}, { clock, log: createTestLog(), pollIntervalMs: 10 }))
+        let w = track(
+            new OutboxWorker(store, {}, { clock, log: createTestLog("yorozu-outbox", "worker"), pollIntervalMs: 10 }),
+        )
         await startUntilIdle(w)
         expect(await store.get(id)).toBeNull()
     })
@@ -459,14 +474,25 @@ describe("OutboxWorker", () => {
         let id = await store.enqueue({ type: "f", payload: {} })
         await store.markFailed(id)
         clock.nowMs += OUTBOX_MAX_FAILED_AGE_MS + 1
-        let w = track(new OutboxWorker(store, {}, { clock, log: createTestLog(), pollIntervalMs: 10, prune: false }))
+        let w = track(
+            new OutboxWorker(
+                store,
+                {},
+                { clock, log: createTestLog("yorozu-outbox", "worker"), pollIntervalMs: 10, prune: false },
+            ),
+        )
         await startUntilIdle(w)
         expect(await store.get(id)).not.toBeNull()
     })
 
     it("drains on store enqueue without waiting for the watchdog", async () => {
         let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 30_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 30_000,
+            }),
+        )
         await startUntilIdle(w)
         expect(processSpy).toHaveBeenCalledTimes(0)
         await store.enqueue({ type: "test/msg", payload: {} })
@@ -477,7 +503,12 @@ describe("OutboxWorker", () => {
 
     it("does not claim again for 2s when the watchdog is 30s", async () => {
         let { store, claimSpy } = makeRepo([])
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 30_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 30_000,
+            }),
+        )
         await startUntilIdle(w)
         let n = claimSpy.mock.calls.length
         await vi.advanceTimersByTimeAsync(2000)
@@ -495,7 +526,7 @@ describe("OutboxWorker", () => {
         processSpy.mockRejectedValueOnce(new Error("temp"))
         let w = track(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 retryBaseMs: 1000,
                 retryCapMs: 30_000,
@@ -517,7 +548,12 @@ describe("OutboxWorker", () => {
 
     it("wake drains without waiting for the watchdog", async () => {
         let { store, state, deleteSpy } = makeRepo([])
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         await startUntilIdle(w)
         state.items.push(makeEntry())
         w.wake()
@@ -532,7 +568,7 @@ describe("OutboxWorker", () => {
         await store.claim(5000)
         let w = track(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 leaseDurationMs: 5000,
                 clock,
@@ -556,7 +592,7 @@ describe("OutboxWorker", () => {
         processSpy.mockRejectedValue(new Error("network down"))
         let w = track(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 isOnline: () => false,
                 isRetryableError: () => true,
@@ -578,7 +614,7 @@ describe("OutboxWorker", () => {
         processSpy.mockRejectedValueOnce(new Error("network down"))
         let w = track(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 isOnline: () => online,
                 isRetryableError: () => true,
@@ -609,7 +645,12 @@ describe("OutboxWorker", () => {
                 release = r
             })
         })
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         await store.enqueue({ type: "test/msg", payload: { n: 1 } })
         w.start()
         await flushMicrotasks()
@@ -629,7 +670,12 @@ describe("OutboxWorker", () => {
             })
             return origNextDueAt()
         }
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         w.start()
         await flushMicrotasks()
         await store.enqueue({ type: "test/msg", payload: {} })
@@ -641,7 +687,12 @@ describe("OutboxWorker", () => {
 
     it("ignores store notify while paused and drains on resume", async () => {
         let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         await startUntilIdle(w)
         w.pause()
         await store.enqueue({ type: "test/msg", payload: {} })
@@ -654,7 +705,12 @@ describe("OutboxWorker", () => {
 
     it("stop unsubscribes so later enqueue does not process", async () => {
         let store = openMemoryOutbox({ clock: { now: () => Date.now() } })
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         await startUntilIdle(w)
         w.stop()
         await store.enqueue({ type: "test/msg", payload: {} })
@@ -665,7 +721,7 @@ describe("OutboxWorker", () => {
     it("start uses a 30s watchdog by default", async () => {
         let { store } = makeRepo([])
         let spy = vi.spyOn(timers, "setInterval")
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog() }))
+        let w = track(new OutboxWorker(store, handlers, { log: createTestLog("yorozu-outbox", "worker") }))
         await startUntilIdle(w)
         expect(spy).toHaveBeenCalledWith(expect.any(Function), 30_000)
     })
@@ -677,7 +733,12 @@ describe("OutboxWorker", () => {
         processSpy.mockImplementation(async (entry) => {
             order.push(entry.id)
         })
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         w.start()
         await flushMicrotasks()
         expect(order).toEqual(["e1"])
@@ -690,7 +751,11 @@ describe("OutboxWorker", () => {
         vi.stubGlobal("requestIdleCallback", undefined)
         let { store } = makeRepo([makeEntry({ id: "e1" }), makeEntry({ id: "e2", createdAt: 1_000_001 })])
         let w = track(
-            new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000, yieldEvery: 0 }),
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+                yieldEvery: 0,
+            }),
         )
         w.start()
         await flushMicrotasks()
@@ -712,7 +777,12 @@ describe("OutboxWorker", () => {
         vi.stubGlobal("requestIdleCallback", ric)
         vi.stubGlobal("cancelIdleCallback", vi.fn())
         let { store } = makeRepo([makeEntry({ id: "e1" }), makeEntry({ id: "e2", createdAt: 1_000_001 })])
-        let w = track(new OutboxWorker(store, handlers, { log: createTestLog(), pollIntervalMs: 60_000 }))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+            }),
+        )
         w.start()
         await flushMicrotasks()
         expect(ric).toHaveBeenCalled()
@@ -731,7 +801,7 @@ describe("OutboxWorker", () => {
         let send = vi.fn(async (entry: OutboxEntry) => ({ ok: true, id: entry.id }))
         workers.push(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 yieldEvery: 0,
                 transport: { send },
@@ -755,7 +825,7 @@ describe("OutboxWorker", () => {
         }
         workers.push(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 yieldEvery: 0,
                 clock,
@@ -777,7 +847,7 @@ describe("OutboxWorker", () => {
         }
         workers.push(
             new OutboxWorker(store, handlers, {
-                log: createTestLog(),
+                log: createTestLog("yorozu-outbox", "worker"),
                 pollIntervalMs: 60_000,
                 yieldEvery: 0,
                 maxAttempts: 5,

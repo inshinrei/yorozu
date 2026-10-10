@@ -1,4 +1,4 @@
-import type { Logger } from "@yorozu/log"
+import { reportError, type Logger } from "@yorozu/log"
 import { resolveClock } from "./ids"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
 
@@ -11,11 +11,6 @@ export type PruneOutboxFailedOpts = {
     clock?: Clock
 }
 
-function reportCaught(log: Logger, err: unknown): void {
-    if (err instanceof Error) log.error(err)
-    else log.warn("never-happen", { err })
-}
-
 /** Prune only failed entries by age then excess count. Never touches non-failed (undelivered) jobs. */
 export async function pruneOutboxFailed(store: OutboxStore, log: Logger, opts?: PruneOutboxFailedOpts): Promise<void> {
     let clock = resolveClock(opts?.clock)
@@ -25,7 +20,7 @@ export async function pruneOutboxFailed(store: OutboxStore, log: Logger, opts?: 
     try {
         failed = await store.listFailed()
     } catch (e) {
-        reportCaught(log, e)
+        reportError(log, e)
         return
     }
     if (!failed.length) return
@@ -48,7 +43,7 @@ export async function pruneOutboxFailed(store: OutboxStore, log: Logger, opts?: 
         try {
             await store.delete(id)
         } catch (err) {
-            reportCaught(log, err)
+            reportError(log, err)
         }
     }
 }

@@ -1,10 +1,9 @@
 import type { Collection, Db } from "@yorozu/db"
-import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
+import { init, type Logger } from "@yorozu/log"
 import { newOutboxEntry, resolveClock } from "./ids"
 import { createListenerSet } from "./notify"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
 
-const ISSUE_KEY: string = "yorozu-outbox"
 const BY_CLAIM: string = "by-claim"
 const BY_FAILED: string = "by-failed"
 
@@ -41,7 +40,7 @@ class CollectionOutboxStore implements OutboxStore {
         this._col = opts.collection
         this._db = opts.db
         this._clock = resolveClock(opts.clock)
-        this._log = makeLog(opts.log ?? makeSilentLog(), ISSUE_KEY)
+        this._log = opts.log ?? init("yorozu-outbox", "store")
     }
 
     protected _transact<R>(fn: (col: Collection<OutboxRow>) => Promise<R>): Promise<R> {
@@ -87,7 +86,7 @@ class CollectionOutboxStore implements OutboxStore {
             if (bestPk == null) return null
             let row = await col.get(bestPk)
             if (!row) {
-                this._log.warn("never-happen", { reason: "claim-missing-row", primaryKey: bestPk })
+                this._log.warning("never-happen", { reason: "claim-missing-row", primaryKey: bestPk })
                 return null
             }
             let best = fromRow(row)
@@ -154,7 +153,7 @@ class CollectionOutboxStore implements OutboxStore {
         for (let hit of hits) {
             let row = hit.value ?? (await this._col.get(String(hit.primaryKey)))
             if (!row) {
-                this._log.warn("never-happen", { reason: "list-failed-missing-row", primaryKey: hit.primaryKey })
+                this._log.warning("never-happen", { reason: "list-failed-missing-row", primaryKey: hit.primaryKey })
                 continue
             }
             let entry = fromRow(row)

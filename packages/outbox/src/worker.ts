@@ -1,10 +1,8 @@
-import { makeLog, makeSilentLog, reportFlowFailure, type Logger } from "@yorozu/log"
+import { init, reportError, type Logger } from "@yorozu/log"
 import { requestIdle, timers } from "@yorozu/utils"
 import { resolveClock } from "./ids"
 import { OUTBOX_MAX_FAILED, OUTBOX_MAX_FAILED_AGE_MS, pruneOutboxFailed } from "./prune"
 import type { Clock, OutboxEntry, OutboxStore } from "./types"
-
-const ISSUE_KEY: string = "yorozu-outbox"
 
 export type OutboxTransport = {
     send(entry: OutboxEntry): Promise<unknown>
@@ -86,7 +84,7 @@ export class OutboxWorker {
         protected readonly handlers: Record<string, OutboxHandler>,
         protected readonly options: OutboxWorkerOptions = {},
     ) {
-        this.log = makeLog(options.log ?? makeSilentLog(), ISSUE_KEY)
+        this.log = options.log ?? init("yorozu-outbox", "worker")
         this._clock = resolveClock(options.clock)
     }
 
@@ -191,8 +189,7 @@ export class OutboxWorker {
     }
 
     protected _report(err: unknown): void {
-        if (err instanceof Error) this.log.error(err)
-        else this.log.warn("never-happen", { err })
+        reportError(this.log, err)
     }
 
     protected async _prune(): Promise<void> {
@@ -223,11 +220,10 @@ export class OutboxWorker {
                 didWork = true
 
                 this.log.trace("outbox: claimed", { type: entry.type, id: entry.id, attempts: entry.attempts })
-                let flow = this.log.flow("outbox-process", { id: entry.id, type: entry.type, attempt: entry.attempts })
-                flow.info("start", { id: entry.id, type: entry.type, attempt: entry.attempts })
+                this.log.info("start", { id: entry.id, type: entry.type, attempt: entry.attempts })
                 let h = this.handlers[entry.type]
                 if (!h) {
-                    flow.warn("never-happen", { reason: "no-handler", type: entry.type })
+                    this.log.warning("never-happen", { reason: "no-handler", type: entry.type })
                     this.log.trace("outbox: no handler for type, deleting", { type: entry.type })
                     await this.store.delete(entry.id)
                     await this._yieldAfterHandled(++processed)
@@ -235,13 +231,11 @@ export class OutboxWorker {
                 }
 
                 try {
-                    await flow.span("process " + entry.type, async () => {
-                        let ctx: OutboxProcessContext | undefined
-                        if (this.options.transport) {
-                            ctx = { result: await this.options.transport.send(entry) }
-                        }
-                        await h.process(entry, ctx)
-                    })
+                    let ctx: OutboxProcessContext | undefined
+                    if (this.options.transport) {
+                        ctx = { result: await this.options.transport.send(entry) }
+                    }
+                    await h.process(entry, ctx)
                 } catch (err) {
                     let errMsg = err instanceof Error ? err.message : String(err)
                     let attempts = entry.attempts
@@ -251,9 +245,9 @@ export class OutboxWorker {
                     if (!retryable) {
                         this.log.trace("outbox: non-retryable error, exhausting", { type: entry.type })
                         await this._exhaust(entry, h, errMsg)
-                        reportFlowFailure(flow, err, { id: entry.id, type: entry.type, outcome: "exhausted" })
+                        reportError(this.log, err, { id: entry.id, type: entry.type, outcome: "exhausted" })
                     } else if (!online) {
-                        flow.warn("skip", { reason: "offline", id: entry.id, type: entry.type })
+                        this.log.warning("skip", { reason: "offline", id: entry.id, type: entry.type })
                         this.log.trace("outbox: transient failure while offline, not counting", { type: entry.type })
                         await Promise.resolve(this.store.releaseUncounted(entry.id, errMsg)).catch((e) => {
                             this._report(e)
@@ -262,14 +256,14 @@ export class OutboxWorker {
                     } else if (attempts >= max) {
                         this.log.trace("outbox: max attempts, exhausting", { type: entry.type })
                         await this._exhaust(entry, h, errMsg)
-                        reportFlowFailure(flow, err, { id: entry.id, type: entry.type, outcome: "exhausted" })
+                        reportError(this.log, err, { id: entry.id, type: entry.type, outcome: "exhausted" })
                     } else {
                         let base = this.options.retryBaseMs ?? 1000
                         let cap = this.options.retryCapMs ?? 30_000
                         let delay = Math.min(base * 2 ** (attempts - 1), cap)
                         let jitter = Math.floor(delay * 0.2 * Math.random())
                         let nextReservedTo = this._clock.now() + delay - jitter
-                        flow.warn("retry", { id: entry.id, type: entry.type, attempt: attempts, delayMs: delay })
+                        this.log.warning("retry", { id: entry.id, type: entry.type, attempt: attempts, delayMs: delay })
                         this.log.trace("outbox: backing off for retry", { type: entry.type, delayMs: delay })
                         await Promise.resolve(this.store.updateAfterFailure(entry.id, errMsg, nextReservedTo)).catch(
                             (e) => {
@@ -285,7 +279,7 @@ export class OutboxWorker {
                 } catch (err) {
                     this._report(err)
                 }
-                flow.info("done", { id: entry.id, type: entry.type })
+                this.log.info("done", { id: entry.id, type: entry.type })
                 await this._yieldAfterHandled(++processed)
             }
             await this._prune()

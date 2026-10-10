@@ -17,7 +17,7 @@ import {
     type TxMode,
 } from "@yorozu/db"
 import { createTxAls, type TxAlsGate } from "@yorozu/db/tx-als"
-import { makeLog, makeSilentLog, type Logger } from "@yorozu/log"
+import { init, reportError, type Logger } from "@yorozu/log"
 import { requestIdle, type IdleHandle } from "@yorozu/utils"
 import { toIdbKeyRange } from "./range"
 
@@ -60,11 +60,6 @@ type SeqBox = { n: number }
 function nextSeq(box: SeqBox): number {
     box.n++
     return box.n
-}
-
-function reportError(log: Logger, err: unknown): void {
-    if (err instanceof Error) log.error(err)
-    else log.warn("never-happen", { err })
 }
 
 function isScalarKey(value: unknown): value is string | number {
@@ -765,7 +760,7 @@ class IdbDriver implements DbDriver {
     protected _conns: Set<IdbDb> = new Set()
 
     constructor(opts: IdbDriverOpts) {
-        this.log = makeLog(opts.log ?? makeSilentLog(), "yorozu-db-idb")
+        this.log = opts.log ?? init("yorozu-db-idb", "driver")
         this._factory = opts.indexedDB ?? globalThis.indexedDB
         this._keyRange = opts.IDBKeyRange ?? globalThis.IDBKeyRange
         this._dbName = opts.dbName
@@ -776,7 +771,7 @@ class IdbDriver implements DbDriver {
     async open(schema: DbSchema): Promise<Db> {
         if (!this._factory) {
             let err = new Error("indexedDB is not available")
-            this.log.error(err)
+            reportError(this.log, err)
             throw err
         }
         let name = this._dbName ?? schema.name
@@ -799,7 +794,7 @@ class IdbDriver implements DbDriver {
     async drop(schema: DbSchema): Promise<void> {
         if (!this._factory) {
             let err = new Error("indexedDB is not available")
-            this.log.error(err)
+            reportError(this.log, err)
             throw err
         }
         let name = this._dbName ?? schema.name
