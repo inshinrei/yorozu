@@ -223,7 +223,7 @@ describe("createResourceCache", () => {
         expect(await col.count()).toBe(1)
     })
 
-    it("resource-evict flow is skip under cap and start/done when trimming", async () => {
+    it("bytes trim logs skip under cap and start/done when trimming", async () => {
         let col = await filesCol()
         let raw = createTestLog("yorozu-resource-cache", "evict")
         let cache = createResourceCache({

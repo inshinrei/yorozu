@@ -447,7 +447,7 @@ describe("OutboxWorker", () => {
         expect(deleteSpy).toHaveBeenCalledWith("e1")
     })
 
-    it("omitted log uses a silent logger and span still runs process", async () => {
+    it("omitted log still runs process", async () => {
         let { store, deleteSpy } = makeRepo([makeEntry()])
         let w = track(new OutboxWorker(store, handlers, { pollIntervalMs: 10 }))
         await startUntilIdle(w)
