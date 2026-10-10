@@ -1,41 +1,55 @@
-import { describe, expect, it } from "vitest"
-import { createTestLog, expectFlowStory } from "./test-log"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { configure, getConfig } from "./configure"
+import { createTestLog } from "./test-log"
+
+afterEach(() => {
+    configure({})
+})
 
 describe("createTestLog", () => {
-    it("captures a flow story with start then done", () => {
-        let log = createTestLog()
-        let flow = log.flow("checkout", { requestId: "r1" })
-        flow.info("start", { orderId: 1 })
-        flow.info("done", { orderId: 1 })
-        expectFlowStory(log.collect(), "checkout", ["start", "done"])
+    it("collects a record with subsystem, category, level, msg, and arguments", () => {
+        let log = createTestLog("s", "c")
+        let before = Date.now()
+        log.info("m", { k: 1 })
+        let rec = log.collect()[0]
+        expect(rec.subsystem).toBe("s")
+        expect(rec.category).toBe("c")
+        expect(rec.level).toBe("info")
+        expect(rec.msg).toBe("m")
+        expect(rec.arguments).toEqual({ k: 1 })
+        expect(rec.timestamp).toBeGreaterThanOrEqual(before)
+        expect(rec.timestamp).toBeLessThanOrEqual(Date.now())
     })
 
-    it("expectFlowStory fails on extra skip", () => {
+    it("clear empties the buffer", () => {
         let log = createTestLog()
-        let flow = log.flow("checkout")
-        flow.info("start", {})
-        flow.warn("skip", { reason: "x" })
-        flow.info("done", {})
-        expect(() => expectFlowStory(log.collect(), "checkout", ["start", "done"])).toThrow(
-            /expected start→done, got start→skip→done/,
-        )
+        log.info("m")
+        log.clear()
+        expect(log.collect()).toEqual([])
     })
 
-    it("span start/done on a flow child are not part of the flow story", async () => {
+    it("returns a detached copy from collect", () => {
         let log = createTestLog()
-        let flow = log.flow("checkout")
-        flow.info("start", {})
-        await flow.span("charge", async () => 1)
-        flow.info("done", {})
-        expectFlowStory(log.collect(), "checkout", ["start", "done"])
-        expect(log.collect().some((r) => (r.args ?? []).includes("span"))).toBe(true)
+        log.info("m")
+        let first = log.collect()
+        first.push(first[0])
+        expect(log.collect()).toHaveLength(1)
     })
 
-    it("flow.error is a story event", () => {
-        let log = createTestLog()
-        let flow = log.flow("checkout")
-        flow.info("start", {})
-        flow.error(new Error("boom"), { orderId: 1 })
-        expectFlowStory(log.collect(), "checkout", ["start", "error"])
+    it("does not read or write the global config", () => {
+        let spy = vi.fn()
+        configure({ handlers: [spy] })
+        let log = createTestLog("s", "c")
+        log.info("m")
+        expect(spy).not.toHaveBeenCalled()
+        expect(log.collect()).toHaveLength(1)
+        expect(getConfig().handlers).toEqual([spy])
+    })
+
+    it("isEnabled is true for every level even with no global handlers", () => {
+        configure({})
+        expect(createTestLog().isEnabled("trace")).toBe(true)
+        expect(createTestLog().subsystem).toBe("")
+        expect(createTestLog().category).toBe("")
     })
 })

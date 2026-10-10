@@ -1,15 +1,12 @@
 {
     "name": "@yorozu/log",
-    "version": "1.0.146",
+    "version": "1.0.147",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",
     "license": "MIT",
-    "description": "halua logger helpers (makeLog, silent, test)",
+    "description": "Swift-style logger (configure / init / handlers)",
     "exports": {
         ".": "./src/index.ts"
-    },
-    "dependencies": {
-        "halua": "5.0.0"
     }
 }
