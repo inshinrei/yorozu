@@ -233,6 +233,15 @@ importers:
 
   packages/log: {}
 
+  packages/log-persist:
+    dependencies:
+      '@yorozu/db':
+        specifier: workspace:^
+        version: link:../db
+      '@yorozu/log':
+        specifier: workspace:^
+        version: link:../log
+
   packages/media-viewer:
     dependencies:
       '@yorozu/animations':

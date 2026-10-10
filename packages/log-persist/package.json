@@ -1,0 +1,16 @@
+{
+    "name": "@yorozu/log-persist",
+    "version": "1.0.149",
+    "type": "module",
+    "sideEffects": false,
+    "author": "inshinrei",
+    "license": "MIT",
+    "description": "queryable rotating log store for @yorozu/log",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@yorozu/db": "workspace:^",
+        "@yorozu/log": "workspace:^"
+    }
+}
