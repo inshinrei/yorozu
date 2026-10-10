@@ -57,6 +57,15 @@ describe("openLogStore", () => {
         expect(rows[0]!.id).toMatch(/^1000-\d+$/)
     })
 
+    it("mutating a queried record does not change the stored row", async () => {
+        let { store } = await openStore()
+        store.handler(rec({ arguments: { a: 1 } }))
+        await store.flush()
+        let [first] = await store.query()
+        first!.arguments.a = 2
+        expect((await store.query())[0]!.arguments).toEqual({ a: 1 })
+    })
+
     it("assigns distinct ids when timestamps match", async () => {
         let { db, store } = await openStore()
         store.handler(rec({ msg: "a" }))
@@ -114,6 +123,25 @@ describe("openLogStore", () => {
         expect((await store.query({ until: 200 })).map((row) => row.msg)).toEqual(["a"])
     })
 
+    it("query since/until on a subsystem uses compound index bounds", async () => {
+        let { store } = await openStore()
+        store.handler(rec({ subsystem: "outbox", category: "worker", timestamp: 100, msg: "early" }))
+        store.handler(rec({ subsystem: "outbox", category: "worker", timestamp: 200, msg: "hit" }))
+        store.handler(rec({ subsystem: "outbox", category: "worker", timestamp: 300, msg: "late" }))
+        store.handler(rec({ subsystem: "db", category: "worker", timestamp: 200, msg: "other-sub" }))
+        store.handler(rec({ subsystem: "outbox", category: "store", timestamp: 200, msg: "other-cat" }))
+        await store.flush()
+        expect((await store.query({ subsystem: "outbox", since: 200, until: 300 })).map((row) => row.msg)).toEqual([
+            "hit",
+            "other-cat",
+        ])
+        expect(
+            (await store.query({ subsystem: "outbox", category: "worker", since: 200, until: 300 })).map(
+                (row) => row.msg,
+            ),
+        ).toEqual(["hit"])
+    })
+
     it("query limit with direction rev is newest first", async () => {
         let { store } = await openStore()
         store.handler(rec({ timestamp: 1, msg: "a" }))
@@ -121,6 +149,15 @@ describe("openLogStore", () => {
         store.handler(rec({ timestamp: 3, msg: "c" }))
         await store.flush()
         expect((await store.query({ limit: 2, direction: "rev" })).map((row) => row.msg)).toEqual(["c", "b"])
+    })
+
+    it("query limit of 0 or negative is empty", async () => {
+        let { store } = await openStore()
+        store.handler(rec({ timestamp: 1, msg: "a" }))
+        store.handler(rec({ timestamp: 2, msg: "b" }))
+        await store.flush()
+        expect(await store.query({ limit: 0 })).toEqual([])
+        expect(await store.query({ limit: -1 })).toEqual([])
     })
 
     it("applies limit after in-memory level filtering", async () => {
@@ -139,6 +176,19 @@ describe("openLogStore", () => {
         await store.flush()
         await store.clear()
         expect(await store.query()).toEqual([])
+    })
+
+    it("rotateEvery <= 0 rotates on every append", async () => {
+        let { store } = await openStore({
+            maxCount: 2,
+            rotateEvery: 0,
+            clock: { now: () => 10_000 },
+        })
+        for (let i = 0; i < 4; i++) {
+            store.handler(rec({ timestamp: 1000 + i, msg: String(i) }))
+        }
+        await store.flush()
+        expect((await store.query()).map((row) => row.msg)).toEqual(["2", "3"])
     })
 
     it("rotates by maxCount after appends", async () => {
@@ -179,6 +229,23 @@ describe("openLogStore", () => {
         await store.flush()
         expect(await store.query()).toHaveLength(5)
         await store.rotate()
+        expect((await store.query()).map((row) => row.msg)).toEqual(["2", "3", "4"])
+    })
+
+    it("rotate() finishes before a handler that fires after rotate is called", async () => {
+        let { store } = await openStore({
+            maxCount: 2,
+            rotateEvery: 100,
+            clock: { now: () => 10_000 },
+        })
+        store.handler(rec({ timestamp: 1, msg: "1" }))
+        store.handler(rec({ timestamp: 2, msg: "2" }))
+        store.handler(rec({ timestamp: 3, msg: "3" }))
+        await store.flush()
+        let done = store.rotate()
+        store.handler(rec({ timestamp: 4, msg: "4" }))
+        await done
+        await store.flush()
         expect((await store.query()).map((row) => row.msg)).toEqual(["2", "3", "4"])
     })
 

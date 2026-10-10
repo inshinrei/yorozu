@@ -61,7 +61,7 @@ function toRecord(row: LogRow): LogRecord {
         category: row.category,
         level: row.level as LogLevel,
         msg: row.msg,
-        arguments: row.arguments,
+        arguments: serializeArgs(row.arguments),
         timestamp: row.timestamp,
     }
 }
@@ -133,8 +133,13 @@ export function openLogStore(db: Db, opts?: LogStoreOpts): LogStore {
         }
     }
 
-    const enqueue = (work: () => Promise<void>): void => {
-        chain = chain.then(work, work)
+    const enqueue = (work: () => Promise<void>): Promise<void> => {
+        let next = chain.then(
+            () => work(),
+            () => work(),
+        )
+        chain = next
+        return next
     }
 
     const handler: LogHandler = (record) => {
@@ -148,7 +153,7 @@ export function openLogStore(db: Db, opts?: LogStoreOpts): LogStore {
                 msg: record.msg,
                 arguments: serializeArgs(record.arguments),
             }
-            enqueue(() => putRow(row))
+            void enqueue(() => putRow(row))
         } catch {
             // logging must not break the app
         }
@@ -165,19 +170,13 @@ export function openLogStore(db: Db, opts?: LogStoreOpts): LogStore {
             if (!matchesLevel(row, filter)) continue
             records.push(toRecord(row))
         }
-        if (filter?.limit != null) records = records.slice(0, filter.limit)
+        if (filter?.limit != null) records = filter.limit > 0 ? records.slice(0, filter.limit) : []
         return records
     }
 
-    const rotate = async (): Promise<void> => {
-        await chain
-        await doRotate()
-    }
+    const rotate = (): Promise<void> => enqueue(doRotate)
 
-    const clear = async (): Promise<void> => {
-        await chain
-        await col.clear()
-    }
+    const clear = (): Promise<void> => enqueue(() => col.clear())
 
     const flush = async (): Promise<void> => {
         await chain
