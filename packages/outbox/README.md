@@ -58,6 +58,7 @@ let worker = new OutboxWorker(store, handlers, {
     log, // optional; silent default
     clock,
     isOnline: () => navigator.onLine,
+    isUncountedError: (err) => false,
     isRetryableError: (err) => true,
     onActivity: () => {
         /* push outbox status */
@@ -85,7 +86,7 @@ Logger is optional. Internally: `options.log ?? init("yorozu-outbox", "worker")`
 
 - Collection `claim` is `keysOnly` + one `get` (FIFO by `createdAt` among due keys); payloads are `structuredClone`d on enqueue / get / claim / listFailed.
 - Claim/lease is a queue. Host injects `OutboxStore` + `Clock` + logger + handlers.
-- Success deletes. Non-retryable or max attempts exhaust. Offline `releaseUncounted` (does not count toward the cap) then skip. Else exponential backoff on `reservedTo`: `min(base * 2^(attempts-1), cap)` minus 0–20% jitter.
+- Success deletes. Uncounted (`isUncountedError`, checked before retryable) `releaseUncounted` + drain break (does not count toward the cap). Non-retryable or max attempts exhaust. Offline `releaseUncounted` (does not count toward the cap) then skip. Else exponential backoff on `reservedTo`: `min(base * 2^(attempts-1), cap)` minus 0–20% jitter.
 - Unknown type: `warning("never-happen")` then delete.
 - `onExhausted` → `markFailed` (retain). Else `rollback?` then delete.
 - Messenger keeps SyncManager, connectivity pause/resume, `withDurableWrite` / durability, and domain handlers. This package does not own those.

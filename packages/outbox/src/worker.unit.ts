@@ -409,6 +409,126 @@ describe("OutboxWorker", () => {
         expect(story(log)).toEqual(["start", "skip"])
     })
 
+    it("parks uncounted errors before retryable and does not claim the next row this tick", async () => {
+        let { store, state, markFailedSpy, releaseUncountedSpy, updateAfterFailureSpy } = makeRepo([
+            makeEntry({ attempts: 0 }),
+            makeEntry({ id: "e2", createdAt: 1_000_001, attempts: 0 }),
+        ])
+        let onExhausted = vi.fn(async (_entry: OutboxEntry): Promise<void> => {})
+        let processUncounted = vi.fn(async (): Promise<void> => {
+            throw new Error("session not live")
+        })
+        let parkedHandlers: Record<string, OutboxHandler> = {
+            "test/msg": { process: processUncounted, onExhausted },
+        }
+        let log = createTestLog("yorozu-outbox", "worker")
+        let w = track(
+            new OutboxWorker(store, parkedHandlers, {
+                log,
+                pollIntervalMs: 10,
+                maxAttempts: 5,
+                isOnline: () => true,
+                isRetryableError: () => false,
+                isUncountedError: (err: unknown): boolean => err instanceof Error && err.message === "session not live",
+            }),
+        )
+        await startUntilIdle(w)
+        expect(releaseUncountedSpy).toHaveBeenCalledTimes(1)
+        expect(releaseUncountedSpy).toHaveBeenCalledWith("e1", expect.any(String))
+        expect(markFailedSpy).not.toHaveBeenCalled()
+        expect(onExhausted).not.toHaveBeenCalled()
+        expect(updateAfterFailureSpy).not.toHaveBeenCalled()
+        expect(processUncounted).toHaveBeenCalledTimes(1)
+        expect(state.items[0]!.attempts).toBe(0)
+        expect(state.items[0]!.failedAt).toBeUndefined()
+        expect(state.items[0]!.reservedTo).toBe(0)
+        expect(state.items[1]!.id).toBe("e2")
+        expect(state.items[1]!.attempts).toBe(0)
+        expect(story(log)).toEqual(["start", "skip"])
+    })
+
+    it("exhausts when uncounted is false and retryable is false", async () => {
+        let { store, markFailedSpy, releaseUncountedSpy } = makeRepo([makeEntry({ type: "test/exhaust", attempts: 1 })])
+        let onExhausted = vi.fn(async (_entry: OutboxEntry): Promise<void> => {})
+        let exhaustHandlers: Record<string, OutboxHandler> = {
+            "test/exhaust": {
+                process: vi.fn(async (): Promise<void> => {
+                    throw new Error("bad request")
+                }),
+                onExhausted,
+            },
+        }
+        let w = track(
+            new OutboxWorker(store, exhaustHandlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 10,
+                maxAttempts: 5,
+                isOnline: () => true,
+                isRetryableError: () => false,
+                isUncountedError: () => false,
+            }),
+        )
+        await startUntilIdle(w)
+        expect(markFailedSpy).toHaveBeenCalledWith("e1", expect.any(String))
+        expect(onExhausted).toHaveBeenCalledTimes(1)
+        expect(releaseUncountedSpy).not.toHaveBeenCalled()
+    })
+
+    it("does not tight-loop claim while uncounted and still online", async () => {
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        processSpy.mockRejectedValue(new Error("session not live"))
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+                isOnline: () => true,
+                isRetryableError: () => true,
+                isUncountedError: (err: unknown): boolean => err instanceof Error && err.message === "session not live",
+                clock,
+            }),
+        )
+        await store.enqueue({ type: "test/msg", payload: {} })
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1000)
+        await flushMicrotasks()
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        expect(await store.count()).toBe(1)
+        expect(await store.listFailed()).toHaveLength(0)
+    })
+
+    it("wake after uncounted drain processes the parked row without burning attempts", async () => {
+        let uncounted = true
+        let clock: Clock = { now: () => Date.now() }
+        let store = openMemoryOutbox({ clock })
+        processSpy.mockImplementation(async (): Promise<void> => {
+            if (uncounted) throw new Error("session not live")
+        })
+        let w = track(
+            new OutboxWorker(store, handlers, {
+                log: createTestLog("yorozu-outbox", "worker"),
+                pollIntervalMs: 60_000,
+                isOnline: () => true,
+                isRetryableError: () => true,
+                isUncountedError: (err: unknown): boolean => err instanceof Error && err.message === "session not live",
+                clock,
+            }),
+        )
+        let id = await store.enqueue({ type: "test/msg", payload: {} })
+        await startUntilIdle(w)
+        expect(processSpy).toHaveBeenCalledTimes(1)
+        let parked = await store.get(id)
+        expect(parked).not.toBeNull()
+        expect(parked!.attempts).toBe(0)
+        expect(parked!.failedAt).toBeUndefined()
+        uncounted = false
+        w.wake()
+        await drainWorker()
+        expect(processSpy).toHaveBeenCalledTimes(2)
+        expect(await store.count()).toBe(0)
+    })
+
     it("deletes immediately for unknown handler type and warns never-happen", async () => {
         let { store, state, deleteSpy } = makeRepo([makeEntry({ type: "unknown/type" })])
         let log = createTestLog("yorozu-outbox", "worker")

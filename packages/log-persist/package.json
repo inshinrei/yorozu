@@ -1,6 +1,6 @@
 {
     "name": "@yorozu/log-persist",
-    "version": "1.0.151",
+    "version": "1.0.152",
     "type": "module",
     "sideEffects": false,
     "author": "inshinrei",

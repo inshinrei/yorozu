@@ -43,6 +43,11 @@ export type OutboxWorkerOptions = {
     /** Host-level online signal (e.g. `window` `online`). If omitted, offline→online waits for `wake()` or the watchdog. */
     subscribeOnline?: (onOnline: () => void) => () => void
     /**
+     * Park-and-break without burning the retry cap. Checked **before** `isRetryableError`.
+     * True → `releaseUncounted` + drain break, same as offline. Defaults to never-uncounted.
+     */
+    isUncountedError?: (err: unknown) => boolean
+    /**
      * Classifies an error as retryable (transient: network/5xx/429 → keep retrying) vs.
      * non-retryable (terminal: 4xx → fail now). Defaults to treating every error as retryable.
      */
@@ -206,6 +211,7 @@ export class OutboxWorker {
         if (this._processing || !this._running || this._paused) return
         this._processing = true
         let didWork = false
+        let parkedDrain = false
         try {
             let lease = this.options.leaseDurationMs ?? 30_000
             let max = this.options.maxAttempts ?? 5
@@ -239,10 +245,18 @@ export class OutboxWorker {
                 } catch (err) {
                     let errMsg = err instanceof Error ? err.message : String(err)
                     let attempts = entry.attempts
+                    let uncounted = this.options.isUncountedError ? this.options.isUncountedError(err) : false
                     let retryable = this.options.isRetryableError ? this.options.isRetryableError(err) : true
                     let online = this.options.isOnline ? this.options.isOnline() : true
 
-                    if (!retryable) {
+                    if (uncounted) {
+                        this.log.warning("skip", { reason: "uncounted", id: entry.id, type: entry.type })
+                        await Promise.resolve(this.store.releaseUncounted(entry.id, errMsg)).catch((e) => {
+                            this._report(e)
+                        })
+                        parkedDrain = true
+                        break
+                    } else if (!retryable) {
                         this.log.trace("outbox: non-retryable error, exhausting", { type: entry.type })
                         await this._exhaust(entry, h, errMsg)
                         reportError(this.log, err, { id: entry.id, type: entry.type, outcome: "exhausted" })
@@ -252,6 +266,7 @@ export class OutboxWorker {
                         await Promise.resolve(this.store.releaseUncounted(entry.id, errMsg)).catch((e) => {
                             this._report(e)
                         })
+                        parkedDrain = true
                         break
                     } else if (attempts >= max) {
                         this.log.trace("outbox: max attempts, exhausting", { type: entry.type })
@@ -301,7 +316,7 @@ export class OutboxWorker {
             if (this._wakePending) {
                 this._wakePending = false
                 let online = this.options.isOnline ? this.options.isOnline() : true
-                if (online) this.wake()
+                if (online && !parkedDrain) this.wake()
             }
         }
     }
