@@ -10,9 +10,14 @@ export const ALBUM_CYCLE_SIZES: number[] = [1, 2, 3, 4, 5, 6, 10]
 
 export const EMPTY_MEDIA_HINT: string = "No media yet — add playground/public/media/manifest.json"
 
-/** Packer geometry width — always the default token; CSS stretches the container. */
+/** packer bubble cap; CSS does not stretch the album. */
 export function albumPackWidth(): number {
     return DEFAULT_ALBUM_MAX_WIDTH
+}
+
+export function albumHostCssText(container: { width: number; height: number }): string {
+    if (!(container.width > 0) || !(container.height > 0)) return ""
+    return `width:${container.width}px;max-width:100%;aspect-ratio:${container.width} / ${container.height}`
 }
 
 export type ManifestMedia = {
@@ -163,7 +168,7 @@ function renderAlbum(
         spacing: DEFAULT_ALBUM_SPACING,
     })
     if (!(containerStyle.width > 0) || !(containerStyle.height > 0)) return album
-    album.style.aspectRatio = `${containerStyle.width} / ${containerStyle.height}`
+    album.style.cssText = albumHostCssText(containerStyle)
     for (let i = 0; i < entries.length; i++) {
         let entry = entries[i]
         let item = items[startIndex + i]

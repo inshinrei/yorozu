@@ -195,18 +195,18 @@ body {
 
 .pg-albums {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 1.25rem;
     width: 100%;
 }
 
 .pg-album {
     position: relative;
-    width: 100%;
-}
-
-.pg-album[data-count="1"] {
-    width: min(100%, 12rem);
+    flex: 0 1 auto;
+    max-width: 100%;
+    overflow: hidden;
+    border-radius: 0.75rem;
 }
 
 .pg-cell {
