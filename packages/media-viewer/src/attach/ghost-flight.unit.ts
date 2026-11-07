@@ -297,6 +297,80 @@ describe("attachMediaViewer", () => {
         }
     })
 
+    it("open ghost does not mount a clone when the clip box is empty", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        HTMLElement.prototype.getBoundingClientRect = () => fakeRect(0, 0, 0, 0)
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeNull()
+        } finally {
+            ghostHost.remove()
+        }
+    })
+
+    it("open ghost dest falls back to the active pane when the clip box is empty", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        HTMLElement.prototype.getBoundingClientRect = function () {
+            if (this.getAttribute("data-side") === "active") {
+                return fakeRect(4, 10, 200, 300)
+            }
+            return fakeRect(0, 0, 0, 0)
+        }
+        try {
+            viewer.open({
+                items: [imgAspect("a", 16, 9)],
+                origin,
+                ghost: true,
+            })
+            await vi.waitFor(() => {
+                expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()
+            })
+        } finally {
+            ghostHost.remove()
+        }
+    })
+
+    it("open ghost uses origin DOM img when the stage is video", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let originImg = document.createElement("img")
+        originImg.setAttribute("data-media-origin", "v")
+        originImg.src = "blob:origin-v"
+        document.body.append(originImg)
+        try {
+            viewer.open({
+                items: [{ id: "v", kind: "video", src: "v.mp4" }],
+                origin: { ...origin, id: "v", imageUrl: "https://cdn.example/video-thumb.jpg" },
+                ghost: true,
+            })
+            await vi.waitFor(() => {
+                expect(ghostHost.querySelector("[data-yorozu-media-ghost] img")).toBeTruthy()
+            })
+            let cloneImg = ghostHost.querySelector("[data-yorozu-media-ghost] img") as HTMLImageElement
+            expect(cloneImg.src).toContain("blob:origin-v")
+            expect(cloneImg.src).not.toContain("video-thumb")
+            expect(originImg.isConnected).toBe(true)
+        } finally {
+            originImg.remove()
+            ghostHost.remove()
+        }
+    })
+
     it("close ghost uses the stage img as bitmap and does not steal the stage node", async () => {
         let ghostHost = document.createElement("div")
         document.body.append(ghostHost)
@@ -565,6 +639,51 @@ describe("attachMediaViewer", () => {
         ghostHost.remove()
     })
 
+    it("close ghost still plays via viewport fallback when clip and pane boxes are empty", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        let closePose = { seen: false, width: "", height: "" }
+        let observer = new MutationObserver(() => {
+            let clone = ghostHost.querySelector("[data-yorozu-media-ghost]") as HTMLElement | null
+            if (!clone) return
+            closePose.seen = true
+            closePose.width = clone.style.width
+            closePose.height = clone.style.height
+        })
+        observer.observe(ghostHost, { childList: true })
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            HTMLElement.prototype.getBoundingClientRect = () => fakeRect(0, 0, 0, 0)
+            closePose = { seen: false, width: "", height: "" }
+            animate.mockClear()
+            api!.close()
+            await vi.waitFor(() => {
+                expect(animate.mock.calls.length).toBeGreaterThan(0)
+            })
+            expect(closePose.seen).toBe(true)
+            expect(closePose.width).toBe(`${window.innerWidth}px`)
+            expect(closePose.height).toBe(`${window.innerHeight}px`)
+        } finally {
+            observer.disconnect()
+            ghostHost.remove()
+        }
+    })
+
     it("close ghost still plays when stage fit is null", async () => {
         let api: MediaViewerChromeApi | undefined
         viewer.open({
@@ -588,5 +707,53 @@ describe("attachMediaViewer", () => {
         await vi.waitFor(() => {
             expect(animate.mock.calls.length).toBeGreaterThan(before)
         })
+    })
+
+    it("close ghost does not start after attach stop during close dualRaf", async () => {
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let api: MediaViewerChromeApi | undefined
+        try {
+            viewer.open({
+                items: [img("a")],
+                origin,
+                ghost: true,
+                chrome: {
+                    header: (_el, chromeApi) => {
+                        api = chromeApi
+                    },
+                },
+            })
+            await vi.waitFor(() => {
+                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
+            })
+            animate.mockClear()
+            ghostHost.replaceChildren()
+            let queued: FrameRequestCallback[] = []
+            let raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+                queued.push(cb)
+                return queued.length
+            })
+            try {
+                api!.close()
+                expect(queued.length).toBeGreaterThan(0)
+                stop?.()
+                stop = undefined
+                while (queued.length > 0) {
+                    let batch = queued.splice(0)
+                    for (let cb of batch) cb(0)
+                }
+                await Promise.resolve()
+                await Promise.resolve()
+                expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeNull()
+                expect(animate).not.toHaveBeenCalled()
+            } finally {
+                raf.mockRestore()
+            }
+        } finally {
+            ghostHost.remove()
+        }
     })
 })

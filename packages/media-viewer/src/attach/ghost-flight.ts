@@ -155,6 +155,9 @@ export function createGhostFlight(opts: {
     async function runCloseGhost(): Promise<boolean> {
         opts.applyOverlayAttrs()
         await dualRaf()
+        let overlay = opts.getOverlay()
+        let viewport = opts.getViewport()
+        if (opts.isDetached() || !viewport || !overlay) return false
         opts.applyOverlayAttrs()
         let snap = opts.viewer.snapshot()
         let current = snap.current
