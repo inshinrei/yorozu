@@ -239,6 +239,9 @@ describe("attachMediaViewer", () => {
         }
         HTMLElement.prototype.getBoundingClientRect = () => layoutBox as DOMRect
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
+        expect(scrollTo).toHaveBeenCalledWith(
+            expect.objectContaining({ behavior: "instant", left: expect.any(Number) }),
+        )
         scrollTo.mockClear()
         viewer.goTo(2)
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth", left: expect.any(Number) }))

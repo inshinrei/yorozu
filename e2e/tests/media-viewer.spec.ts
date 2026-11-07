@@ -592,19 +592,19 @@ test("keyboard switch does not pan the active bitmap", async ({ page }) => {
 })
 
 test("reduced-motion album swipe pages without parallax and morphs filmstrip", async ({ page }) => {
-    await openMediaViewer(page, "img-wide")
+    await openMediaViewer(page, "img-tall")
     let startIndex = await currentThumb(page).getAttribute("data-index")
-    // img-tall incoming current width equals neighbor (44px); morph is the landscape current shrinking.
-    let rest = (await currentThumb(page).boundingBox())!.width
-    await swipeViewportHold(page, -80, 0)
+    let incoming = page.locator(`[data-yorozu-media-thumb][data-index="${Number(startIndex) - 1}"]`)
+    let incomingRest = (await incoming.boundingBox())!.width
+    await swipeViewportHold(page, 80, 0)
     await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
     expect(await currentThumb(page).getAttribute("data-index")).toBe(String(startIndex))
     expect(await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)).toBe("")
-    let live = (await currentThumb(page).boundingBox())!.width
-    expect(live).toBeLessThan(rest)
+    let incomingLive = (await incoming.boundingBox())!.width
+    expect(incomingLive).toBeGreaterThan(incomingRest)
     await page.mouse.up()
     await waitMs(MEDIA_VIEWER_SETTLE_MS + 150)
-    await expectIndex(page, Number(startIndex) + 1)
+    await expectIndex(page, Number(startIndex) - 1)
 })
 
 test("ghost open lands on the clip at 390px without hiding origin", async ({ page }) => {
@@ -629,24 +629,25 @@ test("ghost open lands on the clip at 390px without hiding origin", async ({ pag
             vis: origin ? getComputedStyle(origin).visibility : "",
         }
     })
-    let pair = await landed.jsonValue()
-    expect(pair).not.toBeNull()
-    let g = pair!.g
-    let c = pair!.c
-    expect(g).not.toBeNull()
-    expect(c).not.toBeNull()
+    let pair = (await landed.jsonValue()) as {
+        g: { x: number; y: number; width: number; height: number }
+        c: { x: number; y: number; width: number; height: number }
+        vis: string
+    }
+    let g = pair.g
+    let c = pair.c
     expect(Math.abs(g.x - c.x)).toBeLessThanOrEqual(2)
     expect(Math.abs(g.y - c.y)).toBeLessThanOrEqual(2)
     expect(Math.abs(g.width - c.width)).toBeLessThanOrEqual(2)
     expect(Math.abs(g.height - c.height)).toBeLessThanOrEqual(2)
-    expect(pair!.vis).toBe("visible")
+    expect(pair.vis).toBe("visible")
     await expect(ghost).toHaveCount(0, { timeout: 2000 })
     let after = await clip.boundingBox()
     expect(after).not.toBeNull()
-    expect(Math.abs(after!.x - c.x)).toBeLessThanOrEqual(2)
-    expect(Math.abs(after!.y - c.y)).toBeLessThanOrEqual(2)
-    expect(Math.abs(after!.width - c.width)).toBeLessThanOrEqual(2)
-    expect(Math.abs(after!.height - c.height)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.x - g.x)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.y - g.y)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.width - g.width)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.height - g.height)).toBeLessThanOrEqual(2)
     await page.locator("#chrome-close").click()
     await waitGone(viewer(page))
     let vis = await page
