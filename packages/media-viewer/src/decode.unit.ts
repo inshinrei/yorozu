@@ -275,6 +275,23 @@ describe("applyCanvasImageSource", () => {
         expect(out.draggable).toBe(false)
     })
 
+    it("clones a connected HTMLImageElement and leaves the source in its parent", () => {
+        let host = document.createElement("div")
+        let parent = document.createElement("div")
+        document.body.append(host)
+        let img = document.createElement("img")
+        img.src = "blob:origin-a"
+        host.append(img)
+        applyCanvasImageSource(parent, img, { stage: true, alt: "" })
+        let out = parent.querySelector("[data-yorozu-media-stage]") as HTMLImageElement
+        expect(out).toBeInstanceOf(HTMLImageElement)
+        expect(out).not.toBe(img)
+        expect(out.src).toContain("blob:origin-a")
+        expect(img.parentNode).toBe(host)
+        expect(host.contains(img)).toBe(true)
+        host.remove()
+    })
+
     it("draws a non-img source onto a canvas stage", () => {
         let parent = document.createElement("div")
         let source = document.createElement("canvas")

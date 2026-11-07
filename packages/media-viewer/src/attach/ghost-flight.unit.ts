@@ -38,6 +38,12 @@ describe("attachMediaViewer", () => {
         stop = mount.stop
         animate = mount.animate
         onIndexChange = mount.onIndexChange
+        HTMLElement.prototype.getBoundingClientRect = function () {
+            if (this.getAttribute("data-yorozu-media-clip") === "") {
+                return fakeRect(0, 0, 200, 300)
+            }
+            return fakeRect(0, 0, 0, 0)
+        }
     })
 
     afterEach(() => {
@@ -166,10 +172,12 @@ describe("attachMediaViewer", () => {
         api!.close()
         expect(overlay.getAttribute("data-phase")).toBe("closing")
         expect(overlay.hasAttribute("data-scrim")).toBe(false)
-        expect(document.documentElement.classList.contains("yorozu-media-ghost-animating")).toBe(true)
+        await vi.waitFor(() => {
+            expect(document.documentElement.classList.contains("yorozu-media-ghost-animating")).toBe(true)
+        })
     })
 
-    it("hides the origin thumb after ghost takeoff and restores it after close", async () => {
+    it("keeps the origin thumb visible during open ghost and after close", async () => {
         let ghostHost = document.createElement("div")
         document.body.append(ghostHost)
         stop?.()
@@ -194,50 +202,18 @@ describe("attachMediaViewer", () => {
                 expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(true)
             })
             expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()
-            expect(thumb.style.visibility).toBe("hidden")
-
+            expect(thumb.style.visibility).toBe("visible")
             await vi.waitFor(() => {
                 expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
             })
-            expect(thumb.style.visibility).toBe("hidden")
-
+            expect(thumb.style.visibility).toBe("visible")
             api!.close()
-            expect(thumb.style.visibility).toBe("hidden")
+            expect(thumb.style.visibility).toBe("visible")
             await vi.waitFor(() => {
                 expect(root.querySelector("[data-yorozu-media-viewer]")).toBeNull()
             })
             expect(thumb.style.visibility).toBe("visible")
         } finally {
-            thumb.remove()
-            ghostHost.remove()
-        }
-    })
-
-    it("hides the origin thumb only after the ghost clone is in the host", async () => {
-        let ghostHost = document.createElement("div")
-        document.body.append(ghostHost)
-        stop?.()
-        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
-        let thumb = document.createElement("img")
-        thumb.setAttribute("data-media-origin", "a")
-        thumb.style.visibility = "visible"
-        document.body.append(thumb)
-        let atHide = { seen: false, clone: null as Element | null }
-        let stopTrap = trapVisibility(thumb, (value) => {
-            if (value !== "hidden") return
-            atHide.seen = true
-            atHide.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
-        })
-        try {
-            viewer.open({ items: [img("a")], origin, ghost: true })
-            await vi.waitFor(() => {
-                expect(atHide.seen).toBe(true)
-            })
-            expect(atHide.clone).toBeTruthy()
-            expect(thumb.style.visibility).toBe("hidden")
-            expect(document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS)).toBe(true)
-        } finally {
-            stopTrap()
             thumb.remove()
             ghostHost.remove()
         }
@@ -270,52 +246,6 @@ describe("attachMediaViewer", () => {
         }
     })
 
-    it("restores origin visibility while the close ghost clone is still mounted", async () => {
-        let ghostHost = document.createElement("div")
-        document.body.append(ghostHost)
-        stop?.()
-        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
-        let api: MediaViewerChromeApi | undefined
-        let thumb = document.createElement("img")
-        thumb.setAttribute("data-media-origin", "a")
-        thumb.style.visibility = "visible"
-        document.body.append(thumb)
-        try {
-            viewer.open({
-                items: [img("a")],
-                origin,
-                ghost: true,
-                chrome: {
-                    header: (_el, chromeApi) => {
-                        api = chromeApi
-                    },
-                },
-            })
-            await vi.waitFor(() => {
-                expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
-            })
-            expect(thumb.style.visibility).toBe("hidden")
-            let atUncover = { seen: false, clone: null as Element | null }
-            let stopTrap = trapVisibility(thumb, (value) => {
-                if (value !== "visible") return
-                atUncover.seen = true
-                atUncover.clone = ghostHost.querySelector("[data-yorozu-media-ghost]")
-            })
-            try {
-                api!.close()
-                await vi.waitFor(() => {
-                    expect(atUncover.seen).toBe(true)
-                })
-                expect(atUncover.clone).toBeTruthy()
-            } finally {
-                stopTrap()
-            }
-        } finally {
-            thumb.remove()
-            ghostHost.remove()
-        }
-    })
-
     it("does not hide the origin thumb when ghost is skipped", () => {
         let thumb = document.createElement("img")
         thumb.setAttribute("data-media-origin", "a")
@@ -326,6 +256,44 @@ describe("attachMediaViewer", () => {
             expect(thumb.style.visibility).toBe("visible")
         } finally {
             thumb.remove()
+        }
+    })
+
+    it("open ghost dest uses the live clip box not window insets", async () => {
+        vi.stubGlobal("innerWidth", 390)
+        vi.stubGlobal("innerHeight", 844)
+        let ghostHost = document.createElement("div")
+        document.body.append(ghostHost)
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
+        let thumb = stampOriginThumb("a", { left: 20, top: 10, width: 40, height: 40 })
+        let proto = HTMLElement.prototype.getBoundingClientRect
+        HTMLElement.prototype.getBoundingClientRect = function () {
+            if (this.getAttribute("data-yorozu-media-clip") === "") {
+                return fakeRect(8, 80, 374, 520)
+            }
+            return proto.call(this)
+        }
+        try {
+            viewer.open({
+                items: [imgAspect("a", 16, 9)],
+                origin,
+                ghost: true,
+            })
+            await vi.waitFor(() => {
+                expect(ghostHost.querySelector("[data-yorozu-media-ghost]")).toBeTruthy()
+            })
+            let clone = ghostHost.querySelector("[data-yorozu-media-ghost]") as HTMLElement
+            expect(clone.style.left).toBe("8px")
+            expect(clone.style.top).toBe("80px")
+            expect(clone.style.width).toBe("374px")
+            expect(clone.style.height).toBe("520px")
+            expect(clone.style.width).not.toBe("366px")
+        } finally {
+            HTMLElement.prototype.getBoundingClientRect = proto
+            vi.unstubAllGlobals()
+            thumb.remove()
+            ghostHost.remove()
         }
     })
 
@@ -401,15 +369,15 @@ describe("attachMediaViewer", () => {
         stop = attachMediaViewer(viewer, root, { getGhostHost: () => ghostHost })
         let api: MediaViewerChromeApi | undefined
         let thumb = stampOriginThumb("a", { left: 80, top: 10, width: 40, height: 40 })
-        let atUncover = { seen: false, clone: null as Element | null, left: "", top: "" }
-        let stopTrap = trapVisibility(thumb, (value) => {
-            if (value !== "visible") return
-            atUncover.seen = true
+        let closePose = { seen: false, left: "", top: "" }
+        let observer = new MutationObserver(() => {
             let clone = ghostHost.querySelector("[data-yorozu-media-ghost]") as HTMLElement | null
-            atUncover.clone = clone
-            atUncover.left = clone?.style.left ?? ""
-            atUncover.top = clone?.style.top ?? ""
+            if (!clone) return
+            closePose.seen = true
+            closePose.left = clone.style.left
+            closePose.top = clone.style.top
         })
+        observer.observe(ghostHost, { childList: true })
         try {
             viewer.open({
                 items: [img("a")],
@@ -424,6 +392,7 @@ describe("attachMediaViewer", () => {
             await vi.waitFor(() => {
                 expect(root.querySelector("[data-yorozu-media-viewer]")?.getAttribute("data-phase")).toBe("open")
             })
+            closePose = { seen: false, left: "", top: "" }
             animate.mockClear()
             api!.close()
             await vi.waitFor(() => {
@@ -437,14 +406,11 @@ describe("attachMediaViewer", () => {
                 easing: MEDIA_GHOST_CLOSE_EASING,
                 fill: "forwards",
             })
-            await vi.waitFor(() => {
-                expect(atUncover.seen).toBe(true)
-            })
-            expect(atUncover.clone).toBeTruthy()
-            expect(atUncover.left).toBe("80px")
-            expect(atUncover.top).toBe("10px")
+            expect(closePose.seen).toBe(true)
+            expect(closePose.left).toBe("80px")
+            expect(closePose.top).toBe("10px")
         } finally {
-            stopTrap()
+            observer.disconnect()
             thumb.remove()
             ghostHost.remove()
         }
@@ -619,11 +585,8 @@ describe("attachMediaViewer", () => {
             document.documentElement.classList.contains(MEDIA_GHOST_ANIMATING_CLASS) ||
                 overlay?.getAttribute("data-phase") === "closing",
         ).toBe(true)
-        await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => resolve())
-            })
+        await vi.waitFor(() => {
+            expect(animate.mock.calls.length).toBeGreaterThan(before)
         })
-        expect(animate.mock.calls.length).toBeGreaterThan(before)
     })
 })

@@ -304,11 +304,17 @@ export function applyCanvasImageSource(
     opts: { peek?: boolean; stage?: boolean; alt?: string },
 ): HTMLElement {
     if (source instanceof HTMLImageElement) {
-        markMediaNode(source, opts)
-        source.draggable = false
-        if (opts.alt !== undefined) source.alt = opts.alt
-        parent.append(source)
-        return source
+        let node = source
+        if (source.isConnected) {
+            node = document.createElement("img")
+            let src = source.currentSrc || source.src
+            if (src) node.src = src
+        }
+        markMediaNode(node, opts)
+        node.draggable = false
+        if (opts.alt !== undefined) node.alt = opts.alt
+        parent.append(node)
+        return node
     }
     let canvas = document.createElement("canvas")
     markMediaNode(canvas, opts)

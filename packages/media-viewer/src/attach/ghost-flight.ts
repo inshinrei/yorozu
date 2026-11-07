@@ -28,7 +28,6 @@ export function createGhostFlight(opts: {
     applyOverlayAttrs: () => void
 }): AttachGhostFlight {
     let ghost = createMediaGhost()
-    let originCover: { el: HTMLElement; prev: string } | null = null
 
     function paintedStageEl(): HTMLElement | null {
         let overlay = opts.getOverlay()
@@ -52,7 +51,48 @@ export function createGhostFlight(opts: {
         if (stage instanceof HTMLImageElement || stage instanceof HTMLCanvasElement) return stage
         let peek = active.querySelector("[data-yorozu-media-peek]")
         if (peek instanceof HTMLImageElement || peek instanceof HTMLCanvasElement) return peek
+        let id = opts.viewer.snapshot().current?.id ?? opts.viewer.snapshot().origin?.id
+        if (!id) return undefined
+        let originEl = queryMediaOriginEl(id)
+        if (
+            originEl instanceof HTMLImageElement ||
+            originEl instanceof HTMLCanvasElement ||
+            originEl instanceof HTMLVideoElement
+        ) {
+            return originEl
+        }
+        let nested = originEl?.querySelector("img, canvas, video")
+        if (
+            nested instanceof HTMLImageElement ||
+            nested instanceof HTMLCanvasElement ||
+            nested instanceof HTMLVideoElement
+        ) {
+            return nested
+        }
         return undefined
+    }
+
+    function paintedDestRect(
+        snap: MediaViewerSnapshot,
+    ): { top: number; left: number; width: number; height: number } | null {
+        let overlay = opts.getOverlay()
+        let clip = overlay?.querySelector('[data-side="active"] [data-yorozu-media-clip]')
+        if (clip instanceof HTMLElement) {
+            let box = clip.getBoundingClientRect()
+            if (box.width > 0 && box.height > 0) {
+                return { top: box.top, left: box.left, width: box.width, height: box.height }
+            }
+        }
+        let pane = overlay?.querySelector('[data-side="active"]')
+        if (pane instanceof HTMLElement) {
+            let box = pane.getBoundingClientRect()
+            if (box.width > 0 && box.height > 0) {
+                return computeStageFitRectFromElement(pane, naturalForFit(snap))
+            }
+        }
+        let stage = paintedStageEl()
+        if (stage) return computeStageFitRectFromElement(stage, naturalForFit(snap))
+        return null
     }
 
     function naturalForFit(snap: MediaViewerSnapshot): { width: number; height: number } {
@@ -81,20 +121,6 @@ export function createGhostFlight(opts: {
         return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
     }
 
-    function coverOriginEl(el: HTMLElement | null): void {
-        if (!el) return
-        if (originCover?.el === el) return
-        uncoverOriginEl()
-        originCover = { el, prev: el.style.visibility }
-        el.style.visibility = "hidden"
-    }
-
-    function uncoverOriginEl(): void {
-        if (!originCover) return
-        originCover.el.style.visibility = originCover.prev
-        originCover = null
-    }
-
     async function runOpenGhost(hooks: { onLand: () => void | Promise<void> }): Promise<boolean> {
         let snap = opts.viewer.snapshot()
         let seed = snap.origin
@@ -105,8 +131,8 @@ export function createGhostFlight(opts: {
         let viewport = opts.getViewport()
         if (opts.isDetached() || !viewport || !overlay) return false
         opts.applyOverlayAttrs()
-        let stage = paintedStageEl() ?? viewport
-        let to = computeStageFitRectFromElement(stage, naturalForFit(snap))
+        let to = paintedDestRect(snap)
+        if (!to) return false
         let handle = ghost.playOpen({
             host: opts.getGhostHost(),
             seed,
@@ -121,7 +147,6 @@ export function createGhostFlight(opts: {
             },
         })
         if (!handle) return false
-        coverOriginEl(queryMediaOriginEl(seed.id))
         let ran = await handle.done
         opts.applyOverlayAttrs()
         return ran
@@ -129,16 +154,19 @@ export function createGhostFlight(opts: {
 
     async function runCloseGhost(): Promise<boolean> {
         opts.applyOverlayAttrs()
+        await dualRaf()
+        opts.applyOverlayAttrs()
         let snap = opts.viewer.snapshot()
         let current = snap.current
         let live = current ? captureOriginFromDom(current.id) : null
-        let viewport = opts.getViewport()
-        let stage = paintedStageEl() ?? viewport
-        let fromStage = stage ? computeStageFitRectFromElement(stage, naturalForFit(snap)) : null
-        if (!fromStage && stage) {
-            let box = stage.getBoundingClientRect()
-            if (box.width > 0 && box.height > 0) {
-                fromStage = { top: box.top, left: box.left, width: box.width, height: box.height }
+        let fromStage = paintedDestRect(snap)
+        if (!fromStage) {
+            let stage = paintedStageEl() ?? opts.getViewport()
+            if (stage) {
+                let box = stage.getBoundingClientRect()
+                if (box.width > 0 && box.height > 0) {
+                    fromStage = { top: box.top, left: box.left, width: box.width, height: box.height }
+                }
             }
         }
         if (!fromStage) {
@@ -162,7 +190,6 @@ export function createGhostFlight(opts: {
             bitmap: ghostBitmap(),
             durationMs: MEDIA_GHOST_CLOSE_MS,
             easing: MEDIA_GHOST_CLOSE_EASING,
-            onLand: uncoverOriginEl,
         })
         if (!handle) return false
         let ran = await handle.done
@@ -178,6 +205,6 @@ export function createGhostFlight(opts: {
         runOpenGhost,
         runCloseGhost,
         cancel,
-        uncover: uncoverOriginEl,
+        uncover: (): void => {},
     }
 }
