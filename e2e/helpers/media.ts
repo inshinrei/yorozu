@@ -17,10 +17,11 @@ export async function waitOpen(page: Page): Promise<void> {
 export async function openMediaViewer(
     page: Page,
     id: string,
-    opts?: { motion?: boolean; strip?: "short"; viewport?: { width: number; height: number } },
+    opts?: { motion?: boolean; ghost?: boolean; strip?: "short"; viewport?: { width: number; height: number } },
 ): Promise<void> {
     let params = new URLSearchParams()
     if (opts?.motion) params.set("motion", "1")
+    if (opts?.ghost) params.set("ghost", "1")
     if (opts?.strip === "short") params.set("strip", "short")
     let qs = params.toString()
     if (opts?.viewport) await page.setViewportSize(opts.viewport)

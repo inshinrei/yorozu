@@ -590,3 +590,67 @@ test("keyboard switch does not pan the active bitmap", async ({ page }) => {
     await expect(page.locator("[data-yorozu-media-viewport]")).not.toHaveAttribute("data-pager-field")
     expect(await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)).toBe("")
 })
+
+test("reduced-motion album swipe pages without parallax and morphs filmstrip", async ({ page }) => {
+    await openMediaViewer(page, "img-wide")
+    let startIndex = await currentThumb(page).getAttribute("data-index")
+    // img-tall incoming current width equals neighbor (44px); morph is the landscape current shrinking.
+    let rest = (await currentThumb(page).boundingBox())!.width
+    await swipeViewportHold(page, -80, 0)
+    await expect(page.locator("[data-yorozu-media-viewport]")).toHaveAttribute("data-pager-field", "")
+    expect(await currentThumb(page).getAttribute("data-index")).toBe(String(startIndex))
+    expect(await activeStage(page).evaluate((el) => (el as HTMLElement).style.transform)).toBe("")
+    let live = (await currentThumb(page).boundingBox())!.width
+    expect(live).toBeLessThan(rest)
+    await page.mouse.up()
+    await waitMs(MEDIA_VIEWER_SETTLE_MS + 150)
+    await expectIndex(page, Number(startIndex) + 1)
+})
+
+test("ghost open lands on the clip at 390px without hiding origin", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/media-viewer.html?motion=1&ghost=1")
+    await page.locator('[data-id="img-wide"]').click()
+    let ghost = page.locator("[data-yorozu-media-ghost]")
+    let clip = page.locator("[data-side=active] [data-yorozu-media-clip]")
+    // Handoff + clone exist for ~1 frame; locator polls miss that window.
+    let landed = await page.waitForFunction(() => {
+        if (!document.documentElement.classList.contains("yorozu-media-ghost-handoff")) return null
+        let ghostEl = document.querySelector("[data-yorozu-media-ghost]")
+        let clipEl = document.querySelector("[data-side=active] [data-yorozu-media-clip]")
+        if (!(ghostEl instanceof HTMLElement) || !(clipEl instanceof HTMLElement)) return null
+        let g = ghostEl.getBoundingClientRect()
+        let c = clipEl.getBoundingClientRect()
+        let origin = document.querySelector('[data-yorozu-media-origin="img-wide"]')
+        return {
+            g: { x: g.x, y: g.y, width: g.width, height: g.height },
+            c: { x: c.x, y: c.y, width: c.width, height: c.height },
+            vis: origin ? getComputedStyle(origin).visibility : "",
+        }
+    })
+    let pair = await landed.jsonValue()
+    expect(pair).not.toBeNull()
+    let g = pair!.g
+    let c = pair!.c
+    expect(g).not.toBeNull()
+    expect(c).not.toBeNull()
+    expect(Math.abs(g.x - c.x)).toBeLessThanOrEqual(2)
+    expect(Math.abs(g.y - c.y)).toBeLessThanOrEqual(2)
+    expect(Math.abs(g.width - c.width)).toBeLessThanOrEqual(2)
+    expect(Math.abs(g.height - c.height)).toBeLessThanOrEqual(2)
+    expect(pair!.vis).toBe("visible")
+    await expect(ghost).toHaveCount(0, { timeout: 2000 })
+    let after = await clip.boundingBox()
+    expect(after).not.toBeNull()
+    expect(Math.abs(after!.x - c.x)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.y - c.y)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.width - c.width)).toBeLessThanOrEqual(2)
+    expect(Math.abs(after!.height - c.height)).toBeLessThanOrEqual(2)
+    await page.locator("#chrome-close").click()
+    await waitGone(viewer(page))
+    let vis = await page
+        .locator('[data-yorozu-media-origin="img-wide"]')
+        .evaluate((el) => getComputedStyle(el).visibility)
+    expect(vis).toBe("visible")
+})

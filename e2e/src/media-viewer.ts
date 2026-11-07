@@ -30,6 +30,7 @@ if (new URLSearchParams(location.search).get("strip") === "short") {
 }
 
 const prefersReducedMotion = (): boolean => new URLSearchParams(location.search).get("motion") !== "1"
+const ghostOn = (): boolean => new URLSearchParams(location.search).get("ghost") === "1"
 
 const paintHeader = (container: HTMLElement, api: MediaViewerChromeApi): (() => void) => {
     let bar = document.createElement("div")
@@ -131,7 +132,7 @@ gallery.addEventListener("click", (event: MouseEvent) => {
         items,
         index,
         origin: captureOriginFromDom(id, { attr: "data-yorozu-media-origin" }),
-        ghost: false,
+        ghost: ghostOn(),
         filmstrip: true,
         chrome: { header: paintHeader },
     })
