@@ -105,7 +105,7 @@ describe("createMediaSwipe", () => {
         swipe.destroy()
     })
 
-    it("commits newer on reduced-motion pointer swipe and snaps after the rebase hop", async () => {
+    it("commits newer on reduced-motion pointer swipe and hops to rest", async () => {
         let onNewer = vi.fn()
         let swipe = createMediaSwipe(
             baseCbs({
@@ -118,6 +118,9 @@ describe("createMediaSwipe", () => {
         swipe.onPointerUp(pointer("pointerup", { clientX: 320, clientY: 200 }))
         expect(onNewer).toHaveBeenCalledTimes(1)
         await vi.advanceTimersByTimeAsync(16)
+        expect(swipe.offsetX()).not.toBe(0)
+        expect(swipe.settling()).toBe(true)
+        await vi.advanceTimersByTimeAsync(MEDIA_SWIPE_SETTLE_MS + 48)
         expect(swipe.offsetX()).toBe(0)
         swipe.destroy()
     })

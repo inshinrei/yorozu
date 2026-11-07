@@ -181,13 +181,28 @@ describe("createOffsetDrag", () => {
         drag.destroy()
     })
 
-    it("settleTo duration 0 snaps when reduced motion", () => {
+    it("settleTo honors explicit duration when reduced motion", async () => {
         let drag = createOffsetDrag({
             getEnabled: () => true,
             prefersReducedMotion: () => true,
         })
         drag.setOffset(-80, 0)
         drag.settleTo(0, 0, 350)
+        expect(drag.settling()).toBe(true)
+        expect(drag.offsetX()).not.toBe(0)
+        await vi.advanceTimersByTimeAsync(350 + 48)
+        expect(drag.offsetX()).toBe(0)
+        expect(drag.settling()).toBe(false)
+        drag.destroy()
+    })
+
+    it("settleTo without duration snaps when reduced motion", () => {
+        let drag = createOffsetDrag({
+            getEnabled: () => true,
+            prefersReducedMotion: () => true,
+        })
+        drag.setOffset(-80, 0)
+        drag.settleTo(0, 0)
         expect(drag.offsetX()).toBe(0)
         expect(drag.settling()).toBe(false)
         drag.destroy()

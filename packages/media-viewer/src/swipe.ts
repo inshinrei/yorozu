@@ -51,7 +51,7 @@ export function rebasedOffsetAfterNav(offsetX: number, dir: "older" | "newer", v
 }
 
 export function swipeSettleDurationMs(kind: "bounce" | "nav", reduced: boolean): number {
-    if (reduced) return 0
+    void reduced
     return kind === "nav" ? MOTION_NAV_MS : MOTION_SETTLE_MS
 }
 

@@ -111,7 +111,7 @@ export function createOffsetDrag(config: OffsetDragConfig): OffsetDrag {
         let fromX = offsetX
         let fromY = offsetY
         if (x === 0 && y === 0) axis = "none"
-        let duration = config.prefersReducedMotion?.() ? 0 : (durationMs ?? MOTION_SETTLE_MS)
+        let duration = durationMs ?? (config.prefersReducedMotion?.() ? 0 : MOTION_SETTLE_MS)
         if (duration <= 0 || (fromX === x && fromY === y)) {
             offsetX = x
             offsetY = y

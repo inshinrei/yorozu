@@ -241,8 +241,8 @@ describe("media-viewer swipe math", () => {
     it("swipeSettleDurationMs uses motion tokens", () => {
         expect(swipeSettleDurationMs("nav", false)).toBe(MOTION_NAV_MS)
         expect(swipeSettleDurationMs("bounce", false)).toBe(MOTION_SETTLE_MS)
-        expect(swipeSettleDurationMs("nav", true)).toBe(0)
-        expect(swipeSettleDurationMs("bounce", true)).toBe(0)
+        expect(swipeSettleDurationMs("nav", true)).toBe(MOTION_NAV_MS)
+        expect(swipeSettleDurationMs("bounce", true)).toBe(MOTION_SETTLE_MS)
     })
 })
 
