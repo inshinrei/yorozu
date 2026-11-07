@@ -408,8 +408,7 @@ html.yorozu-media-ghost-handoff [data-yorozu-media-viewport] {
     [data-yorozu-media-chrome],
     [data-yorozu-media-filmstrip-clip],
     [data-yorozu-media-backdrop],
-    [data-yorozu-media-viewer],
-    [data-yorozu-media-thumb] {
+    [data-yorozu-media-viewer] {
         transition: none;
     }
 }

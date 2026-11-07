@@ -48,7 +48,6 @@ export function createFilmstripDom(opts: {
     swipe: MediaSwipe
     decodePort: MediaDecodePort
     isDetached: () => boolean
-    reducedMotion: () => boolean
     emitVisible: () => void
     openPhase: () => "opening" | "open" | "closing" | null
 }): AttachFilmstripDom {
@@ -882,7 +881,7 @@ export function createFilmstripDom(opts: {
             stampFilmstripGeometry(snap)
             if (filmstripMorph(snap).live) return
             if (!shouldCenter) return
-            let instant = opts.reducedMotion() || createdThisPaint || opts.openPhase() !== "open"
+            let instant = createdThisPaint || opts.openPhase() !== "open"
             let behavior: ScrollBehavior = instant ? "instant" : "smooth"
             centerCurrentThumb(behavior)
             void dualRaf().then(() => {

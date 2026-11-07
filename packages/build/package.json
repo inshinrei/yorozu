@@ -1,7 +1,7 @@
 {
   "name": "@yorozu/build",
   "type": "module",
-  "version": "1.0.156",
+  "version": "1.0.157",
   "license": "MIT",
   "author": "inshinrei",
   "description": "build and release utilities for yorozu packages",

@@ -366,14 +366,18 @@ describe("default media viewer styles", () => {
         expect(css).toContain("--yorozu-media-slide-gap: 40px")
     })
 
-    it("reduced-motion chrome snaps filmstrip thumbs", () => {
+    it("reduced-motion chrome snaps without killing thumb transitions", () => {
         let css = readFileSync(join(here, "default.css"), "utf8")
         let chromeReduce =
             [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/g)]
                 .map((match) => match[0])
                 .find((block) => block.includes("[data-yorozu-media-header]")) ?? ""
         expect(chromeReduce).toContain("@media (prefers-reduced-motion: reduce)")
-        expect(chromeReduce).toContain("[data-yorozu-media-thumb]")
+        expect(chromeReduce).toContain("[data-yorozu-media-header]")
+        expect(chromeReduce).toContain("[data-yorozu-media-backdrop]")
+        expect(chromeReduce).not.toContain("[data-yorozu-media-thumb]")
+        expect(css).toContain("[data-yorozu-media-strip][data-switch]")
+        expect(css).toContain("animation: none")
     })
 
     it("does not pad the viewport the absolute strip overlays; pads a descendant the strip lays out", () => {

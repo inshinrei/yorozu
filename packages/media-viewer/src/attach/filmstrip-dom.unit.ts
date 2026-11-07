@@ -9,6 +9,7 @@ import {
     filmstripGapAfter,
     filmstripThumbPitchPx,
 } from "../filmstrip"
+import { MEDIA_SWIPE_SETTLE_MS } from "../swipe"
 import type { MediaViewerChromeApi } from "../types"
 import {
     DecodeFn,
@@ -220,7 +221,7 @@ describe("attachMediaViewer", () => {
         expect(scrollArgs.at(-1)!.behavior).toBe("smooth")
     })
 
-    it("centers with instant behavior when reduced motion is on", () => {
+    it("centers with smooth behavior when reduced motion is on after open", () => {
         stop?.()
         stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
         let scrollTo = vi.fn()
@@ -238,9 +239,9 @@ describe("attachMediaViewer", () => {
         }
         HTMLElement.prototype.getBoundingClientRect = () => layoutBox as DOMRect
         viewer.open({ items: [img("a"), img("b"), img("c")], index: 1 })
-        expect(scrollTo).toHaveBeenCalledWith(
-            expect.objectContaining({ behavior: "instant", left: expect.any(Number) }),
-        )
+        scrollTo.mockClear()
+        viewer.goTo(2)
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth", left: expect.any(Number) }))
     })
 
     it("centers current thumb from strip scrollLeft plus layout rect mid delta", () => {
@@ -1096,7 +1097,29 @@ describe("attachMediaViewer", () => {
         expect(Number.parseFloat(incoming.style.width)).toBeGreaterThan(Number.parseFloat(restIncoming || "44"))
     })
 
-    it("reduced-motion commit lands rest scrollLeft not leftover pair-center", () => {
+    it("reduced-motion live swipe fattens incoming thumb before index changes", () => {
+        vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
+        stop?.()
+        stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
+        viewer.open({
+            items: [imgAspect("a", 16, 9), imgAspect("b", 1, 1), imgAspect("c", 16, 9)],
+            index: 1,
+        })
+        let viewport = root.querySelector("[data-yorozu-media-viewport]") as HTMLElement
+        mockViewportBox(viewport, 160, 600)
+        let incoming = [...root.querySelectorAll("[data-yorozu-media-thumb]")].find(
+            (el) => el.getAttribute("data-index") === "2",
+        ) as HTMLElement
+        expect(incoming).toBeTruthy()
+        let restIncoming = incoming.style.width
+        viewport.dispatchEvent(pointer("pointerdown", { clientX: 400, clientY: 200 }))
+        viewport.dispatchEvent(pointer("pointermove", { clientX: 300, clientY: 200 }))
+        flushLiveRaf()
+        expect(viewer.snapshot().index).toBe(1)
+        expect(Number.parseFloat(incoming.style.width)).toBeGreaterThan(Number.parseFloat(restIncoming || "44"))
+    })
+
+    it("reduced-motion commit lands rest scrollLeft not leftover pair-center", async () => {
         vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] })
         stop?.()
         stop = attachMediaViewer(viewer, root, { prefersReducedMotion: () => true })
@@ -1153,7 +1176,7 @@ describe("attachMediaViewer", () => {
             endPad,
         })
         expect(leftoverLeft).not.toBe(restLeft)
-        flushLiveRaf()
+        await vi.advanceTimersByTimeAsync(MEDIA_SWIPE_SETTLE_MS + 48)
         flushLiveRaf()
         expect(viewer.snapshot().index).toBe(2)
         expect(nav.scrollLeft).toBe(restLeft)

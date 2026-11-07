@@ -151,7 +151,6 @@ export function attachMediaViewer(viewer: MediaViewer, root: HTMLElement, opts?:
         swipe,
         decodePort,
         isDetached: (): boolean => detached,
-        reducedMotion,
         emitVisible,
         openPhase: (): "opening" | "open" | "closing" | null => shell?.openPhase() ?? null,
     })
