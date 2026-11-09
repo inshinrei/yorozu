@@ -1,5 +1,4 @@
 import type { WorkspacePackage } from "../../package-json/collect-package-jsons"
-import type { BumpVersionResult } from "../../versioning/bump-version"
 import { readFile } from "node:fs/promises"
 import { basename } from "node:path"
 import process from "node:process"
@@ -14,18 +13,13 @@ import { exec, ExecError } from "../../misc/exec"
 import { sortWorkspaceByPublishOrder } from "../../misc/publish-order"
 import { collectPackageJsons, filterPackageJsonsForPublish } from "../../package-json/collect-package-jsons"
 import { findRootPackage } from "../../package-json/utils"
-import { bumpVersion } from "../../versioning/bump-version"
 import { generateChangelog } from "../../versioning/generate-changelog"
 import { info } from "../log"
 import { bc, loadConfig } from "./_utils"
-import { formatBumpVersionResult } from "./bump-version"
 import { publishPackages } from "./publish"
 
 function npmPublishList(workspace: Array<WorkspacePackage>): Array<WorkspacePackage> {
-    return filterPackageJsonsForPublish(
-        sortWorkspaceByPublishOrder(workspace.filter(pkg => !pkg.root)),
-        "npm",
-    )
+    return filterPackageJsonsForPublish(sortWorkspaceByPublishOrder(workspace.filter((pkg) => !pkg.root)), "npm")
 }
 
 function printPublishList(packages: Array<WorkspacePackage>): void {
@@ -39,12 +33,22 @@ function printPublishList(packages: Array<WorkspacePackage>): void {
     }
 }
 
-export function shouldSkipAutoRelease(params: {
-    kind: string
+export type ReleasePlan =
+    | { action: "skip"; message: string }
+    | { action: "release"; version: string; changelogKind: "initial" | "generate" }
+
+export function prepareRelease(params: {
     prevTag: string | null
+    currentVersion: string
     commitsSincePrevTag: ReadonlyArray<unknown>
-}): boolean {
-    return params.kind === "auto" && params.prevTag != null && params.commitsSincePrevTag.length === 0
+}): ReleasePlan {
+    if (params.prevTag == null) {
+        return { action: "release", version: params.currentVersion, changelogKind: "initial" }
+    }
+    if (params.commitsSincePrevTag.length === 0) {
+        return { action: "skip", message: `no commits since ${params.prevTag}, nothing to do` }
+    }
+    return { action: "release", version: params.currentVersion, changelogKind: "generate" }
 }
 
 async function nextDateTag(root: string): Promise<string> {
@@ -68,8 +72,6 @@ export let releaseCli = bc.command({
     name: "release",
     desc: "release packages",
     options: {
-        kind: bc.string("kind").desc("release kind").enum("major", "minor", "patch", "auto").default("auto"),
-
         withGithubRelease: bc
             .boolean("with-github-release")
             .desc(
@@ -85,7 +87,9 @@ export let releaseCli = bc.command({
         githubRepo: bc
             .string("github-repo")
             .desc("github repo to create a release for (defaults to GITHUB_REPOSITORY env var)"),
-        githubApiUrl: bc.string("github-api-url").desc("github api url to use for creating a release (for github-compatible apis)"),
+        githubApiUrl: bc
+            .string("github-api-url")
+            .desc("github api url to use for creating a release (for github-compatible apis)"),
 
         withJsr: bc.boolean("with-jsr").desc("whether to publish to jsr").default(false),
         jsrRegistry: bc.string("jsr-registry").desc("URL of the jsr registry to publish to"),
@@ -94,15 +98,19 @@ export let releaseCli = bc.command({
         jsrCreatePackages: bc.boolean("jsr-create-packages").desc("whether to create missing packages in jsr"),
 
         withNpm: bc.boolean("with-npm").desc("whether to publish to npm"),
-        npmToken: bc.string("npm-token").desc("npm token to use for publishing (passed via env and a temporary local .npmrc)"),
+        npmToken: bc
+            .string("npm-token")
+            .desc("npm token to use for publishing (passed via env and a temporary local .npmrc)"),
         npmPublishArgs: bc.string("npm-publish-args").desc("additional arguments to pass to `npm publish`"),
-        npmDistDir: bc.string("npm-dist-dir").desc("directory to publish to npm from, relative to package root (default: dist)"),
+        npmDistDir: bc
+            .string("npm-dist-dir")
+            .desc("directory to publish to npm from, relative to package root (default: dist)"),
         npmRegistry: bc.string("npm-registry").desc("URL of the npm registry to publish to"),
         noProvenance: bc.boolean("no-provenance").desc("version to NOT use provenance even when it should be possible"),
 
         dryRun: bc.boolean("dry-run").desc("whether to skip publishing and only print what is going to happen"),
     },
-    handler: async args => {
+    handler: async (args) => {
         let root = getWorkspaceRoot()
         let config = await loadConfig({
             workspaceRoot: root,
@@ -119,46 +127,34 @@ export let releaseCli = bc.command({
             info(`previous tag: ${prevTag}`)
         }
 
-        let bumpVersionResult: BumpVersionResult | undefined
-        let nextVersion: string
-        let changelog: string
-
-        if (prevTag == null) {
-            nextVersion = asNonNull(rootPackage.json.version)
-            changelog = "Initial release"
-        } else {
-            let commitsSincePrevTag = await getCommitsBetween({ since: prevTag, cwd: root })
-            if (shouldSkipAutoRelease({ kind: args.kind, prevTag, commitsSincePrevTag })) {
-                info(`no commits since ${prevTag}, nothing to do`)
-                process.exit(0)
-            }
-
-            bumpVersionResult = await bumpVersion({
-                workspace: workspaceWithRoot,
-                since: prevTag,
-                type: args.kind === "auto" ? undefined : args.kind,
-                all: true,
-                cwd: root,
-                params: config?.versioning,
-                dryRun: args.dryRun,
-                withRoot: true,
-            })
-
-            info(formatBumpVersionResult(bumpVersionResult, args.kind === "auto"))
-            nextVersion = bumpVersionResult.nextVersion
-            changelog = await generateChangelog({
-                workspace: bumpVersionResult.changedPackages.map(pkg => pkg.package),
-                cwd: root,
-                since: prevTag,
-                params: config?.versioning,
-            })
+        let currentVersion = asNonNull(rootPackage.json.version)
+        let commitsSincePrevTag = prevTag == null ? [] : await getCommitsBetween({ since: prevTag, cwd: root })
+        let plan = prepareRelease({
+            prevTag,
+            currentVersion,
+            commitsSincePrevTag,
+        })
+        if (plan.action === "skip") {
+            info(plan.message)
+            process.exit(0)
         }
+
+        let version = plan.version
+        let changelog =
+            plan.changelogKind === "initial"
+                ? "Initial release"
+                : await generateChangelog({
+                      workspace: workspaceWithRoot,
+                      cwd: root,
+                      since: asNonNull(prevTag),
+                      params: config?.versioning,
+                  })
 
         let taggingSchema = config?.versioning?.taggingSchema ?? "semver"
         let tagName: string
 
         if (prevTag == null || taggingSchema === "semver") {
-            tagName = `v${nextVersion}`
+            tagName = `v${version}`
             if (await gitTagExists(tagName, root)) {
                 throw new Error(
                     `tag ${tagName} already exists. did the previous release complete successfully? if so, please verify versions in package.json and try again`,
@@ -170,7 +166,7 @@ export let releaseCli = bc.command({
             throw new Error(`Unknown tagging schema: ${String(taggingSchema)}`)
         }
 
-        info(`next version: ${nextVersion}`)
+        info(`version: ${version}`)
         info(`next tag: ${tagName}`)
         info("--begin changelog--")
         info(changelog)
@@ -180,7 +176,7 @@ export let releaseCli = bc.command({
         printPublishList(toPublish)
 
         if (isRunningInGithubActions()) {
-            writeGithubActionsOutput("version", nextVersion)
+            writeGithubActionsOutput("version", version)
             writeGithubActionsOutput("tag", tagName)
             writeGithubActionsOutput("changelog", changelog)
         }
@@ -316,7 +312,11 @@ export let releaseCli = bc.command({
                     } catch (err) {
                         if (!(err instanceof ExecError)) throw err
 
-                        if (err.result.stderr.includes(`cannot lock ref 'refs/tags/${tagName}': reference already exists`)) {
+                        if (
+                            err.result.stderr.includes(
+                                `cannot lock ref 'refs/tags/${tagName}': reference already exists`,
+                            )
+                        ) {
                             info(`tag ${tagName} already exists on ${origin}, skipping`)
                         } else {
                             throw err
@@ -349,7 +349,7 @@ export let releaseCli = bc.command({
                     name: tagName,
                     body: changelog,
                     apiUrl: args.githubApiUrl,
-                    artifacts: await parallelMap(tarballs, async file => ({
+                    artifacts: await parallelMap(tarballs, async (file) => ({
                         name: basename(file),
                         type: "application/gzip",
                         body: new Uint8Array(await readFile(file)),

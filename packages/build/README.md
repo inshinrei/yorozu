@@ -9,11 +9,11 @@ The root `package.json` `version` is the source of truth for every managed packa
 ```sh
 pnpm build          # build every npm-publishable package (including standalone)
 pnpm lint:workspace # workspace: protocol, external version alignment, prefer protected over private/#
-pnpm release:dry    # print next version, changelog, and publish list
-pnpm release        # bump, build, publish to npm, commit, and tag
+pnpm release:dry    # print current version, changelog, and publish list
+pnpm release        # build, publish to npm, commit, and tag
 ```
 
-`pnpm release` is `yorozu-build release --with-npm`. First release (no git tag yet) does **not** bump: it publishes the current root version (`0.1.0`) and tags `v0.1.0`. Later releases bump the root version and rewrite every managed package to match.
+`pnpm release` is `yorozu-build release --with-npm`. It publishes the current root version already in `package.json` (lockstep packages are bumped on `feat`/`fix`/`perf`/`revert` commits via `bump-version`). First release (no git tag yet) publishes that version and tags `vX.Y.Z`. Later releases publish the current version and generate a changelog since the previous tag.
 
 ### Standalone packages
 

@@ -13,7 +13,7 @@ by **+1**, in **the same commit** as the code change. Do not leave a follow-up `
 
 Do **not** bump on `docs`, `test`, `chore`, `ci`, `style`, or `refactor`.
 
-Do **not** bump standalone packages. Do not publish from a bump-only thought; publishing stays `pnpm release`.
+Do **not** bump standalone packages. Do not publish from a bump-only thought; publishing stays `pnpm release`. `pnpm release` publishes the versions already in `package.json`.
 
 `feat` is still a patch here (not minor). Use `pnpm exec tsx packages/build/src/cli/main.ts bump-version --type minor|major` only when the human explicitly wants a minor/major cut.
 
